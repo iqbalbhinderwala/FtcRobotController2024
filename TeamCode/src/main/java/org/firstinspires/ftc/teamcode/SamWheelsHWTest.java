@@ -108,10 +108,10 @@ public class SamWheelsHWTest extends LinearOpMode {
         }
         // If forward is inverted
         else {
-            leftFrontDrive  = hardwareMap.get(DcMotor.class, "backright");
-            leftBackDrive   = hardwareMap.get(DcMotor.class, "frontright");
-            rightFrontDrive = hardwareMap.get(DcMotor.class, "backleft");
-            rightBackDrive  = hardwareMap.get(DcMotor.class, "frontleft");
+            leftFrontDrive  = hardwareMap.get(DcMotor.class, "motor 3");
+            leftBackDrive   = hardwareMap.get(DcMotor.class, "motor 4");
+            rightFrontDrive = hardwareMap.get(DcMotor.class, "motor 2");
+            rightBackDrive  = hardwareMap.get(DcMotor.class, "motor 1");
 
             leftFrontDrive .setDirection(DcMotor.Direction.FORWARD);
             leftBackDrive  .setDirection(DcMotor.Direction.REVERSE);
