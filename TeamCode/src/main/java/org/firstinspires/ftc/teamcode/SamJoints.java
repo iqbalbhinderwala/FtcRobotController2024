@@ -26,6 +26,7 @@ public class SamJoints {
     boolean isArmCalibrated = false;
     boolean isWristCalibrated = false;
 
+    private Pose activePreset = Pose.NONE;
 
     public SamJoints(LinearOpMode myOpMode) {
         opMode = myOpMode;
@@ -73,6 +74,13 @@ public class SamJoints {
         }
     }
 
+    public void stepActivePreset() {
+        // Terminate active preset if motors stopped
+        if (activePreset != Pose.NONE && !areMotorsBusy()) {
+            terminateActivePreset();
+        }
+    }
+
     public void addTelemetry(){
         opMode.telemetry.addData("Current position", "Base::%d, Arm::%d, Wrist::%d",
                 baseMotor.getCurrentPosition(), armMotor.getCurrentPosition(), wristMotor.getCurrentPosition());
@@ -84,6 +92,7 @@ public class SamJoints {
                 baseSensor.isPressed(), armSensor.isPressed(), wristSensor.isPressed());
         opMode.telemetry.addData("Calibrated", "Base::%b, Arm::%b, Wrist::%b",
                 isBaseCalibrated, isArmCalibrated, isWristCalibrated);
+        opMode.telemetry.addData("Active Preset Target", activePreset);
     }
 
     void setBaseMotorTargetPostion(int targetPos, double maxPower){
@@ -127,50 +136,102 @@ public class SamJoints {
     }
 
     public enum Pose {
+        NONE,
         PARKED,
-        GROUND,
+        PICK,
         DROP,
     }
 
-    public void goToPose(Pose pose)
+//    public void goToPose(Pose pose)
+//    {
+////        switch (pose) {
+////            case PARKED:
+////                goToPose(pose, BASE_POS_MIN, ARM_POS_SENSOR, WRIST_POS_PARKED);
+////                break;
+////            case GROUND:
+////                goToPose(pose, BASE_POS_MIN, ARM_POS_GROUND, WRIST_POS_GROUND);
+////                break;
+////            case DROP:
+////                goToPose(pose, BASE_POS_DROP, ARM_POS_DROP, WRIST_POS_DROP);
+////                break;
+////        }
+//    }
+
+    public void activatePreset(Pose pose)
     {
-//        switch (pose) {
-//            case PARKED:
-//                goToPose(pose, BASE_POS_MIN, ARM_POS_SENSOR, WRIST_POS_PARKED);
-//                break;
-//            case GROUND:
-//                goToPose(pose, BASE_POS_MIN, ARM_POS_GROUND, WRIST_POS_GROUND);
-//                break;
-//            case DROP:
-//                goToPose(pose, BASE_POS_DROP, ARM_POS_DROP, WRIST_POS_DROP);
-//                break;
-//        }
+        switch (pose) {
+            case NONE:
+                terminateActivePreset();
+                break;
+            case PARKED:
+                activatePose(pose, 0, 0, 0);
+                break;
+            case PICK:
+                //activatePose(pose, 7500, -2400, 5000);
+                break;
+            case DROP:
+                //activatePose(pose, 1400, -8000, 3000);
+                break;
+        }
     }
 
-    private void goToPose(Pose pose, int basePos, int armPose, int wristPos) {
-        if (isFullyCalibrated()) {
-            // Start the motors
-            startMotorTargetPosition(baseMotor,  basePos,  BASE_RUN_POWER);
-            startMotorTargetPosition(armMotor,   armPose,  ARM_RUN_POWER);
-            startMotorTargetPosition(wristMotor, wristPos, WRIST_RUN_POWER);
-            // Keep looping while we are still active, and motor is running.
-            while(opMode.opModeIsActive() && !opMode.gamepad2.b &&
-                    (baseMotor.isBusy() || armMotor.isBusy() || wristMotor.isBusy()))
-            {
-                if (opMode.gamepad1.dpad_up||opMode.gamepad1.dpad_down)
-                    break;
+    private void activatePose(Pose pose, int basePos, int armPose, int wristPos) {
+        if (!isFullyCalibrated() || pose == activePreset) {
+            return;
+        }
+        // Terminate previous active preset
+        terminateActivePreset();
+        // Set new active preset
+        activePreset = pose;
+        // Start the motors
+        startMotorTargetPosition(baseMotor,  basePos,  BASE_RUN_POWER);
+        startMotorTargetPosition(armMotor,   armPose,  ARM_RUN_POWER);
+        startMotorTargetPosition(wristMotor, wristPos, WRIST_RUN_POWER);
+    }
 
-                opMode.telemetry.addData("AUTO Strike a Pose ... ", pose);
-                opMode.telemetry.addData(">", "[Cancel] DPAD Up/Down");
-                opMode.telemetry.addLine("---------------------------");
-                addTelemetry();
-                opMode.telemetry.update();
-            }
+    public boolean isPresetActive() {
+        return activePreset != Pose.NONE;
+    }
+
+    public void terminateActivePreset() {
+        if (activePreset != Pose.NONE) {
             // Stop the motors
             stopMotor(baseMotor);
             stopMotor(armMotor);
             stopMotor(wristMotor);
+            // Reset active preset
+            activePreset = Pose.NONE;
         }
+    }
+
+//    private void goToPose(Pose pose, int basePos, int armPose, int wristPos) {
+//        if (isFullyCalibrated()) {
+//            // Start the motors
+//            startMotorTargetPosition(baseMotor,  basePos,  BASE_RUN_POWER);
+//            startMotorTargetPosition(armMotor,   armPose,  ARM_RUN_POWER);
+//            startMotorTargetPosition(wristMotor, wristPos, WRIST_RUN_POWER);
+//            // Keep looping while we are still active, and motor is running.
+//            while(opMode.opModeIsActive() && !opMode.gamepad2.b &&
+//                    (baseMotor.isBusy() || armMotor.isBusy() || wristMotor.isBusy()))
+//            {
+//                if (opMode.gamepad1.dpad_up||opMode.gamepad1.dpad_down)
+//                    break;
+//
+//                opMode.telemetry.addData("AUTO Strike a Pose ... ", pose);
+//                opMode.telemetry.addData(">", "[Cancel] DPAD Up/Down");
+//                opMode.telemetry.addLine("---------------------------");
+//                addTelemetry();
+//                opMode.telemetry.update();
+//            }
+//            // Stop the motors
+//            stopMotor(baseMotor);
+//            stopMotor(armMotor);
+//            stopMotor(wristMotor);
+//        }
+//    }
+
+    private boolean areMotorsBusy() {
+        return  baseMotor.isBusy() || armMotor.isBusy() || wristMotor.isBusy();
     }
 
     private void runMotorFromCurrent(DcMotor motor, int delta, double maxPower) {
@@ -439,7 +500,7 @@ public class SamJoints {
     final int    WRIST_POS_MAX        =  +8000; // MAX USER
     final int    WRIST_POS_MIN        =   +0; // MIN USER
 //    final int    WRIST_SENSOR_SPAN    =    ?;
-    final double WRIST_SEARCH_POWER   =    0.4;
+    final double WRIST_SEARCH_POWER   =    0.5;
     final double WRIST_RUN_POWER      =    0.8;
 
     static final int CYCLE_MS = 15;     // period of each cycle

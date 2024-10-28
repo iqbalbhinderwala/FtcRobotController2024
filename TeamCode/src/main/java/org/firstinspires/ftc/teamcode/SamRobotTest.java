@@ -48,35 +48,53 @@ public class SamRobotTest extends LinearOpMode {
 
         // Run until the end of the match (driver presses STOP)
         while (opModeIsActive()) {
-            // GAMEPAD 1 - Navigation
-
-            double drive  = -gamepad1.left_stick_y  * MAX_DRIVE_SPEED;
-            double strafe = -gamepad1.left_stick_x  * MAX_STRAFE_SPEED;
-            double turn   = -gamepad1.right_stick_x * MAX_TURN_SPEED;
+            // GAMEPAD 2 - Navigation
+            double drive  = -gamepad2.left_stick_y  * MAX_DRIVE_SPEED;
+            double strafe = -gamepad2.left_stick_x  * MAX_STRAFE_SPEED;
+            double turn   = -gamepad2.right_stick_x * MAX_TURN_SPEED;
             nav.moveRobot(drive, strafe, turn);
 
-            if (gamepad1.left_stick_button &&  lastPress.seconds() > BUTTON_DELAY) {
+            if (gamepad2.left_stick_button &&  lastPress.seconds() > BUTTON_DELAY) {
                 lastPress.reset();
                 nav.swapForwardDirection();
             }
 
-            // GAMEPAD 2 - ARM CONTROL
+            // GAMEPAD 1 - ARM CONTROL
 
             // Claw
-            if (gamepad2.left_bumper && lastLeftBumper.seconds() > BUTTON_DELAY) {
+            if (gamepad1.left_bumper && lastLeftBumper.seconds() > BUTTON_DELAY) {
                 lastLeftBumper.reset();
                 claw.toggle();
             }
 
-            // Individual joint control
-            double basePower   = -gamepad2.left_stick_y;  // Note: pushing stick forward gives negative stick_y value
-            double armPower    = -gamepad2.right_stick_y; // Note: pushing stick forward gives negative stick_y value
-            double wristPower  = (-gamepad2.left_trigger + gamepad2.right_trigger);
-            joints.actuate(basePower, armPower, wristPower);
-
+            // Attempt joints calibration
             if (!joints.isFullyCalibrated())
             {
                 joints.tryResetEncoders();
+            }
+
+            // Presets
+            if (gamepad1.b) {
+                joints.terminateActivePreset();
+            // } else if (gamepad2.dpad_left) {
+            //     joints.activatePreset(SamJoints.Pose.PICK);
+            // } else if (gamepad2.dpad_right) {
+            //     joints.activatePreset(SamJoints.Pose.DROP);
+            } else if (gamepad1.back) {
+                joints.activatePreset(SamJoints.Pose.PARKED);
+            } else {
+                joints.stepActivePreset();
+            }
+
+            // Individual joint control
+            double basePower   = -gamepad1.left_stick_y;  // Note: pushing stick forward gives negative stick_y value
+            double armPower    = -gamepad1.right_stick_y; // Note: pushing stick forward gives negative stick_y value
+            double wristPower  = (-gamepad1.left_trigger + gamepad1.right_trigger);
+            if (Math.abs(basePower)>0 || Math.abs(armPower)>0 || Math.abs(wristPower)>0) {
+                joints.terminateActivePreset();
+            }
+            if (!joints.isPresetActive()) {
+                joints.actuate(basePower, armPower, wristPower);
             }
 
             // Show the elapsed game time.
@@ -84,6 +102,9 @@ public class SamRobotTest extends LinearOpMode {
             joints.addTelemetry();
             if (joints.isFullyCalibrated()) {
                 telemetry.addData("#", "*** FULLY CALIBRATED ***");
+                telemetry.addData(">", "Parked Pose: BACK");
+                // telemetry.addData(">", "Pick Pose: DPAD_LEFT");
+                // telemetry.addData(">", "Drop Pose: DPAD_RIGHT");
             }
             telemetry.update();
         }
