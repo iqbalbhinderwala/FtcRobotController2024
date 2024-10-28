@@ -4,9 +4,9 @@ import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 import com.qualcomm.robotcore.util.ElapsedTime;
 
-@TeleOp(name="[Sam] Robot Test", group="Sam")
+@TeleOp(name="[Sam] ***** MAIN TELEOP *****", group="Sam")
 //@Disabled
-public class SamRobotTest extends LinearOpMode {
+public class SamMainTeleop extends LinearOpMode {
 
     // Declare OpMode members.
     private ElapsedTime runtime = new ElapsedTime();
