@@ -45,6 +45,6 @@ public class SamClaw {
         return diff1 <= diff2;
     }
 
-    final double OPEN_POS   = 0.10;
-    final double CLOSED_POS = 0.35;
+    final double OPEN_POS   = 0.15;
+    final double CLOSED_POS = 0.0;
 }
