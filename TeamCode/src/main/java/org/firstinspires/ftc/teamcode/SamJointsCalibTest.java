@@ -47,9 +47,6 @@ public class SamJointsCalibTest extends LinearOpMode {
             joints.addTelemetry();
             if (joints.isFullyCalibrated()) {
                 telemetry.addData("#", "*** FULLY CALIBRATED ***");
-                telemetry.addData(">", "Parked Pose: BACK");
-                telemetry.addData(">", "Ground Pose: DPAD_LEFT");
-                telemetry.addData(">", "BackDrop Pose: DPAD_RIGHT");
             }
             telemetry.update();
         }

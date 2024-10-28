@@ -106,10 +106,6 @@ public class SamJointsHWTest extends LinearOpMode {
             double armPower    = -gamepad1.right_stick_y * 0.5; // Note: pushing stick forward gives negative stick_y value
             double wristPower  = (-gamepad1.left_trigger + gamepad1.right_trigger) * 0.5; // TODO: CALIBRATE MAX POWER FOR BASE
 
-            boolean baseSensorState = baseSensor.isPressed();
-            boolean armSensorState = armSensor.isPressed();
-            boolean wristSensorState = wristSensor.isPressed();
-
             baseMotor.setPower(basePower);
             armMotor.setPower(armPower);
             wristMotor.setPower(wristPower);
@@ -145,13 +141,16 @@ public class SamJointsHWTest extends LinearOpMode {
                 claw.setPosition(claw.getPosition()-0.02);
             }
 
+            telemetry.addData(">", "Y: Try reset encoders");
+            telemetry.addData(">", "    DPad Up/Down: Adjust Claw");
+
             telemetry.addData("BASE ", "Pos=%d  Pwr=%.1f\tSense=%.1f", baseMotor.getCurrentPosition(),  baseMotor.getPower(),  baseSensor.getValue());
             telemetry.addData("ARM  ", "Pos=%d  Pwr=%.1f\tSense=%.1f", armMotor.getCurrentPosition(),   armMotor.getPower(),   armSensor.getValue());
             telemetry.addData("WRIST", "Pos=%d  Pwr=%.1f\tSense=%.1f", wristMotor.getCurrentPosition(), wristMotor.getPower(), wristSensor.getValue());
             telemetry.addData("CLAW ", "Pos=%.2f", claw.getPosition());
-            telemetry.addData("Sensor (Base)",  baseSensorState);
-            telemetry.addData("Sensor (Arm)",   armSensorState);
-            telemetry.addData("Sensor (Wrist)", wristSensorState);
+            telemetry.addData("Sensor (Base)",  baseSensor.isPressed());
+            telemetry.addData("Sensor (Arm)",   armSensor.isPressed());
+            telemetry.addData("Sensor (Wrist)", wristSensor.isPressed());
             telemetry.addData("Base Calibrated",    isBaseCalibrated);
             telemetry.addData("Arm Calibrated",     isArmCalibrated);
             telemetry.addData("Wrist Calibrated",   isWristCalibrated);
