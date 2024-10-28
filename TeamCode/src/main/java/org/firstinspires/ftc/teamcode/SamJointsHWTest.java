@@ -144,12 +144,6 @@ public class SamJointsHWTest extends LinearOpMode {
                 lastPress.reset();
                 claw.setPosition(claw.getPosition()-0.02);
             }
-            if(gamepad1.right_bumper){
-                claw.setPosition(0.1); // open
-            }
-            if(gamepad1.left_bumper){
-                claw.setPosition(0.35); // closed
-            }
 
             telemetry.addData("BASE ", "Pos=%d  Pwr=%.1f\tSense=%.1f", baseMotor.getCurrentPosition(),  baseMotor.getPower(),  baseSensor.getValue());
             telemetry.addData("ARM  ", "Pos=%d  Pwr=%.1f\tSense=%.1f", armMotor.getCurrentPosition(),   armMotor.getPower(),   armSensor.getValue());
