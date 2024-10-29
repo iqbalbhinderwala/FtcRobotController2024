@@ -139,6 +139,7 @@ public class SamJoints {
         NONE,
         PARKED,
         ARENA,
+        HIGHBAR,
     }
 
     public void activatePreset(Pose pose)
@@ -152,6 +153,9 @@ public class SamJoints {
                 break;
             case ARENA:
                 activatePose(pose, 7400, 2000, 750);
+                break;
+            case HIGHBAR:
+                activatePose(pose, 4300, 6700, 3800);
                 break;
         }
     }

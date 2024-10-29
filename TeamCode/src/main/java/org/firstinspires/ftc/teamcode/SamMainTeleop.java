@@ -78,6 +78,8 @@ public class SamMainTeleop extends LinearOpMode {
                 joints.terminateActivePreset();
             } else if (gamepad1.dpad_down) {
                 joints.activatePreset(SamJoints.Pose.ARENA);
+            } else if (gamepad1.dpad_up) {
+                joints.activatePreset(SamJoints.Pose.HIGHBAR);
             } else if (gamepad1.back) {
                 joints.activatePreset(SamJoints.Pose.PARKED);
             } else {
@@ -102,6 +104,7 @@ public class SamMainTeleop extends LinearOpMode {
                 telemetry.addData("#", "*** FULLY CALIBRATED ***");
                 telemetry.addData(">", "Parked Pose: BACK");
                 telemetry.addData(">", "Arena Pose: DPAD_DOWN");
+                telemetry.addData(">", "Highbar Pose: DPAD_UP");
             }
             telemetry.update();
         }
