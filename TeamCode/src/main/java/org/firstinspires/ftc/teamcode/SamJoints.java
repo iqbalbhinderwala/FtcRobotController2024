@@ -138,24 +138,8 @@ public class SamJoints {
     public enum Pose {
         NONE,
         PARKED,
-        PICK,
-        DROP,
+        ARENA,
     }
-
-//    public void goToPose(Pose pose)
-//    {
-////        switch (pose) {
-////            case PARKED:
-////                goToPose(pose, BASE_POS_MIN, ARM_POS_SENSOR, WRIST_POS_PARKED);
-////                break;
-////            case GROUND:
-////                goToPose(pose, BASE_POS_MIN, ARM_POS_GROUND, WRIST_POS_GROUND);
-////                break;
-////            case DROP:
-////                goToPose(pose, BASE_POS_DROP, ARM_POS_DROP, WRIST_POS_DROP);
-////                break;
-////        }
-//    }
 
     public void activatePreset(Pose pose)
     {
@@ -166,11 +150,8 @@ public class SamJoints {
             case PARKED:
                 activatePose(pose, 0, 0, 0);
                 break;
-            case PICK:
-                //activatePose(pose, 7500, -2400, 5000);
-                break;
-            case DROP:
-                //activatePose(pose, 1400, -8000, 3000);
+            case ARENA:
+                activatePose(pose, 7400, 2000, 750);
                 break;
         }
     }
