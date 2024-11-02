@@ -73,9 +73,9 @@ public class SamJointsHWTest extends LinearOpMode {
         armMotor.setDirection(DcMotorSimple.Direction.REVERSE);
         wristMotor.setDirection(DcMotorSimple.Direction.REVERSE);
 
-        baseSensor = hardwareMap.get(TouchSensor.class, "sensor 6");
-        armSensor = hardwareMap.get(TouchSensor.class, "sensor 5");
-        wristSensor = hardwareMap.get(TouchSensor.class, "sensor 8");
+        baseSensor  = hardwareMap.get(TouchSensor.class, "base sensor");
+        armSensor   = hardwareMap.get(TouchSensor.class, "arm sensor");
+        wristSensor = hardwareMap.get(TouchSensor.class, "wrist sensor");
 
         claw = hardwareMap.get(Servo.class,"servo 0");
 

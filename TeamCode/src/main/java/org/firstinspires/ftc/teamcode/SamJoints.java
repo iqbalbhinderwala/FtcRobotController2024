@@ -46,9 +46,9 @@ public class SamJoints {
         armMotor.setDirection(DcMotorSimple.Direction.REVERSE);
         wristMotor.setDirection(DcMotorSimple.Direction.REVERSE);
 
-        baseSensor  = opMode.hardwareMap.get(TouchSensor.class, "sensor 6");
-        armSensor   = opMode.hardwareMap.get(TouchSensor.class, "sensor 5");
-        wristSensor = opMode.hardwareMap.get(TouchSensor.class, "sensor 8");
+        baseSensor  = opMode.hardwareMap.get(TouchSensor.class, "base sensor");
+        armSensor   = opMode.hardwareMap.get(TouchSensor.class, "arm sensor");
+        wristSensor = opMode.hardwareMap.get(TouchSensor.class, "wrist sensor");
 
         // We do not automatically reset the encoders in case they are already calibrated
         // relative to the reference position given by the optical sensors.
@@ -124,8 +124,8 @@ public class SamJoints {
         double maxArmPower   = isArmCalibrated   ? ARM_RUN_POWER   : ARM_SEARCH_POWER;
         double maxWristPower = isWristCalibrated ? WRIST_RUN_POWER : WRIST_SEARCH_POWER;
 
-        baseMotor .setPower(Range.clip(basePower , -maxBasePower,  maxBasePower));
-        armMotor  .setPower(Range.clip(armPower  , -maxArmPower,   maxArmPower));
+        baseMotor.setPower(Range.clip(basePower, -maxBasePower, maxBasePower));
+        armMotor.setPower(Range.clip(armPower, -maxArmPower, maxArmPower));
         wristMotor.setPower(Range.clip(wristPower, -maxWristPower, maxWristPower));
     }
 
@@ -152,10 +152,10 @@ public class SamJoints {
                 activatePose(pose, 0, 0, 0);
                 break;
             case ARENA:
-                activatePose(pose, 7400, 2000, 750);
-                break;
+                activatePose(pose, 7750, 1600, 0);
+                  break;
             case HIGHBAR:
-                activatePose(pose, 4300, 6700, 3800);
+                activatePose(pose, 3875, 8175, 5251);
                 break;
         }
     }
@@ -169,9 +169,9 @@ public class SamJoints {
         // Set new active preset
         activePreset = pose;
         // Start the motors
+        startMotorTargetPosition(wristMotor, wristPos, WRIST_RUN_POWER);
         startMotorTargetPosition(baseMotor,  basePos,  BASE_RUN_POWER);
         startMotorTargetPosition(armMotor,   armPose,  ARM_RUN_POWER);
-        startMotorTargetPosition(wristMotor, wristPos, WRIST_RUN_POWER);
     }
 
     public boolean isPresetActive() {
@@ -467,26 +467,26 @@ public class SamJoints {
     }
 
     // BASE MOTOR
-    final int    BASE_POS_MAX         = +8000; // MAX USER
+    final int    BASE_POS_MAX         = +7750; // MAX USER
     final int    BASE_POS_MIN         =    +0; // MIN USER
     //    final int    BASE_SENSOR_SPAN     =   700;
     final double BASE_SEARCH_POWER    =   0.5;
-    final double BASE_RUN_POWER       =   0.8;
+    final double BASE_RUN_POWER       =   1.0;
 
     // ARM MOTOR
-    final int    ARM_POS_MAX          = +8000; // MAX USER
+    final int    ARM_POS_MAX          = +8300; // MAX USER
     final int    ARM_POS_MIN          =    +0; // MIN USER
 
     //    final int    ARM_SENSOR_SPAN      =   450;
     final double ARM_SEARCH_POWER     =   0.5;
-    final double ARM_RUN_POWER        =   0.8;
+    final double ARM_RUN_POWER        =   1.0;
 
     // WRIST MOTOR
     final int    WRIST_POS_MAX        =  +8000; // MAX USER
     final int    WRIST_POS_MIN        =   +0; // MIN USER
 //    final int    WRIST_SENSOR_SPAN    =    ?;
     final double WRIST_SEARCH_POWER   =    0.5;
-    final double WRIST_RUN_POWER      =    0.8;
+    final double WRIST_RUN_POWER      =    1.0;
 
     static final int CYCLE_MS = 15;     // period of each cycle
 
