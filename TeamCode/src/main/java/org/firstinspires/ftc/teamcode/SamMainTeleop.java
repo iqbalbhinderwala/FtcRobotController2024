@@ -54,11 +54,6 @@ public class SamMainTeleop extends LinearOpMode {
             double turn   = -gamepad2.right_stick_x * MAX_TURN_SPEED;
             nav.moveRobot(drive, strafe, turn);
 
-            if (gamepad2.left_stick_button &&  lastPress.seconds() > BUTTON_DELAY) {
-                lastPress.reset();
-                nav.swapForwardDirection();
-            }
-
             // GAMEPAD 1 - ARM CONTROL
 
             // Claw
