@@ -85,6 +85,8 @@ public class SamJoints {
                 baseSensor.isPressed(), armSensor.isPressed(), wristSensor.isPressed());
         opMode.telemetry.addData("Calibrated", "Base::%b, Arm::%b, Wrist::%b",
                 isBaseCalibrated, isArmCalibrated, isWristCalibrated);
+        opMode.telemetry.addData("IsForward / Extended", "Base::%b, Arm::%b",
+                isBaseForward(), isArmExtended());
         opMode.telemetry.addData("Active Preset Target", activePreset);
     }
 
@@ -95,6 +97,14 @@ public class SamJoints {
         opMode.telemetry.addData("baseMotorTarget", targetPos);
         opMode.telemetry.addData("current base pos", baseMotor.getCurrentPosition());
 
+    }
+
+    private boolean isBaseForward() {
+            return isBaseCalibrated && (baseMotor.getCurrentPosition() > BASE_POS_FORWARD_MIN);
+    }
+
+    private boolean isArmExtended() {
+        return isArmCalibrated && (armMotor.getCurrentPosition() > ARM_POS_EXTENDED_MIN);
     }
 
     public void actuate(double basePower, double armPower, double wristPower) {
@@ -111,6 +121,14 @@ public class SamJoints {
         }
         if (isWristCalibrated) {
             wristPower = cutPowerIfMovingPastLimits(wristPower, wristPos, WRIST_POS_MIN, WRIST_POS_MAX);
+        }
+
+        // Limit Base Forward | Arm Extension
+        if (isBaseForward()) {
+            armPower = cutPowerIfMovingPastLimits(armPower, armPos, ARM_POS_MIN, ARM_POS_EXTENDED_MIN);
+        }
+        if (isArmExtended()) {
+            basePower = cutPowerIfMovingPastLimits(basePower, basePos, BASE_POS_MIN, BASE_POS_FORWARD_MIN);
         }
 
         double maxBasePower  = isBaseCalibrated  ? BASE_RUN_POWER  : BASE_SEARCH_POWER;
@@ -320,6 +338,7 @@ public class SamJoints {
         PARKED,
         ARENA,
         HIGHBAR,
+        TRANSITION,
     }
 
     public void activatePreset(Pose pose)
@@ -332,16 +351,22 @@ public class SamJoints {
                 activatePose(pose, 0, 0, 0);
                 break;
             case ARENA:
-                activatePose(pose, 7750, 1600, 0);
+                activatePose(pose, 7750, 1600, 3500);
                   break;
             case HIGHBAR:
                 activatePose(pose, 3875, 8175, 5251);
+                break;
+            case TRANSITION:
+                activatePose(pose, BASE_POS_FORWARD_MIN, ARM_POS_EXTENDED_MIN, 5000);
                 break;
         }
     }
 
     // BASE MOTOR
     final int    BASE_POS_MAX         = +7750; // MAX USER
+    final int    BASE_POS_FORWARD_MIN = +5300;
+//    final int    BASE_POS_VERTICAL    = +3200;
+
     final int    BASE_POS_MIN         =    +0; // MIN USER
     //    final int    BASE_SENSOR_SPAN     =   700;
     final double BASE_SEARCH_POWER    =   0.5;
@@ -349,6 +374,9 @@ public class SamJoints {
 
     // ARM MOTOR
     final int    ARM_POS_MAX          = +8300; // MAX USER
+//    final int    ARM_POS_EXTENDED_MAX = +6200;
+//    final int    ARM_POS_90DEG        = +3900;
+    final int    ARM_POS_EXTENDED_MIN = +1600;
     final int    ARM_POS_MIN          =    +0; // MIN USER
 
     //    final int    ARM_SENSOR_SPAN      =   450;
@@ -357,11 +385,10 @@ public class SamJoints {
 
     // WRIST MOTOR
     final int    WRIST_POS_MAX        =  +8000; // MAX USER
-    final int    WRIST_POS_MIN        =   +0; // MIN USER
+    final int    WRIST_POS_MIN        =     +0; // MIN USER
 //    final int    WRIST_SENSOR_SPAN    =    ?;
     final double WRIST_SEARCH_POWER   =    0.5;
     final double WRIST_RUN_POWER      =    1.0;
 
     static final int CYCLE_MS = 15;     // period of each cycle
-
 }
