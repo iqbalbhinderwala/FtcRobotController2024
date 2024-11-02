@@ -63,15 +63,8 @@ public class SamJoints {
     }
 
     // Start all hardware components.
-    public void start(boolean autoCalibrate){
-        if(!tryResetEncoders()) {
-//            if (autoCalibrate){
-//                calibrateArm();
-//                calibrateWrist();
-//            } else {
-//                calibrateEncodersInteractive(autoCalibrate);
-//            }
-        }
+    public void start(){
+        tryResetEncoders();
     }
 
     public void stepActivePreset() {
@@ -188,32 +181,6 @@ public class SamJoints {
             activePreset = Pose.NONE;
         }
     }
-
-//    private void goToPose(Pose pose, int basePos, int armPose, int wristPos) {
-//        if (isFullyCalibrated()) {
-//            // Start the motors
-//            startMotorTargetPosition(baseMotor,  basePos,  BASE_RUN_POWER);
-//            startMotorTargetPosition(armMotor,   armPose,  ARM_RUN_POWER);
-//            startMotorTargetPosition(wristMotor, wristPos, WRIST_RUN_POWER);
-//            // Keep looping while we are still active, and motor is running.
-//            while(opMode.opModeIsActive() && !opMode.gamepad2.b &&
-//                    (baseMotor.isBusy() || armMotor.isBusy() || wristMotor.isBusy()))
-//            {
-//                if (opMode.gamepad1.dpad_up||opMode.gamepad1.dpad_down)
-//                    break;
-//
-//                opMode.telemetry.addData("AUTO Strike a Pose ... ", pose);
-//                opMode.telemetry.addData(">", "[Cancel] DPAD Up/Down");
-//                opMode.telemetry.addLine("---------------------------");
-//                addTelemetry();
-//                opMode.telemetry.update();
-//            }
-//            // Stop the motors
-//            stopMotor(baseMotor);
-//            stopMotor(armMotor);
-//            stopMotor(wristMotor);
-//        }
-//    }
 
     private boolean areMotorsBusy() {
         return  baseMotor.isBusy() || armMotor.isBusy() || wristMotor.isBusy();
@@ -371,99 +338,6 @@ public class SamJoints {
             }
         }
         return (baseSensor.isPressed() && armSensor.isPressed() && wristSensor.isPressed());
-    }
-
-    private void calibrateEncodersInteractive(boolean autoCalibrate) {
-        boolean skipCal = false;
-        while(!isFullyCalibrated() && !skipCal) {
-            opMode.telemetry.addLine("---------------------------------------");
-            opMode.telemetry.addData("Calibrated", "Arm::%b, Wrist::%b",
-                    isArmCalibrated, isWristCalibrated);
-            opMode.telemetry.addLine("Start calibration?");
-            opMode.telemetry.addLine("\t A::[OK]\n\t B::[SKIP]\n\t X::[WRIST] \n\t Y::[ARM]");
-            opMode.telemetry.update();
-            while (opMode.opModeIsActive()) {
-                if (opMode.gamepad1.b) {
-                    skipCal = true;
-                    break;
-                }
-                if (opMode.gamepad1.a) {
-                    opMode.telemetry.addLine("Starting Full Calibration ...");
-                    opMode.telemetry.update();
-                    calibrateArm();
-                    calibrateWrist();
-                    break;
-                }
-                if (opMode.gamepad1.x) {
-                    opMode.telemetry.addLine("Starting Wrist Calibration ...");
-                    opMode.telemetry.update();
-                    calibrateWrist();
-                    break;
-                }
-                if (opMode.gamepad1.y) {
-                    opMode.telemetry.addLine("Starting Arm Calibration ...");
-                    opMode.telemetry.update();
-                    calibrateArm();
-                    break;
-                }
-            }
-        }
-        
-        // If successful, move back up to safe range since wrist reference position is below ground
-//        if (isFullyCalibrated()) {
-//            goToPose(Pose.GROUND);
-//        }
-    }
-
-    private void calibrateArm(){
-//        opMode.telemetry.addLine("Performing Arm calibration ...");
-//        // Arm Calibration
-//        if (!isArmCalibrated && !armSensor.isPressed()) {
-//            // 1. Search ARM up if starting from the MIN
-//            boolean ok = searchReferencePosition(armMotor, armSensor,
-//                    ARM_SENSOR_SPAN + ARM_POS_SENSOR - ARM_POS_MIN,
-//                    ARM_SEARCH_POWER,
-//                    4); // 1500 / sec
-//            if (!ok) {
-//                // 2. Raise WRIST first so it is not in the way of Arm Searching DOWN
-//                if (isWristCalibrated) {
-//                    runMotorToPosition(wristMotor, WRIST_POS_MAX, WRIST_RUN_POWER);
-//                } else {
-//                    // TODO: ...
-//                }
-//                // 2. Search DOWN for Arm
-//                searchReferencePosition(armMotor, armSensor,
-//                        ARM_POS_MIN - ARM_POS_MAX_DANGER,
-//                        ARM_SEARCH_POWER,
-//                        12); // 1500 / sec
-//            }
-//        }
-    }
-
-    private void calibrateWrist(){
-//        opMode.telemetry.addLine("Performing Wrist calibration ...");
-//
-//        // Wrist Calibration
-//        if (!isWristCalibrated && !wristSensor.isPressed()) {
-//            // 1. If WRIST not calibrated, move arm up to make room for claw calibration
-////            if(isArmCalibrated) {
-////                runMotorToPosition(armMotor, ARM_POS_WRIST_CAL, ARM_RUN_POWER);
-////            } else {
-////                runMotorFromCurrent(armMotor, ARM_POS_WRIST_CAL - ARM_POS_MIN, ARM_RUN_POWER);
-////            }
-//
-//            // Start the motor
-//            startMotorTargetPosition(baseMotor, 75, 0.5);
-//
-//            // 2. Search DOWN for wrist
-//            searchReferencePosition(wristMotor, wristSensor,
-//                    WRIST_POS_SENSOR - WRIST_POS_MAX_DANGER, // SEARCH DOWN -3500
-//                    WRIST_SEARCH_POWER,
-//                    4); // 1000/sec at 0.5 PWR
-//
-//            // Stop the motor
-//            stopMotor(baseMotor);
-//        }
     }
 
     // BASE MOTOR
