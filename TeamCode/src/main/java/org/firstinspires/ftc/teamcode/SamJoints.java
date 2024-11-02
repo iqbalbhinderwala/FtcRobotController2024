@@ -1,5 +1,6 @@
 package org.firstinspires.ftc.teamcode;
 
+import static java.lang.Math.abs;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.hardware.DcMotor;
 import com.qualcomm.robotcore.hardware.DcMotorSimple;
@@ -46,9 +47,9 @@ public class SamJoints {
         armMotor.setDirection(DcMotorSimple.Direction.REVERSE);
         wristMotor.setDirection(DcMotorSimple.Direction.REVERSE);
 
-        baseSensor  = opMode.hardwareMap.get(TouchSensor.class, "sensor 6");
-        armSensor   = opMode.hardwareMap.get(TouchSensor.class, "sensor 5");
-        wristSensor = opMode.hardwareMap.get(TouchSensor.class, "sensor 8");
+        baseSensor  = opMode.hardwareMap.get(TouchSensor.class, "base sensor");
+        armSensor   = opMode.hardwareMap.get(TouchSensor.class, "arm sensor");
+        wristSensor = opMode.hardwareMap.get(TouchSensor.class, "wrist sensor");
 
         // We do not automatically reset the encoders in case they are already calibrated
         // relative to the reference position given by the optical sensors.
@@ -71,13 +72,6 @@ public class SamJoints {
 //            } else {
 //                calibrateEncodersInteractive(autoCalibrate);
 //            }
-        }
-    }
-
-    public void stepActivePreset() {
-        // Terminate active preset if motors stopped
-        if (activePreset != Pose.NONE && !areMotorsBusy()) {
-            terminateActivePreset();
         }
     }
 
@@ -105,8 +99,8 @@ public class SamJoints {
     }
 
     public void actuate(double basePower, double armPower, double wristPower) {
-        int basePos  = baseMotor.getCurrentPosition();
-        int armPos   = armMotor.getCurrentPosition();
+        int basePos = baseMotor.getCurrentPosition();
+        int armPos = armMotor.getCurrentPosition();
         int wristPos = wristMotor.getCurrentPosition();
 
         // If moving past safe limits, cut the power
@@ -120,13 +114,26 @@ public class SamJoints {
             wristPower = cutPowerIfMovingPastLimits(wristPower, wristPos, WRIST_POS_MIN, WRIST_POS_MAX);
         }
 
-        double maxBasePower  = isBaseCalibrated  ? BASE_RUN_POWER  : BASE_SEARCH_POWER;
-        double maxArmPower   = isArmCalibrated   ? ARM_RUN_POWER   : ARM_SEARCH_POWER;
+        double maxBasePower = isBaseCalibrated ? BASE_RUN_POWER : BASE_SEARCH_POWER;
+        double maxArmPower = isArmCalibrated ? ARM_RUN_POWER : ARM_SEARCH_POWER;
         double maxWristPower = isWristCalibrated ? WRIST_RUN_POWER : WRIST_SEARCH_POWER;
 
-        baseMotor .setPower(Range.clip(basePower , -maxBasePower,  maxBasePower));
-        armMotor  .setPower(Range.clip(armPower  , -maxArmPower,   maxArmPower));
-        wristMotor.setPower(Range.clip(wristPower, -maxWristPower, maxWristPower));
+        if (basePower != 0) {
+            baseMotor.setPower(Range.clip(basePower, -maxBasePower, maxBasePower));
+        }
+        else {
+            baseMotor.setPower(0);
+        }
+        if (armPower != 0) {
+            armMotor.setPower(Range.clip(armPower, -maxArmPower, maxArmPower));
+        }else {
+            armMotor.setPower(0);
+        }
+        if (wristPower != 0){
+            wristMotor.setPower(Range.clip(wristPower, -maxWristPower, maxWristPower));
+        }else {
+            wristMotor.setPower(0);
+        }
     }
 
     private double cutPowerIfMovingPastLimits(double power, int pos, int minPos, int maxPos) {
@@ -152,10 +159,10 @@ public class SamJoints {
                 activatePose(pose, 0, 0, 0);
                 break;
             case ARENA:
-                activatePose(pose, 7400, 2000, 750);
-                break;
+                activatePose(pose, 7750, 1600, 0);
+                  break;
             case HIGHBAR:
-                activatePose(pose, 4300, 6700, 3800);
+                activatePose(pose, 3875, 8175, 5251);
                 break;
         }
     }
@@ -169,9 +176,9 @@ public class SamJoints {
         // Set new active preset
         activePreset = pose;
         // Start the motors
+        startMotorTargetPosition(wristMotor, wristPos, WRIST_RUN_POWER);
         startMotorTargetPosition(baseMotor,  basePos,  BASE_RUN_POWER);
         startMotorTargetPosition(armMotor,   armPose,  ARM_RUN_POWER);
-        startMotorTargetPosition(wristMotor, wristPos, WRIST_RUN_POWER);
     }
 
     public boolean isPresetActive() {
@@ -186,6 +193,14 @@ public class SamJoints {
             stopMotor(wristMotor);
             // Reset active preset
             activePreset = Pose.NONE;
+        }
+    }
+
+
+    public void stepActivePreset() {
+        // Terminate active preset if motors stopped
+        if (activePreset != Pose.NONE && !areMotorsBusy()) {
+            terminateActivePreset();
         }
     }
 
@@ -212,7 +227,7 @@ public class SamJoints {
 //            stopMotor(baseMotor);
 //            stopMotor(armMotor);
 //            stopMotor(wristMotor);
-//        }
+//        }D:\FtcRobotController2024\TeamCode\src\main\java\org\firstinspires\ftc\teamcode\SamJoints.java:176: error: unreported exception InterruptedException; must be caught or declared to be thrown
 //    }
 
     private boolean areMotorsBusy() {
@@ -467,26 +482,26 @@ public class SamJoints {
     }
 
     // BASE MOTOR
-    final int    BASE_POS_MAX         = +8000; // MAX USER
+    final int    BASE_POS_MAX         = +7750; // MAX USER
     final int    BASE_POS_MIN         =    +0; // MIN USER
     //    final int    BASE_SENSOR_SPAN     =   700;
     final double BASE_SEARCH_POWER    =   0.5;
-    final double BASE_RUN_POWER       =   0.8;
+    final double BASE_RUN_POWER       =   1.0;//0.8;
 
     // ARM MOTOR
-    final int    ARM_POS_MAX          = +8000; // MAX USER
+    final int    ARM_POS_MAX          = +8300; // MAX USER
     final int    ARM_POS_MIN          =    +0; // MIN USER
 
     //    final int    ARM_SENSOR_SPAN      =   450;
     final double ARM_SEARCH_POWER     =   0.5;
-    final double ARM_RUN_POWER        =   0.8;
+    final double ARM_RUN_POWER        =   1.0;//0.8;
 
     // WRIST MOTOR
     final int    WRIST_POS_MAX        =  +8000; // MAX USER
     final int    WRIST_POS_MIN        =   +0; // MIN USER
 //    final int    WRIST_SENSOR_SPAN    =    ?;
     final double WRIST_SEARCH_POWER   =    0.5;
-    final double WRIST_RUN_POWER      =    0.8;
+    final double WRIST_RUN_POWER      =    1.0;//0.8;
 
     static final int CYCLE_MS = 15;     // period of each cycle
 
