@@ -128,31 +128,6 @@ public class SamJoints {
         return power;
     }
 
-    public enum Pose {
-        NONE,
-        PARKED,
-        ARENA,
-        HIGHBAR,
-    }
-
-    public void activatePreset(Pose pose)
-    {
-        switch (pose) {
-            case NONE:
-                terminateActivePreset();
-                break;
-            case PARKED:
-                activatePose(pose, 0, 0, 0);
-                break;
-            case ARENA:
-                activatePose(pose, 7750, 1600, 0);
-                  break;
-            case HIGHBAR:
-                activatePose(pose, 3875, 8175, 5251);
-                break;
-        }
-    }
-
     private void activatePose(Pose pose, int basePos, int armPose, int wristPos) {
         if (!isFullyCalibrated() || pose == activePreset) {
             return;
@@ -338,6 +313,31 @@ public class SamJoints {
             }
         }
         return (baseSensor.isPressed() && armSensor.isPressed() && wristSensor.isPressed());
+    }
+
+    public enum Pose {
+        NONE,
+        PARKED,
+        ARENA,
+        HIGHBAR,
+    }
+
+    public void activatePreset(Pose pose)
+    {
+        switch (pose) {
+            case NONE:
+                terminateActivePreset();
+                break;
+            case PARKED:
+                activatePose(pose, 0, 0, 0);
+                break;
+            case ARENA:
+                activatePose(pose, 7750, 1600, 0);
+                  break;
+            case HIGHBAR:
+                activatePose(pose, 3875, 8175, 5251);
+                break;
+        }
     }
 
     // BASE MOTOR
