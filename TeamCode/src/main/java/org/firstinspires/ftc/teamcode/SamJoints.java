@@ -338,6 +338,7 @@ public class SamJoints {
         PARKED,
         ARENA,
         HIGHBAR,
+        LOWBAR,
         TRANSITION,
     }
 
@@ -354,7 +355,10 @@ public class SamJoints {
                 activatePose(pose, 7750, 1600, 3500);
                   break;
             case HIGHBAR:
-                activatePose(pose, 3875, 8175, 5251);
+                activatePose(pose, 4575, 8000, 8000);
+                break;
+            case LOWBAR:
+                activatePose(pose, 4500, 4000, 7000);
                 break;
             case TRANSITION:
                 activatePose(pose, BASE_POS_FORWARD_MIN, ARM_POS_EXTENDED_MIN, 5000);
@@ -384,7 +388,7 @@ public class SamJoints {
     final double ARM_RUN_POWER        =   1.0;
 
     // WRIST MOTOR
-    final int    WRIST_POS_MAX        =  +8000; // MAX USER
+    final int    WRIST_POS_MAX        =  +8500; // MAX USER
     final int    WRIST_POS_MIN        =     +0; // MIN USER
 //    final int    WRIST_SENSOR_SPAN    =    ?;
     final double WRIST_SEARCH_POWER   =    0.5;
