@@ -114,14 +114,14 @@ public class SamJoints {
         }
 
         // Limit Base Forward | Arm Extension
-        if (isBaseForward()) {
-            // If base is forward, restrict arm from extending
-            armPower = cutPowerIfMovingPastLimits(armPower, armPos, ARM_POS_MIN, ARM_POS_EXTENDED_MIN);
-        }
-        if (isArmExtended()) {
-            // If arm is extended, restrict base being forward
-            basePower = cutPowerIfMovingPastLimits(basePower, basePos, BASE_POS_MIN, BASE_POS_FORWARD_MIN);
-        }
+//        if (isBaseForward()) {
+//            // If base is forward, restrict arm from extending
+//            armPower = cutPowerIfMovingPastLimits(armPower, armPos, ARM_POS_MIN, ARM_POS_EXTENDED_MIN);
+//        }
+//        if (isArmExtended()) {
+//            // If arm is extended, restrict base being forward
+//            basePower = cutPowerIfMovingPastLimits(basePower, basePos, BASE_POS_MIN, BASE_POS_FORWARD_MIN);
+//        }
 
         double maxBasePower  = isBaseCalibrated  ? BASE_RUN_POWER  : BASE_SEARCH_POWER;
         double maxArmPower   = isArmCalibrated   ? ARM_RUN_POWER   : ARM_SEARCH_POWER;
@@ -240,7 +240,7 @@ public class SamJoints {
                 activatePose(pose, 0, 0, 0);
                 break;
             case ARENA:
-                activatePose(pose, 7750, 1600, 3500);
+                activatePose(pose, 7170, 2120, 3500);
                   break;
             case HIGHBAR:
                 activatePose(pose, 4575, 8000, 8000);
