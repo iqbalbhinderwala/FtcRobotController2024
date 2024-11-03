@@ -4,7 +4,6 @@ import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.hardware.DcMotor;
 import com.qualcomm.robotcore.hardware.DcMotorSimple;
 import com.qualcomm.robotcore.hardware.TouchSensor;
-import com.qualcomm.robotcore.util.ElapsedTime;
 import com.qualcomm.robotcore.util.Range;
 
 public class SamJoints {
@@ -90,15 +89,6 @@ public class SamJoints {
         opMode.telemetry.addData("Active Preset Target", activePreset);
     }
 
-    void setBaseMotorTargetPostion(int targetPos, double maxPower){
-        stopMotor(baseMotor);
-        startMotorTargetPosition(baseMotor, targetPos, maxPower);
-
-        opMode.telemetry.addData("baseMotorTarget", targetPos);
-        opMode.telemetry.addData("current base pos", baseMotor.getCurrentPosition());
-
-    }
-
     private boolean isBaseForward() {
             return isBaseCalibrated && (baseMotor.getCurrentPosition() > BASE_POS_FORWARD_MIN);
     }
@@ -125,9 +115,11 @@ public class SamJoints {
 
         // Limit Base Forward | Arm Extension
         if (isBaseForward()) {
+            // If base is forward, restrict arm from extending
             armPower = cutPowerIfMovingPastLimits(armPower, armPos, ARM_POS_MIN, ARM_POS_EXTENDED_MIN);
         }
         if (isArmExtended()) {
+            // If arm is extended, restrict base being forward
             basePower = cutPowerIfMovingPastLimits(basePower, basePos, BASE_POS_MIN, BASE_POS_FORWARD_MIN);
         }
 
@@ -179,22 +171,6 @@ public class SamJoints {
         return  baseMotor.isBusy() || armMotor.isBusy() || wristMotor.isBusy();
     }
 
-    private void runMotorFromCurrent(DcMotor motor, int delta, double maxPower) {
-        int targetPos = motor.getCurrentPosition() + delta;
-        runMotorToPosition(motor, targetPos, maxPower);
-    }
-
-    private void runMotorToPosition(DcMotor motor, int targetPos, double maxPower) {
-        // Start the motor
-        startMotorTargetPosition(motor, targetPos, maxPower);
-        // Keep looping while we are still active, and motor is running.
-        while(opMode.opModeIsActive() && motor.isBusy()) {
-            opMode.sleep(CYCLE_MS);
-        }
-        // Stop the motor
-        stopMotor(motor);
-    }
-
     private void startMotorTargetPosition(DcMotor motor, int targetPos, double maxPower) {
         // Set Target FIRST, then turn on RUN_TO_POSITION
         motor.setTargetPosition(targetPos);
@@ -211,94 +187,6 @@ public class SamJoints {
         motor.setTargetPosition(motor.getCurrentPosition());
         motor.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
         motor.setPower(0);
-    }
-
-    private boolean searchReferencePosition(
-            DcMotor motor,
-            TouchSensor sensor,
-            int searchDelta,        // search from current pos
-            double maxPower,        // 0..1
-            double timeout)         // seconds
-    {
-        if (sensor.isPressed()) // Already at reference position
-            return true;
-
-        // Determine new target position, and pass to motor controller
-        int startPos = motor.getCurrentPosition();
-        int targetPos = startPos + searchDelta;
-
-        int[] edgePos = new int[]{0, 0};
-        int edgeIndex = 0;
-        boolean edgeTarget = true; // First sensor value to look for
-
-        ElapsedTime searchTime = new ElapsedTime();
-        searchTime.reset();
-
-        // Set Target FIRST, then turn on RUN_TO_POSITION, with the required motor speed
-        startMotorTargetPosition(motor, targetPos, maxPower);
-
-        // Keep looping while we are still active, and motor is running.
-        while(opMode.opModeIsActive() && motor.isBusy()) {
-            int curPos = motor.getCurrentPosition();
-            boolean curState = sensor.isPressed();
-            double speed = (curPos - startPos) / searchTime.seconds();
-
-            // Sensor target
-            if (edgeIndex < 2 && curState == edgeTarget) { // Found an edge
-//                telemetry.addData(">", "%.1f @ %d = %b  SPD=%.1f/s @ %.2fPWR",
-//                        searchTime.seconds(), curPos, curState,
-//                        speed, motor.getPower());
-
-                edgePos[edgeIndex] = curPos;
-                opMode.telemetry.addData(">", "Goal Reached @%d = %b", edgePos[edgeIndex], edgeTarget);
-
-                // Invert target for the next edge
-                edgeTarget = !edgeTarget;
-                ++edgeIndex;
-
-                // Found both edges
-                if (edgeIndex == 2) {
-                    targetPos = (edgePos[0] + edgePos[1])/2;
-                    motor.setTargetPosition(targetPos);
-                    opMode.telemetry.addData(">", "HOLE SIDES @ [%d , %d] Width =  %d",
-                            edgePos[0], edgePos[1], Math.abs(edgePos[1]-edgePos[0]));
-                }
-            }
-            // Emergency Stop
-            if (opMode.gamepad1.b) {
-                opMode.telemetry.addLine("Emergency Stop");
-                speed = (motor.getCurrentPosition() - startPos) / searchTime.seconds();
-                opMode.telemetry.addData(">", "%.1f @ %d = %b  SPD=%.1f/s @ %.2fPWR",
-                        searchTime.seconds(), motor.getCurrentPosition(), sensor.isPressed(),
-                        speed, motor.getPower());
-                opMode.telemetry.addLine("PRESS DPAD_RIGHT TO CONTINUE");
-                opMode.telemetry.update();
-                while (opMode.opModeIsActive() && !opMode.gamepad1.dpad_right) opMode.sleep(100);
-                break;
-            }
-            // Timeout
-            if (searchTime.seconds() > timeout) {
-                opMode.telemetry.addData(">", "Timeout %.1f sec", searchTime.seconds());
-                break;
-            }
-        }
-
-        opMode.telemetry.addData(">", "%.1f sec, LOOP EXIT(opActive=%b motorBusy=%b)",
-                searchTime.seconds(), opMode.opModeIsActive(), motor.isBusy());
-        opMode.telemetry.addData("Power", "%.2f", motor.getPower());
-
-        stopMotor(motor);
-
-        boolean success = sensor.isPressed();
-        opMode.telemetry.addData("-------->", success ? "SUCCESS" : "SEARCH FAILED");
-        opMode.telemetry.addData(">DONE CALIB", "STARTED @%d  STOPPED @%d", startPos, motor.getCurrentPosition());
-//        telemetry.addLine("PRESS DPAD_RIGHT TO CONTINUE");
-//        telemetry.update(); while (!gamepad1.dpad_right) sleep(100);
-
-        if (success){
-            tryResetEncoders();
-        }
-        return success;
     }
 
     public boolean isFullyCalibrated() {
@@ -378,7 +266,6 @@ public class SamJoints {
 
     // ARM MOTOR
     final int    ARM_POS_MAX          = +8300; // MAX USER
-//    final int    ARM_POS_EXTENDED_MAX = +6200;
 //    final int    ARM_POS_90DEG        = +3900;
     final int    ARM_POS_EXTENDED_MIN = +1600;
     final int    ARM_POS_MIN          =    +0; // MIN USER
@@ -393,6 +280,4 @@ public class SamJoints {
 //    final int    WRIST_SENSOR_SPAN    =    ?;
     final double WRIST_SEARCH_POWER   =    0.5;
     final double WRIST_RUN_POWER      =    1.0;
-
-    static final int CYCLE_MS = 15;     // period of each cycle
 }
