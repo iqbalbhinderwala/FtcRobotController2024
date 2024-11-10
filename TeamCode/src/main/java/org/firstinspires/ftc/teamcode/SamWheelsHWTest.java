@@ -32,6 +32,7 @@ package org.firstinspires.ftc.teamcode;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 import com.qualcomm.robotcore.hardware.DcMotor;
+import com.qualcomm.robotcore.hardware.DcMotorSimple;
 import com.qualcomm.robotcore.util.ElapsedTime;
 import com.qualcomm.robotcore.util.Range;
 
@@ -108,10 +109,10 @@ public class SamWheelsHWTest extends LinearOpMode {
         }
         // If forward is inverted
         else {
-            leftFrontDrive  = hardwareMap.get(DcMotor.class, "motor 3");
-            leftBackDrive   = hardwareMap.get(DcMotor.class, "motor 4");
-            rightFrontDrive = hardwareMap.get(DcMotor.class, "motor 2");
-            rightBackDrive  = hardwareMap.get(DcMotor.class, "motor 1");
+            leftFrontDrive  = hardwareMap.get(DcMotor.class, "motor 1");
+            leftBackDrive   = hardwareMap.get(DcMotor.class, "motor 2");
+            rightFrontDrive = hardwareMap.get(DcMotor.class, "motor 4");
+            rightBackDrive  = hardwareMap.get(DcMotor.class, "motor 3");
 
             leftFrontDrive .setDirection(DcMotor.Direction.FORWARD);
             leftBackDrive  .setDirection(DcMotor.Direction.REVERSE);

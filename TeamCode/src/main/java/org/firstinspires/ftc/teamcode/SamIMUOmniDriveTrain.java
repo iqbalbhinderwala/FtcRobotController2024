@@ -32,6 +32,7 @@ package org.firstinspires.ftc.teamcode;
 import com.qualcomm.hardware.rev.RevHubOrientationOnRobot;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.hardware.DcMotor;
+import com.qualcomm.robotcore.hardware.DcMotorSimple;
 import com.qualcomm.robotcore.hardware.IMU;
 import com.qualcomm.robotcore.util.ElapsedTime;
 import com.qualcomm.robotcore.util.Range;
@@ -109,7 +110,7 @@ public class SamIMUOmniDriveTrain
             rightBackDrive  = opMode.hardwareMap.get(DcMotor.class, "motor 1");
 
             leftFrontDrive .setDirection(DcMotor.Direction.FORWARD);
-            leftBackDrive  .setDirection(DcMotor.Direction.REVERSE);
+            leftBackDrive  .setDirection(DcMotor.Direction.FORWARD);
             rightFrontDrive.setDirection(DcMotor.Direction.REVERSE);
             rightBackDrive .setDirection(DcMotor.Direction.REVERSE);
         }

@@ -340,6 +340,7 @@ public class SamJoints {
         HIGHBAR,
         LOWBAR,
         TRANSITION,
+        RAIL,
     }
 
     public void activatePreset(Pose pose)
@@ -355,13 +356,16 @@ public class SamJoints {
                 activatePose(pose, 7750, 1600, 3500);
                   break;
             case HIGHBAR:
-                activatePose(pose, 4575, 8000, 8000);
+                activatePose(pose, 2500, 2800, 2400);
                 break;
             case LOWBAR:
                 activatePose(pose, 4500, 4000, 7000);
                 break;
             case TRANSITION:
                 activatePose(pose, BASE_POS_FORWARD_MIN, ARM_POS_EXTENDED_MIN, 5000);
+                break;
+            case RAIL:
+                activatePose(pose, 5200, 1175, 2900);
                 break;
         }
     }
