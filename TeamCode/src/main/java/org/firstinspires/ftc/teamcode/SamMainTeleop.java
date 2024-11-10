@@ -16,9 +16,9 @@ public class SamMainTeleop extends LinearOpMode {
     public SamJoints joints = null;
     public SamClaw claw = null;
 
-    double MAX_DRIVE_SPEED = 0.3;
-    double MAX_STRAFE_SPEED = 0.4;
-    double MAX_TURN_SPEED = 0.3;
+    double MAX_DRIVE_SPEED = 0.4;
+    double MAX_STRAFE_SPEED = 0.55;
+    double MAX_TURN_SPEED = 0.4;
 
     ElapsedTime lastPress = new ElapsedTime();
     ElapsedTime lastLeftBumper = new ElapsedTime();
@@ -71,16 +71,16 @@ public class SamMainTeleop extends LinearOpMode {
             // Presets
             if (gamepad1.b) {
                 joints.terminateActivePreset();
-            } else if (gamepad1.dpad_down) {
-                joints.activatePreset(SamJoints.Pose.ARENA);
+//            } else if (gamepad1.dpad_down) {
+//                joints.activatePreset(SamJoints.Pose.ARENA);
+            } else if (gamepad1.dpad_left) {
+                joints.activatePreset(SamJoints.Pose.RAIL);
             } else if (gamepad1.dpad_up) {
                 joints.activatePreset(SamJoints.Pose.HIGHBAR);
             } else if (gamepad1.dpad_right) {
-                joints.activatePreset(SamJoints.Pose.LOWBAR);
+                joints.activatePreset(SamJoints.Pose.TRANSITION);
             } else if (gamepad1.back) {
                 joints.activatePreset(SamJoints.Pose.PARKED);
-            } else if (gamepad1.dpad_left) {
-                joints.activatePreset(SamJoints.Pose.TRANSITION);
             } else {
                 joints.stepActivePreset();
             }
@@ -103,9 +103,9 @@ public class SamMainTeleop extends LinearOpMode {
                 telemetry.addData("#", "*** FULLY CALIBRATED ***");
                 telemetry.addData(">", "Parked Pose: BACK");
                 telemetry.addData(">", "Arena Pose: DPAD_DOWN");
+                telemetry.addData(">", "Rail Pose: DPAD_LEFT");
                 telemetry.addData(">", "Highbar Pose: DPAD_UP");
                 telemetry.addData(">", "Lowbar Pose: DPAD_RIGHT");
-                telemetry.addData(">", "Transition Pose: DPAD_LEFT");
             }
             telemetry.update();
         }
