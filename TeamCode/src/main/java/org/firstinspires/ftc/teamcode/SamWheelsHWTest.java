@@ -96,48 +96,60 @@ public class SamWheelsHWTest extends LinearOpMode {
 
 
     private void initMotors(boolean invertForward) {
-        // If forward is not inverted
-        if (!invertForward) {
-            // Initialize the hardware variables. Note that the strings used here must correspond
-            // to the names assigned during the robot configuration step on the DS or RC devices.
-            leftFrontDrive  = hardwareMap.get(DcMotor.class, "motor 1");
-            leftBackDrive   = hardwareMap.get(DcMotor.class, "motor 2");
-            rightFrontDrive = hardwareMap.get(DcMotor.class, "motor 4");
-            rightBackDrive  = hardwareMap.get(DcMotor.class, "motor 3");
+        // Initialize the hardware variables. Note that the strings used here must correspond
+        // to the names assigned during the robot configuration step on the DS or RC devices.
+        leftFrontDrive  = hardwareMap.get(DcMotor.class, "motor 1");
+        leftBackDrive   = hardwareMap.get(DcMotor.class, "motor 2");
+        rightFrontDrive = hardwareMap.get(DcMotor.class, "motor 4");
+        rightBackDrive  = hardwareMap.get(DcMotor.class, "motor 3");
 
-            // ########################################################################################
-            // !!!            IMPORTANT Drive Information. Test your motor directions.            !!!!!
-            // ########################################################################################
-            // Most robots need the motors on one side to be reversed to drive forward.
-            // The motor reversals shown here are for a "direct drive" robot (the wheels turn the same direction as the motor shaft)
-            // If your robot has additional gear reductions or uses a right-angled drive, it's important to ensure
-            // that your motors are turning in the correct direction.  So, start out with the reversals here, BUT
-            // when you first test your robot, push the left joystick forward and observe the direction the wheels turn.
-            // Reverse the direction (flip FORWARD <-> REVERSE ) of any wheel that runs backward
-            // Keep testing until ALL the wheels move the robot forward when you push the left joystick forward.
-            leftFrontDrive .setDirection(DcMotor.Direction.FORWARD);
-            leftBackDrive  .setDirection(DcMotor.Direction.FORWARD);
-            rightFrontDrive.setDirection(DcMotor.Direction.FORWARD);
-            rightBackDrive .setDirection(DcMotor.Direction.REVERSE);
-        }
-        // If forward is inverted
-        else {
-            leftFrontDrive  = hardwareMap.get(DcMotor.class, "motor 3");
-            leftBackDrive   = hardwareMap.get(DcMotor.class, "motor 4");
-            rightFrontDrive = hardwareMap.get(DcMotor.class, "motor 2");
-            rightBackDrive  = hardwareMap.get(DcMotor.class, "motor 1");
+        // ########################################################################################
+        // !!!            IMPORTANT Drive Information. Test your motor directions.            !!!!!
+        // ########################################################################################
+        // Most robots need the motors on one side to be reversed to drive forward.
+        // The motor reversals shown here are for a "direct drive" robot (the wheels turn the same direction as the motor shaft)
+        // If your robot has additional gear reductions or uses a right-angled drive, it's important to ensure
+        // that your motors are turning in the correct direction.  So, start out with the reversals here, BUT
+        // when you first test your robot, push the left joystick forward and observe the direction the wheels turn.
+        // Reverse the direction (flip FORWARD <-> REVERSE ) of any wheel that runs backward
+        // Keep testing until ALL the wheels move the robot forward when you push the left joystick forward.
+        leftFrontDrive .setDirection(DcMotor.Direction.FORWARD);
+        leftBackDrive  .setDirection(DcMotor.Direction.FORWARD);
+        rightFrontDrive.setDirection(DcMotor.Direction.FORWARD);
+        rightBackDrive .setDirection(DcMotor.Direction.REVERSE);
 
-            leftFrontDrive .setDirection(DcMotor.Direction.FORWARD);
-            leftBackDrive  .setDirection(DcMotor.Direction.REVERSE);
-            rightFrontDrive.setDirection(DcMotor.Direction.REVERSE);
-            rightBackDrive .setDirection(DcMotor.Direction.REVERSE);
+        java.util.List<DcMotor> motorList =
+                Arrays.asList(leftFrontDrive, leftBackDrive, rightFrontDrive, rightBackDrive);
+
+        for (DcMotor motor : motorList) {
+            motor.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
+            motor.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
         }
 
-        for (DcMotor dcMotor : Arrays.asList(leftFrontDrive, leftBackDrive, rightFrontDrive, rightBackDrive)) {
-            dcMotor.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
-            dcMotor.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+        if (invertForward) {
+            // Swap leftFrontDrive <-> rightBackDrive
+            DcMotor temp = leftFrontDrive;
+            leftFrontDrive = rightBackDrive;
+            rightBackDrive = temp;
+            // Swap leftBackDrive <-> rightFrontDrive
+            temp = leftBackDrive;
+            leftBackDrive = rightFrontDrive;
+            rightFrontDrive = temp;
+            // Invert direction
+            for (DcMotor motor : motorList) {
+                toggleMotorDirection(motor);
+            }
         }
     }
+
+    private void toggleMotorDirection(DcMotor motor){
+        if (motor.getDirection() == DcMotor.Direction.FORWARD) {
+            motor.setDirection(DcMotor.Direction.REVERSE);
+        } else {
+            motor.setDirection(DcMotor.Direction.FORWARD);
+        }
+    }
+
     @Override
     public void runOpMode() {
         initMotors(isForwardDirectionInverted);
@@ -248,7 +260,6 @@ public class SamWheelsHWTest extends LinearOpMode {
             telemetry.addData(">", "X/Y: Front Wheels (L/R)");
             telemetry.addData(">", "A/B: Back  Wheels (L/R)");
             telemetry.addData(">", "BACK button: Invert forward direction");
-//            telemetry.addData("Status", "Run Time: " + runtime.toString());
             telemetry.addData("Power Front Left/Right", "%4.2f, %4.2f", leftFrontPower, rightFrontPower);
             telemetry.addData("Power Back  Left/Right", "%4.2f, %4.2f", leftBackPower, rightBackPower);
             telemetry.addData("Max power", maxPower);
