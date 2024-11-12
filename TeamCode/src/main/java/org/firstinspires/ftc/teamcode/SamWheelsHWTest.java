@@ -35,6 +35,8 @@ import com.qualcomm.robotcore.hardware.DcMotor;
 import com.qualcomm.robotcore.util.ElapsedTime;
 import com.qualcomm.robotcore.util.Range;
 
+import java.util.Arrays;
+
 /* FROM SAMPLE: BasicOmniOpMode_Linear.java
  *
  * This file contains an example of a Linear "OpMode".
@@ -71,12 +73,24 @@ public class SamWheelsHWTest extends LinearOpMode {
     // Declare OpMode members for each of the 4 motors.
     private ElapsedTime runtime = new ElapsedTime();
     private ElapsedTime lastPress = new ElapsedTime();
+
+    private ElapsedTime deltaTime = new ElapsedTime();
+    int leftFrontLastPos = 0;
+    int leftBackLastPos = 0;
+    int rightFrontLastPos = 0;
+    int rightBackLastPos = 0;
+
+    double leftFrontVelocity = 0.0;
+    double leftBackVelocity = 0.0;
+    double rightFrontVelocity = 0.0;
+    double rightBackVelocity = 0.0;
+
     private final double PRESS_DELAY = 0.25;
     private DcMotor leftFrontDrive = null;
     private DcMotor leftBackDrive = null;
     private DcMotor rightFrontDrive = null;
     private DcMotor rightBackDrive = null;
-    double maxSpeed = 0.3;
+    double maxPower = 0.3;
     boolean individualWheelControl = false;
     boolean isForwardDirectionInverted = false;
 
@@ -117,6 +131,11 @@ public class SamWheelsHWTest extends LinearOpMode {
             leftBackDrive  .setDirection(DcMotor.Direction.REVERSE);
             rightFrontDrive.setDirection(DcMotor.Direction.REVERSE);
             rightBackDrive .setDirection(DcMotor.Direction.REVERSE);
+        }
+
+        for (DcMotor dcMotor : Arrays.asList(leftFrontDrive, leftBackDrive, rightFrontDrive, rightBackDrive)) {
+            dcMotor.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
+            dcMotor.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
         }
     }
     @Override
@@ -194,17 +213,17 @@ public class SamWheelsHWTest extends LinearOpMode {
             // Select max speed (don't drive full power)
             if(gamepad1.dpad_up && lastPress.seconds() >= PRESS_DELAY){
                 lastPress.reset();
-                maxSpeed += 0.1;
-                maxSpeed =  Range.clip(maxSpeed, 0, 1);
+                maxPower += 0.1;
+                maxPower =  Range.clip(maxPower, 0, 1);
             } else if (gamepad1.dpad_down && lastPress.seconds() >= PRESS_DELAY) {
                 lastPress.reset();
-                maxSpeed -= 0.1;
-                maxSpeed =  Range.clip(maxSpeed, 0, 1);
+                maxPower -= 0.1;
+                maxPower =  Range.clip(maxPower, 0, 1);
             }
-            leftFrontPower  *= maxSpeed;
-            rightFrontPower *= maxSpeed;
-            leftBackPower   *= maxSpeed;
-            rightBackPower  *= maxSpeed;
+            leftFrontPower  *= maxPower;
+            rightFrontPower *= maxPower;
+            leftBackPower   *= maxPower;
+            rightBackPower  *= maxPower;
 
             // Send calculated power to wheels
             leftFrontDrive.setPower(leftFrontPower);
@@ -212,16 +231,32 @@ public class SamWheelsHWTest extends LinearOpMode {
             leftBackDrive.setPower(leftBackPower);
             rightBackDrive.setPower(rightBackPower);
 
+            // Calculate velocities
+            if (deltaTime.seconds() > 0.5) {
+                leftFrontVelocity = (leftFrontDrive.getCurrentPosition() - leftFrontLastPos) / deltaTime.seconds();
+                leftBackVelocity = (leftBackDrive.getCurrentPosition() - leftBackLastPos) / deltaTime.seconds();
+                rightFrontVelocity = (rightFrontDrive.getCurrentPosition() - rightFrontLastPos) / deltaTime.seconds();
+                rightBackVelocity = (rightBackDrive.getCurrentPosition() - rightBackLastPos) / deltaTime.seconds();
+                deltaTime.reset();
+                leftFrontLastPos = leftFrontDrive.getCurrentPosition();
+                leftBackLastPos = leftBackDrive.getCurrentPosition();
+                rightFrontLastPos = rightFrontDrive.getCurrentPosition();
+                rightBackLastPos = rightBackDrive.getCurrentPosition();
+            }
             // Show the elapsed game time and wheel power.
             telemetry.addData(">", "DPad Up/Down Adjust speed");
             telemetry.addData(">", "X/Y: Front Wheels (L/R)");
             telemetry.addData(">", "A/B: Back  Wheels (L/R)");
             telemetry.addData(">", "BACK button: Invert forward direction");
-            telemetry.addData("Status", "Run Time: " + runtime.toString());
+//            telemetry.addData("Status", "Run Time: " + runtime.toString());
             telemetry.addData("Power Front Left/Right", "%4.2f, %4.2f", leftFrontPower, rightFrontPower);
             telemetry.addData("Power Back  Left/Right", "%4.2f, %4.2f", leftBackPower, rightBackPower);
-            telemetry.addData("Max speed", maxSpeed);
+            telemetry.addData("Max power", maxPower);
             telemetry.addData("IsForwardInverted", isForwardDirectionInverted);
+            telemetry.addData("Velocity Front Left/Right", "%4.2f, %4.2f /s", leftFrontVelocity, rightFrontVelocity);
+            telemetry.addData("Velocity Back  Left/Right", "%4.2f, %4.2f /s", leftBackVelocity, rightBackVelocity);
+            telemetry.addData("Encoder Front Left/Right", "%d, %d", leftFrontDrive.getCurrentPosition(), rightFrontDrive.getCurrentPosition());
+            telemetry.addData("Encoder Back  Left/Right", "%d, %d", leftBackDrive.getCurrentPosition(), rightBackDrive.getCurrentPosition());
             telemetry.update();
         }
     }
