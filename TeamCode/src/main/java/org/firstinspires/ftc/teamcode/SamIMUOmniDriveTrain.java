@@ -76,43 +76,22 @@ public class SamIMUOmniDriveTrain
     static final double MIN_TURN_SPEED = 0.2;
 
     // Constructor
-    public SamIMUOmniDriveTrain(LinearOpMode myOpMode, boolean invertForwardDirection) {
+    public SamIMUOmniDriveTrain(LinearOpMode myOpMode) {
         opMode = myOpMode;
-        isForwardDirectionInverted = invertForwardDirection;
-    }
-
-    public void swapForwardDirection() {
-        isForwardDirectionInverted = !isForwardDirectionInverted;
-        initMotors();
     }
 
     private void initMotors() {
-        // If forward is NOT inverted
-        if (!isForwardDirectionInverted) {
-            // Initialize the hardware variables. Note that the strings used here must correspond
-            // to the names assigned during the robot configuration step on the DS or RC devices.
-            leftFrontDrive  = opMode.hardwareMap.get(DcMotor.class, "motor 1");
-            leftBackDrive   = opMode.hardwareMap.get(DcMotor.class, "motor 2");
-            rightFrontDrive = opMode.hardwareMap.get(DcMotor.class, "motor 4");
-            rightBackDrive  = opMode.hardwareMap.get(DcMotor.class, "motor 3");
+        // Initialize the hardware variables. Note that the strings used here must correspond
+        // to the names assigned during the robot configuration step on the DS or RC devices.
+        leftFrontDrive  = opMode.hardwareMap.get(DcMotor.class, "motor 1");
+        leftBackDrive   = opMode.hardwareMap.get(DcMotor.class, "motor 2");
+        rightFrontDrive = opMode.hardwareMap.get(DcMotor.class, "motor 4");
+        rightBackDrive  = opMode.hardwareMap.get(DcMotor.class, "motor 3");
 
-            leftFrontDrive .setDirection(DcMotor.Direction.FORWARD);
-            leftBackDrive  .setDirection(DcMotor.Direction.FORWARD);
-            rightFrontDrive.setDirection(DcMotor.Direction.FORWARD);
-            rightBackDrive .setDirection(DcMotor.Direction.REVERSE);
-        }
-        // If forward is inverted
-        else {
-            leftFrontDrive  = opMode.hardwareMap.get(DcMotor.class, "motor 3");
-            leftBackDrive   = opMode.hardwareMap.get(DcMotor.class, "motor 4");
-            rightFrontDrive = opMode.hardwareMap.get(DcMotor.class, "motor 2");
-            rightBackDrive  = opMode.hardwareMap.get(DcMotor.class, "motor 1");
-
-            leftFrontDrive .setDirection(DcMotor.Direction.FORWARD);
-            leftBackDrive  .setDirection(DcMotor.Direction.REVERSE);
-            rightFrontDrive.setDirection(DcMotor.Direction.REVERSE);
-            rightBackDrive .setDirection(DcMotor.Direction.REVERSE);
-        }
+        leftFrontDrive .setDirection(DcMotor.Direction.FORWARD);
+        leftBackDrive  .setDirection(DcMotor.Direction.FORWARD);
+        rightFrontDrive.setDirection(DcMotor.Direction.FORWARD);
+        rightBackDrive .setDirection(DcMotor.Direction.REVERSE);
 
         leftFrontDrive .setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
         leftBackDrive  .setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);

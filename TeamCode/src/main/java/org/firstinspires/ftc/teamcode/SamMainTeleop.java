@@ -30,7 +30,7 @@ public class SamMainTeleop extends LinearOpMode {
         telemetry.addData("Status", "Initialized");
         telemetry.update();
 
-        nav = new SamIMUOmniDriveTrain(this, false);
+        nav = new SamIMUOmniDriveTrain(this);
         joints = new SamJoints(this);
         claw = new SamClaw(this);
 

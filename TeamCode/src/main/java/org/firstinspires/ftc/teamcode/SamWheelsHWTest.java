@@ -95,7 +95,7 @@ public class SamWheelsHWTest extends LinearOpMode {
     boolean isForwardDirectionInverted = false;
 
 
-    private void initMotors(boolean invertForward) {
+    private void initMotors() {
         // Initialize the hardware variables. Note that the strings used here must correspond
         // to the names assigned during the robot configuration step on the DS or RC devices.
         leftFrontDrive  = hardwareMap.get(DcMotor.class, "motor 1");
@@ -118,41 +118,39 @@ public class SamWheelsHWTest extends LinearOpMode {
         rightFrontDrive.setDirection(DcMotor.Direction.FORWARD);
         rightBackDrive .setDirection(DcMotor.Direction.REVERSE);
 
-        java.util.List<DcMotor> motorList =
-                Arrays.asList(leftFrontDrive, leftBackDrive, rightFrontDrive, rightBackDrive);
-
-        for (DcMotor motor : motorList) {
+        // Set behaviors for each motor
+        for (DcMotor motor : Arrays.asList(leftFrontDrive, leftBackDrive, rightFrontDrive, rightBackDrive)) {
             motor.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
             motor.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
         }
-
-        if (invertForward) {
-            // Swap leftFrontDrive <-> rightBackDrive
-            DcMotor temp = leftFrontDrive;
-            leftFrontDrive = rightBackDrive;
-            rightBackDrive = temp;
-            // Swap leftBackDrive <-> rightFrontDrive
-            temp = leftBackDrive;
-            leftBackDrive = rightFrontDrive;
-            rightFrontDrive = temp;
-            // Invert direction
-            for (DcMotor motor : motorList) {
-                toggleMotorDirection(motor);
-            }
-        }
     }
 
-    private void toggleMotorDirection(DcMotor motor){
-        if (motor.getDirection() == DcMotor.Direction.FORWARD) {
-            motor.setDirection(DcMotor.Direction.REVERSE);
-        } else {
-            motor.setDirection(DcMotor.Direction.FORWARD);
+    private void invertForwardDirection() {
+        isForwardDirectionInverted = !isForwardDirectionInverted;
+
+        // Swap leftFrontDrive <-> rightBackDrive
+        DcMotor temp = leftFrontDrive;
+        leftFrontDrive = rightBackDrive;
+        rightBackDrive = temp;
+
+        // Swap leftBackDrive <-> rightFrontDrive
+        temp = leftBackDrive;
+        leftBackDrive = rightFrontDrive;
+        rightFrontDrive = temp;
+
+        // Invert motor direction
+        for (DcMotor motor : Arrays.asList(leftFrontDrive, leftBackDrive, rightFrontDrive, rightBackDrive)) {
+            if (motor.getDirection() == DcMotor.Direction.FORWARD) {
+                motor.setDirection(DcMotor.Direction.REVERSE);
+            } else {
+                motor.setDirection(DcMotor.Direction.FORWARD);
+            }
         }
     }
 
     @Override
     public void runOpMode() {
-        initMotors(isForwardDirectionInverted);
+        initMotors();
 
         // Wait for the game to start (driver presses PLAY)
         telemetry.addData("Status", "Initialized");
@@ -164,11 +162,9 @@ public class SamWheelsHWTest extends LinearOpMode {
         // run until the end of the match (driver presses STOP)
         while (opModeIsActive()) {
             // Invert forward direction
-            if (gamepad1.back && lastPress.seconds() >= PRESS_DELAY){
+            if (gamepad1.back && lastPress.seconds() >= PRESS_DELAY) {
                 lastPress.reset();
-                // Swap direction and re-initialize motor hardware
-                isForwardDirectionInverted = !isForwardDirectionInverted;
-                initMotors(isForwardDirectionInverted);
+                invertForwardDirection();
             }
 
             telemetry.addData(">","L_STICK (%.1f , %.1f)", gamepad1.left_stick_x, gamepad1.left_stick_y);
@@ -223,7 +219,7 @@ public class SamWheelsHWTest extends LinearOpMode {
             }
 
             // Select max speed (don't drive full power)
-            if(gamepad1.dpad_up && lastPress.seconds() >= PRESS_DELAY){
+            if(gamepad1.dpad_up && lastPress.seconds() >= PRESS_DELAY) {
                 lastPress.reset();
                 maxPower += 0.1;
                 maxPower =  Range.clip(maxPower, 0, 1);
