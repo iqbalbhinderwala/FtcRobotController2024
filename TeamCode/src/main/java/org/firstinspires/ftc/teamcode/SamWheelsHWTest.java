@@ -93,6 +93,8 @@ public class SamWheelsHWTest extends LinearOpMode {
     double maxPower = 0.3;
     boolean individualWheelControl = false;
     boolean isForwardDirectionInverted = false;
+    boolean enableBrake = false;
+    boolean enableEncoders = false;
 
 
     private void initMotors() {
@@ -117,15 +119,9 @@ public class SamWheelsHWTest extends LinearOpMode {
         leftBackDrive  .setDirection(DcMotor.Direction.FORWARD);
         rightFrontDrive.setDirection(DcMotor.Direction.FORWARD);
         rightBackDrive .setDirection(DcMotor.Direction.REVERSE);
-
-        // Set behaviors for each motor
-        for (DcMotor motor : Arrays.asList(leftFrontDrive, leftBackDrive, rightFrontDrive, rightBackDrive)) {
-            motor.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
-            motor.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
-        }
     }
 
-    private void invertForwardDirection() {
+    private void toggleForwardDirection() {
         isForwardDirectionInverted = !isForwardDirectionInverted;
 
         // Swap leftFrontDrive <-> rightBackDrive
@@ -148,9 +144,29 @@ public class SamWheelsHWTest extends LinearOpMode {
         }
     }
 
+    private void toggleBrakes() {
+        enableBrake = !enableBrake;
+        for (DcMotor motor : Arrays.asList(leftFrontDrive, leftBackDrive, rightFrontDrive, rightBackDrive)) {
+            motor.setZeroPowerBehavior(enableBrake ? DcMotor.ZeroPowerBehavior.BRAKE : DcMotor.ZeroPowerBehavior.FLOAT);
+        }
+    }
+
+    private void toggleEncoders() {
+        enableEncoders = !enableEncoders;
+        for (DcMotor motor : Arrays.asList(leftFrontDrive, leftBackDrive, rightFrontDrive, rightBackDrive)) {
+            if (enableEncoders) {
+                motor.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+                motor.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+            } else {
+                motor.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
+            }
+        }
+    }
+
     @Override
     public void runOpMode() {
         initMotors();
+        toggleBrakes();
 
         // Wait for the game to start (driver presses PLAY)
         telemetry.addData("Status", "Initialized");
@@ -164,9 +180,18 @@ public class SamWheelsHWTest extends LinearOpMode {
             // Invert forward direction
             if (gamepad1.back && lastPress.seconds() >= PRESS_DELAY) {
                 lastPress.reset();
-                invertForwardDirection();
+                toggleForwardDirection();
             }
 
+            if (gamepad1.left_bumper && lastPress.seconds() >= PRESS_DELAY) {
+                lastPress.reset();
+                toggleBrakes();
+            }
+
+            if (gamepad1.right_bumper && lastPress.seconds() >= PRESS_DELAY) {
+                lastPress.reset();
+                toggleEncoders();
+            }
             telemetry.addData(">","L_STICK (%.1f , %.1f)", gamepad1.left_stick_x, gamepad1.left_stick_y);
             telemetry.addData(">","R_STICK (%.1f , %.1f)", gamepad1.right_stick_x, gamepad1.right_stick_y);
 
@@ -256,10 +281,13 @@ public class SamWheelsHWTest extends LinearOpMode {
             telemetry.addData(">", "X/Y: Front Wheels (L/R)");
             telemetry.addData(">", "A/B: Back  Wheels (L/R)");
             telemetry.addData(">", "BACK button: Invert forward direction");
+            telemetry.addData(">", "L/R bumpers: Toggle BRAKES / ENCODERS");
+            telemetry.addData("IsForwardDirectionInverted", isForwardDirectionInverted);
+            telemetry.addData("ZeroPowerBrake", enableBrake);
+            telemetry.addData("RUN_USING_ENCODER", enableEncoders);
             telemetry.addData("Power Front Left/Right", "%4.2f, %4.2f", leftFrontPower, rightFrontPower);
             telemetry.addData("Power Back  Left/Right", "%4.2f, %4.2f", leftBackPower, rightBackPower);
             telemetry.addData("Max power", maxPower);
-            telemetry.addData("IsForwardInverted", isForwardDirectionInverted);
             telemetry.addData("Velocity Front Left/Right", "%4.2f, %4.2f /s", leftFrontVelocity, rightFrontVelocity);
             telemetry.addData("Velocity Back  Left/Right", "%4.2f, %4.2f /s", leftBackVelocity, rightBackVelocity);
             telemetry.addData("Encoder Front Left/Right", "%d, %d", leftFrontDrive.getCurrentPosition(), rightFrontDrive.getCurrentPosition());
