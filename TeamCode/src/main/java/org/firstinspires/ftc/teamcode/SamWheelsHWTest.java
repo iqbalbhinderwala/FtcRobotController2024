@@ -90,6 +90,10 @@ public class SamWheelsHWTest extends LinearOpMode {
     private DcMotor leftBackDrive = null;
     private DcMotor rightFrontDrive = null;
     private DcMotor rightBackDrive = null;
+
+    private DcMotor odometerX = null;
+    private DcMotor odometerY = null;
+
     double maxPower = 0.3;
     boolean individualWheelControl = false;
     boolean isForwardDirectionInverted = false;
@@ -105,6 +109,9 @@ public class SamWheelsHWTest extends LinearOpMode {
         rightFrontDrive = hardwareMap.get(DcMotor.class, "motor 4");
         rightBackDrive  = hardwareMap.get(DcMotor.class, "motor 3");
 
+        odometerX = hardwareMap.get(DcMotor.class, "odometer drive");
+        odometerY = hardwareMap.get(DcMotor.class, "odometer strafe");
+
         // ########################################################################################
         // !!!            IMPORTANT Drive Information. Test your motor directions.            !!!!!
         // ########################################################################################
@@ -115,10 +122,13 @@ public class SamWheelsHWTest extends LinearOpMode {
         // when you first test your robot, push the left joystick forward and observe the direction the wheels turn.
         // Reverse the direction (flip FORWARD <-> REVERSE ) of any wheel that runs backward
         // Keep testing until ALL the wheels move the robot forward when you push the left joystick forward.
-        leftFrontDrive .setDirection(DcMotor.Direction.FORWARD);
+        leftFrontDrive .setDirection(DcMotor.Direction.REVERSE);
         leftBackDrive  .setDirection(DcMotor.Direction.FORWARD);
         rightFrontDrive.setDirection(DcMotor.Direction.FORWARD);
         rightBackDrive .setDirection(DcMotor.Direction.REVERSE);
+
+        odometerX.setDirection(DcMotor.Direction.REVERSE); // +-ve forward
+        odometerY.setDirection(DcMotor.Direction.FORWARD); // +-ve left
     }
 
     private void toggleForwardDirection() {
@@ -134,8 +144,10 @@ public class SamWheelsHWTest extends LinearOpMode {
         leftBackDrive = rightFrontDrive;
         rightFrontDrive = temp;
 
-        // Invert motor direction
-        for (DcMotor motor : Arrays.asList(leftFrontDrive, leftBackDrive, rightFrontDrive, rightBackDrive)) {
+        // Invert motor / odometer encoder direction
+        for (DcMotor motor : Arrays.asList(odometerX, odometerY,
+                leftFrontDrive, leftBackDrive, rightFrontDrive, rightBackDrive))
+        {
             if (motor.getDirection() == DcMotor.Direction.FORWARD) {
                 motor.setDirection(DcMotor.Direction.REVERSE);
             } else {
@@ -154,12 +166,15 @@ public class SamWheelsHWTest extends LinearOpMode {
     private void toggleEncoders() {
         enableEncoders = !enableEncoders;
         for (DcMotor motor : Arrays.asList(leftFrontDrive, leftBackDrive, rightFrontDrive, rightBackDrive)) {
+            motor.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
             if (enableEncoders) {
-                motor.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
                 motor.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
             } else {
                 motor.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
             }
+        }
+        for (DcMotor motor : Arrays.asList(odometerX, odometerY)) {
+            motor.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
         }
     }
 
@@ -292,6 +307,7 @@ public class SamWheelsHWTest extends LinearOpMode {
             telemetry.addData("Velocity Back  Left/Right", "%4.2f, %4.2f /s", leftBackVelocity, rightBackVelocity);
             telemetry.addData("Encoder Front Left/Right", "%d, %d", leftFrontDrive.getCurrentPosition(), rightFrontDrive.getCurrentPosition());
             telemetry.addData("Encoder Back  Left/Right", "%d, %d", leftBackDrive.getCurrentPosition(), rightBackDrive.getCurrentPosition());
+            telemetry.addData("Odometer Front/Side", "%d, %d", odometerX.getCurrentPosition(), odometerY.getCurrentPosition());
             telemetry.update();
         }
     }

@@ -44,17 +44,15 @@ public class SamJointsHWTest extends LinearOpMode {
     // Declare OpMode members.
     private DcMotor baseMotor = null;
     private DcMotor armMotor = null;
-    private DcMotor wristMotor = null;
 
     private TouchSensor baseSensor = null;
     private TouchSensor armSensor = null;
-    private TouchSensor wristSensor = null;
 
     boolean isBaseCalibrated = false;
     boolean isArmCalibrated = false;
-    boolean isWristCalibrated = false;
 
-    private Servo claw = null;
+    private Servo wristServo = null;
+    private Servo clawServo = null;
 
     @Override
     public void runOpMode() {
@@ -64,25 +62,26 @@ public class SamJointsHWTest extends LinearOpMode {
         // Initialize the hardware variables. Note that the strings used here as parameters
         // to 'get' must correspond to the names assigned during the robot configuration
         // step (using the FTC Robot Controller app on the phone).
-        baseMotor = hardwareMap.get(DcMotor.class, "motor 5");
-        armMotor = hardwareMap.get(DcMotor.class, "motor 6");
-        wristMotor = hardwareMap.get(DcMotor.class, "motor 7");
+        baseMotor = hardwareMap.get(DcMotor.class, "motor base");
+        armMotor = hardwareMap.get(DcMotor.class, "motor arm");
+
+        baseSensor  = hardwareMap.get(TouchSensor.class, "base sensor");
+        armSensor   = hardwareMap.get(TouchSensor.class, "arm sensor");
+
+        wristServo = hardwareMap.get(Servo.class, "servo wrist");
+        clawServo = hardwareMap.get(Servo.class,"servo claw");
 
         // +ve raise up; -ve lower towards ground
         baseMotor.setDirection(DcMotorSimple.Direction.FORWARD);
         armMotor.setDirection(DcMotorSimple.Direction.REVERSE);
-        wristMotor.setDirection(DcMotorSimple.Direction.REVERSE);
+        wristServo.setDirection(Servo.Direction.REVERSE); // 0: parked
+        clawServo.setDirection(Servo.Direction.FORWARD); // 0: opened
 
-        baseSensor  = hardwareMap.get(TouchSensor.class, "base sensor");
-        armSensor   = hardwareMap.get(TouchSensor.class, "arm sensor");
-        wristSensor = hardwareMap.get(TouchSensor.class, "wrist sensor");
-
-        claw = hardwareMap.get(Servo.class,"servo 0");
-
-        telemetry.addData("Sensor state", "Base: %b  Arm: %b  Wrist: %b", baseSensor.isPressed(), armSensor.isPressed(), wristSensor.isPressed());
-        telemetry.addData("Current base position", baseMotor.getCurrentPosition());
-        telemetry.addData("Current arm position", armMotor.getCurrentPosition());
-        telemetry.addData("Current wrist position", wristMotor.getCurrentPosition());
+        telemetry.addData("Sensor state", "Base: %b  Arm: %b", baseSensor.isPressed(), armSensor.isPressed());
+        telemetry.addData("Base position", baseMotor.getCurrentPosition());
+        telemetry.addData("Arm position", armMotor.getCurrentPosition());
+        telemetry.addData("Wrist position", wristServo.getPosition());
+        telemetry.addData("Claw position", clawServo.getPosition());
         telemetry.update();
 
         // Wait for the game to start (driver presses PLAY)
@@ -90,11 +89,9 @@ public class SamJointsHWTest extends LinearOpMode {
 
         baseMotor .setMode(DcMotor.RunMode.RUN_USING_ENCODER);
         armMotor  .setMode(DcMotor.RunMode.RUN_USING_ENCODER);
-        wristMotor.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
 
         baseMotor .setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
         armMotor  .setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
-        wristMotor.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
 
         // run until the end of the match (driver presses STOP)
 
@@ -104,11 +101,9 @@ public class SamJointsHWTest extends LinearOpMode {
         while (opModeIsActive()) {
             double basePower   = -gamepad1.left_stick_y  * 0.5; // Note: pushing stick forward gives negative stick_y value
             double armPower    = -gamepad1.right_stick_y * 0.5; // Note: pushing stick forward gives negative stick_y value
-            double wristPower  = (-gamepad1.left_trigger + gamepad1.right_trigger) * 0.5; // TODO: CALIBRATE MAX POWER FOR BASE
 
             baseMotor.setPower(basePower);
             armMotor.setPower(armPower);
-            wristMotor.setPower(wristPower);
 
             // RESET ENCODERS WHOSE SENSOR IS TRUE
             if (gamepad1.y) {
@@ -124,36 +119,40 @@ public class SamJointsHWTest extends LinearOpMode {
                     armMotor.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
                     armMotor.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
                 }
-                if (wristSensor.isPressed())
-                {
-                    isWristCalibrated = true;
-                    wristMotor.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
-                    wristMotor.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
-                }
             }
 
+            // WRIST
             if (gamepad1.dpad_up && lastPress.seconds() > BUTTON_DELAY) {
                 lastPress.reset();
-                claw.setPosition(claw.getPosition()+0.02);
+                wristServo.setPosition(wristServo.getPosition()+0.1);
             }
             if (gamepad1.dpad_down && lastPress.seconds() > BUTTON_DELAY) {
                 lastPress.reset();
-                claw.setPosition(claw.getPosition()-0.02);
+                wristServo.setPosition(wristServo.getPosition()-0.1);
+            }
+
+            // CLAW
+            if (gamepad1.dpad_right && lastPress.seconds() > BUTTON_DELAY) {
+                lastPress.reset();
+                clawServo.setPosition(clawServo.getPosition()+0.02);
+            }
+            if (gamepad1.dpad_left && lastPress.seconds() > BUTTON_DELAY) {
+                lastPress.reset();
+                clawServo.setPosition(clawServo.getPosition()-0.02);
             }
 
             telemetry.addData(">", "Y: Try reset encoders");
-            telemetry.addData(">", "    DPad Up/Down: Adjust Claw");
-
+            telemetry.addData(">", "DPad U/D: Adjust Wrist");
+            telemetry.addData(">", "DPad L/R: Adjust Claw");
+            telemetry.addData("", "--------------------------------");
             telemetry.addData("BASE ", "Pos=%d  Pwr=%.1f\tSense=%.1f", baseMotor.getCurrentPosition(),  baseMotor.getPower(),  baseSensor.getValue());
             telemetry.addData("ARM  ", "Pos=%d  Pwr=%.1f\tSense=%.1f", armMotor.getCurrentPosition(),   armMotor.getPower(),   armSensor.getValue());
-            telemetry.addData("WRIST", "Pos=%d  Pwr=%.1f\tSense=%.1f", wristMotor.getCurrentPosition(), wristMotor.getPower(), wristSensor.getValue());
-            telemetry.addData("CLAW ", "Pos=%.2f", claw.getPosition());
+            telemetry.addData("WRIST", "Pos=%.2f", wristServo.getPosition());
+            telemetry.addData("CLAW ", "Pos=%.2f", clawServo.getPosition());
             telemetry.addData("Sensor (Base)",  baseSensor.isPressed());
             telemetry.addData("Sensor (Arm)",   armSensor.isPressed());
-            telemetry.addData("Sensor (Wrist)", wristSensor.isPressed());
             telemetry.addData("Base Calibrated",    isBaseCalibrated);
             telemetry.addData("Arm Calibrated",     isArmCalibrated);
-            telemetry.addData("Wrist Calibrated",   isWristCalibrated);
             telemetry.update();
         }
     }
