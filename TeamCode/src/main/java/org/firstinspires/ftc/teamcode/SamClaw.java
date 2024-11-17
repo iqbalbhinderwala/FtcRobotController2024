@@ -16,7 +16,7 @@ public class SamClaw {
     }
 
     public void init() {
-        servo = opMode.hardwareMap.get(Servo.class, "servo 0");
+        servo = opMode.hardwareMap.get(Servo.class, "servo claw");
     }
 
     public void open() {

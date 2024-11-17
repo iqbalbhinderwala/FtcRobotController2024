@@ -15,11 +15,11 @@ public class SamJointsCalibTest extends LinearOpMode {
 
     @Override
     public void runOpMode() {
-        telemetry.addData("Status", "Initialized");
-        telemetry.update();
-
         // Initialize components.
         joints.init();
+
+        telemetry.addData("Status", "Initialized");
+        telemetry.update();
 
         // Wait for the game to start (driver presses PLAY)
         waitForStart();
@@ -42,8 +42,6 @@ public class SamJointsCalibTest extends LinearOpMode {
 
             // Show the elapsed game time.
             telemetry.addData("Status", "Run Time: " + runtime.toString());
-//            telemetry.addData("Target Power", "Base::%.1f, Arm::%.1f, Wrist::%.1f",
-//                    basePower, armPower, wristPower);
             joints.addTelemetry();
             if (joints.isFullyCalibrated()) {
                 telemetry.addData("#", "*** FULLY CALIBRATED ***");

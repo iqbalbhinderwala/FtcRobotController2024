@@ -32,7 +32,6 @@ package org.firstinspires.ftc.teamcode;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 import com.qualcomm.robotcore.hardware.DcMotor;
-import com.qualcomm.robotcore.hardware.DcMotorSimple;
 import com.qualcomm.robotcore.hardware.Servo;
 import com.qualcomm.robotcore.hardware.TouchSensor;
 import com.qualcomm.robotcore.util.ElapsedTime;
@@ -44,39 +43,37 @@ public class SamJointsHWTest extends LinearOpMode {
     // Declare OpMode members.
     private DcMotor baseMotor = null;
     private DcMotor armMotor = null;
-
     private TouchSensor baseSensor = null;
     private TouchSensor armSensor = null;
+    private Servo wristServo = null;
+    private Servo clawServo = null;
 
     boolean isBaseCalibrated = false;
     boolean isArmCalibrated = false;
 
-    private Servo wristServo = null;
-    private Servo clawServo = null;
-
-    @Override
-    public void runOpMode() {
-        telemetry.addData("Status", "Initialized");
-        telemetry.update();
-
+    private void initJointsHardware() {
         // Initialize the hardware variables. Note that the strings used here as parameters
         // to 'get' must correspond to the names assigned during the robot configuration
         // step (using the FTC Robot Controller app on the phone).
-        baseMotor = hardwareMap.get(DcMotor.class, "motor base");
-        armMotor = hardwareMap.get(DcMotor.class, "motor arm");
-
         baseSensor  = hardwareMap.get(TouchSensor.class, "base sensor");
         armSensor   = hardwareMap.get(TouchSensor.class, "arm sensor");
+        baseMotor   = hardwareMap.get(DcMotor.class, "motor base");
+        armMotor    = hardwareMap.get(DcMotor.class, "motor arm");
+        wristServo  = hardwareMap.get(Servo.class, "servo wrist");
+        clawServo   = hardwareMap.get(Servo.class,"servo claw");
 
-        wristServo = hardwareMap.get(Servo.class, "servo wrist");
-        clawServo = hardwareMap.get(Servo.class,"servo claw");
-
-        // +ve raise up; -ve lower towards ground
-        baseMotor.setDirection(DcMotorSimple.Direction.FORWARD);
-        armMotor.setDirection(DcMotorSimple.Direction.REVERSE);
+        baseMotor.setDirection(DcMotor.Direction.FORWARD);
+        armMotor .setDirection(DcMotor.Direction.REVERSE);
         wristServo.setDirection(Servo.Direction.REVERSE); // 0: parked
-        clawServo.setDirection(Servo.Direction.FORWARD); // 0: opened
+        clawServo .setDirection(Servo.Direction.FORWARD); // 0: opened
+    }
 
+    @Override
+    public void runOpMode() {
+
+        initJointsHardware();
+
+        telemetry.addData("Status", "Initialized");
         telemetry.addData("Sensor state", "Base: %b  Arm: %b", baseSensor.isPressed(), armSensor.isPressed());
         telemetry.addData("Base position", baseMotor.getCurrentPosition());
         telemetry.addData("Arm position", armMotor.getCurrentPosition());
@@ -87,17 +84,15 @@ public class SamJointsHWTest extends LinearOpMode {
         // Wait for the game to start (driver presses PLAY)
         waitForStart();
 
-        baseMotor .setMode(DcMotor.RunMode.RUN_USING_ENCODER);
-        armMotor  .setMode(DcMotor.RunMode.RUN_USING_ENCODER);
-
-        baseMotor .setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
-        armMotor  .setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
-
-        // run until the end of the match (driver presses STOP)
+        for (DcMotor motor : new DcMotor[] {baseMotor, armMotor}) {
+            motor.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+            motor.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
+        }
 
         ElapsedTime lastPress = new ElapsedTime();
-        final double BUTTON_DELAY = 0.1;
+        final double BUTTON_DELAY = 0.25;
 
+        // run until the end of the match (driver presses STOP)
         while (opModeIsActive()) {
             double basePower   = -gamepad1.left_stick_y  * 0.5; // Note: pushing stick forward gives negative stick_y value
             double armPower    = -gamepad1.right_stick_y * 0.5; // Note: pushing stick forward gives negative stick_y value

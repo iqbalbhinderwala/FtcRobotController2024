@@ -32,6 +32,7 @@ package org.firstinspires.ftc.teamcode;
 import com.qualcomm.hardware.rev.RevHubOrientationOnRobot;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.hardware.DcMotor;
+import com.qualcomm.robotcore.hardware.HardwareMap;
 import com.qualcomm.robotcore.hardware.IMU;
 import com.qualcomm.robotcore.util.ElapsedTime;
 import com.qualcomm.robotcore.util.Range;
@@ -55,6 +56,9 @@ public class SamIMUOmniDriveTrain
     private DcMotor rightFrontDrive  = null;  //  Used to control the right front drive wheel
     private DcMotor leftBackDrive    = null;  //  Used to control the left back drive wheel
     private DcMotor rightBackDrive   = null;  //  Used to control the right back drive wheel
+    private DcMotor odometerX        = null;
+    private DcMotor odometerY        = null;
+
     private IMU     imu              = null;   // Control/Expansion Hub IMU
 
     private double  headingError  = 0;
@@ -80,34 +84,36 @@ public class SamIMUOmniDriveTrain
         opMode = myOpMode;
     }
 
-    private void initMotors() {
+    private void initMotors(HardwareMap hardwareMap) {
         // Initialize the hardware variables. Note that the strings used here must correspond
         // to the names assigned during the robot configuration step on the DS or RC devices.
-        leftFrontDrive  = opMode.hardwareMap.get(DcMotor.class, "motor 1");
-        leftBackDrive   = opMode.hardwareMap.get(DcMotor.class, "motor 2");
-        rightFrontDrive = opMode.hardwareMap.get(DcMotor.class, "motor 4");
-        rightBackDrive  = opMode.hardwareMap.get(DcMotor.class, "motor 3");
+        leftFrontDrive  = hardwareMap.get(DcMotor.class, "motor 1");
+        leftBackDrive   = hardwareMap.get(DcMotor.class, "motor 2");
+        rightFrontDrive = hardwareMap.get(DcMotor.class, "motor 4");
+        rightBackDrive  = hardwareMap.get(DcMotor.class, "motor 3");
+        odometerX = hardwareMap.get(DcMotor.class, "odometer drive");
+        odometerY = hardwareMap.get(DcMotor.class, "odometer strafe");
 
-        leftFrontDrive .setDirection(DcMotor.Direction.FORWARD);
+        // Nominal Direction of Motor Rotation
+        leftFrontDrive .setDirection(DcMotor.Direction.REVERSE);
         leftBackDrive  .setDirection(DcMotor.Direction.FORWARD);
         rightFrontDrive.setDirection(DcMotor.Direction.FORWARD);
         rightBackDrive .setDirection(DcMotor.Direction.REVERSE);
+        odometerX.setDirection(DcMotor.Direction.REVERSE); // +-ve forward
+        odometerY.setDirection(DcMotor.Direction.FORWARD); // +-ve left
 
-        leftFrontDrive .setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
-        leftBackDrive  .setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
-        rightFrontDrive.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
-        rightBackDrive .setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
+        // Configure operating modes
+        for (DcMotor motor : new DcMotor[]{leftFrontDrive, leftBackDrive, rightFrontDrive, rightBackDrive}) {
+            // Disable the encoders. Drive by power.
+            // TurnToHeading() relies on encoders being disabled.
+            motor.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
 
-        // Disable the encoders.
-        // TurnToHeading() relies on encoders being disabled.
-        // NOTE: RUN_USING_ENCODER positions are always ZERO anyway?!
-        leftFrontDrive .setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
-        leftBackDrive  .setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
-        rightFrontDrive.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
-        rightBackDrive .setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
+            // BRAKE on zero power.
+            motor.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
+        }
     }
 
-    private void initIMU() {
+    private void initIMU(HardwareMap hardwareMap) {
         /* The next two lines define Hub orientation.
          * The Default Orientation (shown) is when a hub is mounted horizontally with the printed logo pointing UP and the USB port pointing FORWARD.
          *
@@ -119,7 +125,7 @@ public class SamIMUOmniDriveTrain
 
         // Now initialize the IMU with this mounting orientation
         // This sample expects the IMU to be in a REV Hub and named "imu".
-        imu = opMode.hardwareMap.get(IMU.class, "imu");
+        imu = hardwareMap.get(IMU.class, "imu");
         imu.initialize(new IMU.Parameters(orientationOnRobot));
 
         // Reset the IMU heading.
@@ -250,8 +256,8 @@ public class SamIMUOmniDriveTrain
      * Initialize
      */
     public void init() {
-        initMotors();
-        initIMU();
+        initMotors(opMode.hardwareMap);
+        initIMU(opMode.hardwareMap);
     }
 
     /**
