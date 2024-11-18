@@ -294,22 +294,23 @@ public class SamIMUOmniDriveTrain
         double targetY = y + errY;
 
         while(opMode.opModeIsActive() &&
-                (Math.abs(errX) > MOVE_THRESHOLD_INCH||Math.abs(errY) > MOVE_THRESHOLD_INCH)) {
-            // Multiply the error by the gain to determine the required correction/  Limit the result to +/- 1.0
+                (Math.abs(errX) > MOVE_THRESHOLD_INCH || Math.abs(errY) > MOVE_THRESHOLD_INCH)) {
+            // Multiply the error by the gain to determine the required correction
+            // Limit the result to +/- 1.0
             double xPower = Range.clip(errX * MOVE_GAIN, -1, 1);
             double yPower = Range.clip(errY * MOVE_GAIN, -1, 1);
 
-            // Clip the speed to the maximum permitted value.
+            // Clip the power to the maximum permitted value.
             xPower = clampMagnitude(xPower, MIN_MOVE_POWER, maxPower); // MIN_MOVE_POWER to prevent stalling
             yPower = clampMagnitude(yPower, MIN_MOVE_POWER, maxPower); // MIN_MOVE_POWER to prevent stalling
 
-            // Pivot in place by applying the turning correction
+            // Pivot in place by applying the moving correction
             moveRobot(xPower, yPower, 0);
 
             // Get current position / error
             x = odometerX.getCurrentPosition() * ODOMETER_INCH_PER_COUNT; // inches
-            errX = targetX - x;
             y = odometerY.getCurrentPosition() * ODOMETER_INCH_PER_COUNT; // inches
+            errX = targetX - x;
             errY = targetY - y;
         }
         stopMotors();
