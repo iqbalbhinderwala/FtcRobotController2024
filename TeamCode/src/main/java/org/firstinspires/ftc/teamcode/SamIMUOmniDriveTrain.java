@@ -284,7 +284,13 @@ public class SamIMUOmniDriveTrain
         moveRobot(forward, -right, 0);
     }
 
-
+    /**
+     * Drive by distance
+     * <p>
+     * Positive X is forward
+     * <p>
+     * Positive Y is strafe left
+     **/
     public void driveDistance(double dx, double dy, double maxPower) {
         double x = odometerX.getCurrentPosition() * ODOMETER_INCH_PER_COUNT; // inches
         double y = odometerY.getCurrentPosition() * ODOMETER_INCH_PER_COUNT; // inches

@@ -7,8 +7,8 @@ public class TemplateExternalClass {
 
     /* Declare Component members. */
 
-    public TemplateExternalClass(LinearOpMode myOpMode) {
-        opMode = myOpMode;
+    public TemplateExternalClass(LinearOpMode opMode) {
+        this.opMode = opMode;
     }
 
     // Initialize all hardware components.
@@ -16,6 +16,6 @@ public class TemplateExternalClass {
     }
 
     // Start all hardware components.
-    public void start(){
+    public void start() {
     }
 }

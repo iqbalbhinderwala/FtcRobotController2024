@@ -34,14 +34,14 @@ public class SamMainTeleop extends LinearOpMode {
         joints = new SamJoints(this);
         claw = new SamClaw(this);
 
+        // Wait for the game to start (driver presses PLAY)
+        waitForStart();
+        runtime.reset();
+
         // Initialize components.
         nav.init();
         joints.init();
         claw.init();
-
-        // Wait for the game to start (driver presses PLAY)
-        waitForStart();
-        runtime.reset();
 
         // Start components.
         joints.start();
