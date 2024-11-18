@@ -72,13 +72,6 @@ public class SamIMUOmniDriveTrain
     private double leftBackPower   = 0;
     private double rightBackPower  = 0;
 
-    // These constants define the desired driving/control characteristics
-    // They can/should be tweaked to suit the specific robot drive train.
-    static final double HEADING_THRESHOLD = 1.0 ;   // How close must the heading get to the target before moving to next step.
-                                                    // Requiring more accuracy (a smaller number) will often make the turn take longer to get into the final position.
-
-    static final double MIN_TURN_SPEED = 0.2;
-
     // Constructor
     public SamIMUOmniDriveTrain(LinearOpMode myOpMode) {
         opMode = myOpMode;
@@ -188,10 +181,6 @@ public class SamIMUOmniDriveTrain
         return Range.clip(headingError * proportionalGain, -1, 1);
     }
 
-
-    // Adjust these numbers to suit your robot.
-    final double TURN_GAIN   =  0.015 ;    //  Turn Control "Gain".  eg: Ramp up to 25% power at a 25 degree error. (0.25 / 25.0)
-
     /**
      *  Spin on the central axis to point in a new direction.
      *  <p>
@@ -213,12 +202,8 @@ public class SamIMUOmniDriveTrain
         // Run getSteeringCorrection() once to calculate the current heading error
         getSteeringCorrection(heading, TURN_GAIN);
 
-        // Account for overshooting
-        double overshoot = 0.10 * Math.abs(headingError);  // 0.10 tuned/tested only for 90 degree turns
-        double headingThresholdWithOvershoot = Math.max(HEADING_THRESHOLD, overshoot);
-
         // keep looping while we are still active, and not on heading.
-        while (opMode.opModeIsActive() && (Math.abs(headingError) > headingThresholdWithOvershoot)) {
+        while (opMode.opModeIsActive() && (Math.abs(headingError) > HEADING_THRESHOLD)) {
             if( timer.seconds() > timeout){
                 opMode.telemetry.addLine("TurnToHeading::Timeout");
                 break;
@@ -234,14 +219,15 @@ public class SamIMUOmniDriveTrain
 
             headingError = heading - getHeading();
 
-//            opMode.telemetry.addData(">", "yaw=%.2f  err=%.2f turnPwr=%.2f", getHeading(), headingError, turnSpeed);
+            // opMode.telemetry.addData(">", "yaw=%.2f  err=%.2f turnPwr=%.2f", getHeading(), headingError, turnSpeed);
+            // opMode.telemetry.update();
         }
 
         // Stop all motion
         moveRobot(0, 0, 0);
 
-        opMode.telemetry.addData(">", "%.1fsec  target=%.2f yaw=%.2f  err=%.2f",
-                timer.seconds(), targetHeading, getHeading(), headingError);
+        // opMode.telemetry.addData(">", "%.1fsec  target=%.2f yaw=%.2f  err=%.2f",
+        //         timer.seconds(), targetHeading, getHeading(), headingError);
 //        opMode.telemetry.addLine("Done. Press BACK to continue.");
 //        opMode.telemetry.update();
 //        while(opMode.opModeIsActive()&&!opMode.gamepad1.back){opMode.sleep(100);}
@@ -258,6 +244,16 @@ public class SamIMUOmniDriveTrain
     public void init() {
         initMotors(opMode.hardwareMap);
         initIMU(opMode.hardwareMap);
+    }
+
+    /**
+     * Start
+     */
+    public void start() {
+        // Reset all encoders
+        for (DcMotor motor : new DcMotor[]{leftFrontDrive, leftBackDrive, rightFrontDrive, rightBackDrive, odometerX, odometerY}) {
+            motor.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+        }
     }
 
     /**
@@ -295,13 +291,59 @@ public class SamIMUOmniDriveTrain
         moveRobot(forward, -right, 0);
     }
 
-    public void driveStraight(double power, double heading, double seconds) {
-        ElapsedTime timer = new ElapsedTime();
-        timer.reset();
-        while(opMode.opModeIsActive() && timer.seconds() < seconds) {
-            cruise(power, heading);
+
+    public void driveDistance(double dx, double dy, double maxPower) {
+        double x = odometerX.getCurrentPosition() * ODOMETER_INCH_PER_COUNT; // inches
+        double y = odometerY.getCurrentPosition() * ODOMETER_INCH_PER_COUNT; // inches
+        double errX = dx;
+        double errY = dy;
+        double targetX = x + errX;
+        double targetY = y + errY;
+
+        while(opMode.opModeIsActive() &&
+                (Math.abs(errX) > MOVE_THRESHOLD_INCH||Math.abs(errY) > MOVE_THRESHOLD_INCH)) {
+            // Multiply the error by the gain to determine the required correction/  Limit the result to +/- 1.0
+            double xPower = Range.clip(errX * MOVE_GAIN, -1, 1);
+            double yPower = Range.clip(errY * MOVE_GAIN, -1, 1);
+
+            // Clip the speed to the maximum permitted value.
+            xPower = clampMagnitude(xPower, MIN_MOVE_POWER, maxPower); // MIN_MOVE_POWER to prevent stalling
+            yPower = clampMagnitude(yPower, MIN_MOVE_POWER, maxPower); // MIN_MOVE_POWER to prevent stalling
+
+            // Pivot in place by applying the turning correction
+            moveRobot(xPower, yPower, 0);
+
+            // Get current position / error
+            x = odometerX.getCurrentPosition() * ODOMETER_INCH_PER_COUNT; // inches
+            errX = targetX - x;
+            y = odometerY.getCurrentPosition() * ODOMETER_INCH_PER_COUNT; // inches
+            errY = targetY - y;
         }
         stopMotors();
     }
 
+    public void addTelemetry() {
+        opMode.telemetry.addData("Odometer",
+                "(%.1f,%.1f) in",
+                odometerX.getCurrentPosition() * ODOMETER_INCH_PER_COUNT,
+                odometerY.getCurrentPosition() * ODOMETER_INCH_PER_COUNT);
+    }
+
+
+    // These constants define the desired driving/control characteristics
+    // They can/should be tweaked to suit the specific robot drive train.
+    static final double HEADING_THRESHOLD = 2.0 ;   // How close must the heading get to the target before moving to next step.
+                                                    // Requiring more accuracy (a smaller number) will often make the turn take longer to get into the final position.
+    static final double MIN_TURN_SPEED = 0.1;
+    static final double TURN_GAIN = 1.0 / 15.0 ;    // Turn Control "Gain". Start reducing power at 15 degrees.
+
+    static final double MOVE_THRESHOLD_INCH = 0.5;
+    static final double MIN_MOVE_POWER = 0.1;
+    static final double MOVE_GAIN = 1.0 / 3.0;      // Move Control "Gain". Start reducing power at 3 inches
+
+    // https://www.gobilda.com/swingarm-odometry-pod-48mm-wheel/
+    static final double ODOMETER_DIAMETER_MM = 48;
+    static final double ODOMETER_COUNT_PER_REVOLUTION = 2000;
+    static final double ODOMETER_MM_PER_COUNT = (ODOMETER_DIAMETER_MM * Math.PI) / ODOMETER_COUNT_PER_REVOLUTION;
+    static final double ODOMETER_INCH_PER_COUNT = ODOMETER_MM_PER_COUNT / 25.4;
 }

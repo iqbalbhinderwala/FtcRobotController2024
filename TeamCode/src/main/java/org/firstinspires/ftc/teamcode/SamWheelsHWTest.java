@@ -85,7 +85,6 @@ public class SamWheelsHWTest extends LinearOpMode {
     double rightFrontVelocity = 0.0;
     double rightBackVelocity = 0.0;
 
-    private final double PRESS_DELAY = 0.25;
     private DcMotor leftFrontDrive = null;
     private DcMotor leftBackDrive = null;
     private DcMotor rightFrontDrive = null;
@@ -94,7 +93,8 @@ public class SamWheelsHWTest extends LinearOpMode {
     private DcMotor odometerX = null;
     private DcMotor odometerY = null;
 
-    double maxPower = 0.3;
+    private final double PRESS_DELAY = 0.25;
+    double maxPower = 0.5;
     boolean individualWheelControl = false;
     boolean isForwardDirectionInverted = false;
     boolean enableBrake = false;
@@ -292,7 +292,7 @@ public class SamWheelsHWTest extends LinearOpMode {
                 rightBackLastPos = rightBackDrive.getCurrentPosition();
             }
             // Show the elapsed game time and wheel power.
-            telemetry.addData(">", "DPad Up/Down Adjust speed");
+            telemetry.addData(">", "DPad U/D Adjust power");
             telemetry.addData(">", "X/Y: Front Wheels (L/R)");
             telemetry.addData(">", "A/B: Back  Wheels (L/R)");
             telemetry.addData(">", "BACK button: Invert forward direction");
@@ -307,8 +307,17 @@ public class SamWheelsHWTest extends LinearOpMode {
             telemetry.addData("Velocity Back  Left/Right", "%4.2f, %4.2f /s", leftBackVelocity, rightBackVelocity);
             telemetry.addData("Encoder Front Left/Right", "%d, %d", leftFrontDrive.getCurrentPosition(), rightFrontDrive.getCurrentPosition());
             telemetry.addData("Encoder Back  Left/Right", "%d, %d", leftBackDrive.getCurrentPosition(), rightBackDrive.getCurrentPosition());
-            telemetry.addData("Odometer Front/Side", "%d, %d", odometerX.getCurrentPosition(), odometerY.getCurrentPosition());
+            telemetry.addData("Odometer", "(%d, %d)  --> (%.1f,%.1f) INCH",
+                    odometerX.getCurrentPosition(), odometerY.getCurrentPosition(),
+                    odometerX.getCurrentPosition()*ODOMETER_INCH_PER_COUNT,
+                    odometerY.getCurrentPosition()*ODOMETER_INCH_PER_COUNT);
             telemetry.update();
         }
     }
+
+    // https://www.gobilda.com/swingarm-odometry-pod-48mm-wheel/
+    private static final double ODOMETER_DIAMETER_MM = 48;
+    private static final double ODOMETER_COUNT_PER_REVOLUTION = 2000;
+    private static final double ODOMETER_MM_PER_COUNT = (ODOMETER_DIAMETER_MM * Math.PI) / ODOMETER_COUNT_PER_REVOLUTION;
+    private static final double ODOMETER_INCH_PER_COUNT = ODOMETER_MM_PER_COUNT / 25.4;
 }
