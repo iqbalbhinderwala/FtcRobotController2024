@@ -23,14 +23,14 @@ public class SamAutoDriveSample extends LinearOpMode
     @Override
     public void runOpMode()
     {
-        robot.init();
-
         // Send telemetry message to signify robot waiting
         telemetry.addData("Status", "Ready to start.");
         telemetry.update();
 
-        // Wait for driver to press PLAY
+        // Wait for driver to press PLAY before robot allowed to move.
         waitForStart();
+
+        robot.init();
 
         // Started
         while (opModeIsActive())
@@ -46,24 +46,26 @@ public class SamAutoDriveSample extends LinearOpMode
             // turn 90 degrees right.
             if(gamepad1.dpad_left) {
                 targetHeading -= 90;
-                robot.turnToHeading(MAX_TURN_SPEED, targetHeading, 1000);
+                robot.turnToHeading(MAX_TURN_SPEED, targetHeading);
             }
             // turn 90 degrees left.
             if(gamepad1.dpad_right) {
                 targetHeading += 90;
-                robot.turnToHeading(MAX_TURN_SPEED, targetHeading, 1000);
+                robot.turnToHeading(MAX_TURN_SPEED, targetHeading);
             }
-            // forward
+            // move forward
             if(gamepad1.y) {
                 robot.driveDistance(DISTANCE_INCH, 0, MAX_DRIVE_POWER);
             }
+            // move back
             if(gamepad1.a) {
                 robot.driveDistance(-DISTANCE_INCH, 0, MAX_DRIVE_POWER);
             }
-            //
+            // strafe left
             if(gamepad1.x) {
                 robot.driveDistance(0, DISTANCE_INCH, MAX_DRIVE_POWER);
             }
+            // strafe right
             if(gamepad1.b) {
                 robot.driveDistance(0, -DISTANCE_INCH, MAX_DRIVE_POWER);
             }

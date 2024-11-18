@@ -195,19 +195,12 @@ public class SamIMUOmniDriveTrain
      *              0 = fwd. +ve is CCW from fwd. -ve is CW from forward.
      *              If a relative angle is required, add/subtract from current heading.
      */
-    public void turnToHeading(double maxTurnSpeed, double heading, double timeout) {
-        ElapsedTime timer = new ElapsedTime();
-        timer.reset();
-
+    public void turnToHeading(double maxTurnSpeed, double heading) {
         // Run getSteeringCorrection() once to calculate the current heading error
         getSteeringCorrection(heading, TURN_GAIN);
 
         // keep looping while we are still active, and not on heading.
         while (opMode.opModeIsActive() && (Math.abs(headingError) > HEADING_THRESHOLD)) {
-            if( timer.seconds() > timeout){
-                opMode.telemetry.addLine("TurnToHeading::Timeout");
-                break;
-            }
             // Determine required steering to keep on heading
             double turnSpeed = getSteeringCorrection(heading, TURN_GAIN);
 
