@@ -87,7 +87,7 @@ public class SamJoints {
     }
 
     private boolean isBaseForward() {
-            return isBaseCalibrated && (baseMotor.getCurrentPosition() > BASE_POS_FORWARD_MIN);
+        return isBaseCalibrated && (baseMotor.getCurrentPosition() > BASE_POS_FORWARD_MIN);
     }
 
     private boolean isArmExtended() {
@@ -212,6 +212,7 @@ public class SamJoints {
         HIGHBAR,
         LOWBAR,
         RAIL,
+        RAIL_UP,
         TRANSITION,
     }
 
@@ -225,16 +226,19 @@ public class SamJoints {
                 activatePose(pose, 0, 0, 0);
                 break;
             case ARENA:
-                activatePose(pose, 7170, 2120, 3500);
+                activatePose(pose, 7325, 1350, 0.65);
                   break;
             case HIGHBAR:
-                activatePose(pose, 2500, 2800, 2400);
+                activatePose(pose, 3000, 2070, 0.68);
                 break;
-            case LOWBAR:
-                activatePose(pose, 4500, 4000, 7000);
-                break;
+//            case LOWBAR:
+//                activatePose(pose, 4500, 4000, 7000);
+//                break;
             case RAIL:
-                activatePose(pose, 5200, 1175, 2900);
+                activatePose(pose, 5850, 0, 0.58);
+                break;
+            case RAIL_UP:
+                activatePose(pose, 5850-1500, 0, 0.58);
                 break;
             case TRANSITION:
                 activatePose(pose, BASE_POS_FORWARD_MIN, ARM_POS_EXTENDED_MIN, 5000);

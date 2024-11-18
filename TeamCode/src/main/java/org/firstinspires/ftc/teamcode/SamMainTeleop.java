@@ -16,9 +16,9 @@ public class SamMainTeleop extends LinearOpMode {
     public SamJoints joints = null;
     public SamClaw claw = null;
 
-    double MAX_DRIVE_SPEED  = 1;
-    double MAX_STRAFE_SPEED = 1;
-    double MAX_TURN_SPEED   = 1;
+    double MAX_DRIVE_SPEED  = 0.7;
+    double MAX_STRAFE_SPEED = 0.7;
+    double MAX_TURN_SPEED   = 0.7;
 
     ElapsedTime lastPress = new ElapsedTime();
     ElapsedTime lastLeftBumper = new ElapsedTime();
@@ -57,7 +57,7 @@ public class SamMainTeleop extends LinearOpMode {
             // GAMEPAD 1 - ARM CONTROL
 
             // Claw
-            if (gamepad1.left_bumper && lastLeftBumper.seconds() > BUTTON_DELAY) {
+            if (gamepad2.left_bumper && lastLeftBumper.seconds() > BUTTON_DELAY) {
                 lastLeftBumper.reset();
                 claw.toggle();
             }
@@ -69,17 +69,17 @@ public class SamMainTeleop extends LinearOpMode {
             }
 
             // Presets
-            if (gamepad1.b) {
+            if (gamepad2.b) {
                 joints.terminateActivePreset();
-//            } else if (gamepad1.dpad_down) {
-//                joints.activatePreset(SamJoints.Pose.ARENA);
-            } else if (gamepad1.dpad_left) {
+            } else if (gamepad2.dpad_down) {
+                joints.activatePreset(SamJoints.Pose.ARENA);
+            } else if (gamepad2.dpad_left) {
                 joints.activatePreset(SamJoints.Pose.RAIL);
-            } else if (gamepad1.dpad_up) {
+            } else if (gamepad2.dpad_up) {
                 joints.activatePreset(SamJoints.Pose.HIGHBAR);
-            } else if (gamepad1.dpad_right) {
-                joints.activatePreset(SamJoints.Pose.TRANSITION);
-            } else if (gamepad1.back) {
+            } else if (gamepad2.dpad_right) {
+                joints.activatePreset(SamJoints.Pose.RAIL_UP);
+            } else if (gamepad2.back) {
                 joints.activatePreset(SamJoints.Pose.PARKED);
             } else {
                 joints.stepActivePreset();
