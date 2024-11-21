@@ -55,19 +55,10 @@ public class SamJoints {
         baseMotor   = hardwareMap.get(DcMotor.class, "motor base");
         armMotor    = hardwareMap.get(DcMotor.class, "motor arm");
         wristServo  = hardwareMap.get(Servo.class, "servo wrist");
-//        clawServo   = hardwareMap.get(Servo.class,"servo claw");
 
         baseMotor.setDirection(DcMotor.Direction.FORWARD);
         armMotor .setDirection(DcMotor.Direction.REVERSE);
         wristServo.setDirection(Servo.Direction.REVERSE); // 0: parked
-//        clawServo .setDirection(Servo.Direction.FORWARD); // 0: opened
-    }
-
-    public void stepActivePreset() {
-        // Terminate active preset if motors stopped
-        if (activePreset != Pose.NONE && !areMotorsBusy()) {
-            terminateActivePreset();
-        }
     }
 
     public void addTelemetry(){
@@ -95,16 +86,16 @@ public class SamJoints {
     }
 
     public void actuate(double basePower, double armPower, double wristPower) {
-        int basePos  = baseMotor.getCurrentPosition();
-        int armPos   = armMotor.getCurrentPosition();
+        int basePos = baseMotor.getCurrentPosition();
+        int armPos = armMotor.getCurrentPosition();
         double wristPos = wristServo.getPosition();
 
         // If moving past safe limits, cut the power
-        if (isBaseCalibrated) {
-            basePower = cutPowerIfMovingPastLimits(basePower, basePos, BASE_POS_MIN, BASE_POS_MAX);
+        if (isBaseCalibrated && isMovingPastLimits(basePower, basePos, BASE_POS_MIN, BASE_POS_MAX)) {
+            basePower = 0;
         }
-        if (isArmCalibrated) {
-            armPower = cutPowerIfMovingPastLimits(armPower, armPos, ARM_POS_MIN, ARM_POS_MAX);
+        if (isArmCalibrated && isMovingPastLimits(armPower, armPos, ARM_POS_MIN, ARM_POS_MAX)) {
+            armPower = 0;
         }
 
         // Limit Base Forward | Arm Extension
@@ -117,18 +108,28 @@ public class SamJoints {
 //            basePower = cutPowerIfMovingPastLimits(basePower, basePos, BASE_POS_MIN, BASE_POS_FORWARD_MIN);
 //        }
 
-        double maxBasePower  = isBaseCalibrated  ? BASE_RUN_POWER  : BASE_SEARCH_POWER;
-        double maxArmPower   = isArmCalibrated   ? ARM_RUN_POWER   : ARM_SEARCH_POWER;
+        double maxBasePower  = isBaseCalibrated ? BASE_RUN_POWER : BASE_SEARCH_POWER;
+        double maxArmPower   = isArmCalibrated  ? ARM_RUN_POWER  : ARM_SEARCH_POWER;
+
+        // Also reduce power when approaching ZERO to match search power used when calibrating
+        if (isBaseCalibrated && isApproachingZero(basePower, basePos, BASE_SENSOR_SPAN)) {
+            maxBasePower = BASE_SEARCH_POWER;
+        }
+        if (isArmCalibrated && isApproachingZero(armPower, armPos, ARM_SENSOR_SPAN)) {
+            maxArmPower = ARM_SEARCH_POWER;
+        }
 
         baseMotor.setPower(Range.clip(basePower, -maxBasePower, maxBasePower));
-        armMotor.setPower(Range.clip(armPower, -maxArmPower, maxArmPower));
+        armMotor .setPower(Range.clip(armPower,  -maxArmPower,  maxArmPower));
         wristServo.setPosition(wristPos + wristPower * WRIST_INCREMENT);
     }
 
-    private double cutPowerIfMovingPastLimits(double power, int pos, int minPos, int maxPos) {
-        if ((pos < minPos && power < 0) || (pos > maxPos && power > 0))
-            return 0;
-        return power;
+    private boolean isMovingPastLimits(double power, int pos, int minPos, int maxPos) {
+        return (pos < minPos && power < 0) || (pos > maxPos && power > 0);
+    }
+
+    private boolean isApproachingZero(double power, int pos, int radius) {
+        return (Math.abs(pos) < radius) && (power*pos < 0);
     }
 
     private void activatePose(Pose pose, int basePos, int armPose, double wristPos) {
@@ -149,6 +150,13 @@ public class SamJoints {
         return activePreset != Pose.NONE;
     }
 
+    public void stepActivePreset() {
+        // Terminate active preset if motors stopped
+        if (activePreset != Pose.NONE && !areMotorsBusy()) {
+            terminateActivePreset();
+        }
+    }
+
     public void terminateActivePreset() {
         if (activePreset != Pose.NONE) {
             // Stop the motors
@@ -160,7 +168,7 @@ public class SamJoints {
     }
 
     private boolean areMotorsBusy() {
-        return  baseMotor.isBusy() || armMotor.isBusy();
+        return baseMotor.isBusy() || armMotor.isBusy();
     }
 
     private void startMotorTargetPosition(DcMotor motor, int targetPos, double maxPower) {
@@ -229,11 +237,11 @@ public class SamJoints {
                 activatePose(pose, 8450, 1050, 0.65);
                   break;
             case HIGHBAR:
-                activatePose(pose, 4295, 2320, 0.50);
+                activatePose(pose, 4756, 2325, 0.50);
                 break;
-//            case LOWBAR:
+            case LOWBAR:
 //                activatePose(pose, 4500, 4000, 7000);
-//                break;
+                break;
             case RAIL:
                 activatePose(pose, 6450, 0, 0.65);
                 break;
@@ -241,7 +249,7 @@ public class SamJoints {
                 activatePose(pose, 6450-1500, 0, 0.65);
                 break;
             case TRANSITION:
-                activatePose(pose, BASE_POS_FORWARD_MIN, ARM_POS_EXTENDED_MIN, 5000);
+//                activatePose(pose, BASE_POS_FORWARD_MIN, ARM_POS_EXTENDED_MIN, 5000);
                 break;
         }
     }
@@ -252,7 +260,7 @@ public class SamJoints {
 //    final int    BASE_POS_VERTICAL    = +3200;
 
     final int    BASE_POS_MIN         =    +0; // MIN USER
-    //    final int    BASE_SENSOR_SPAN     =   700;
+    final int    BASE_SENSOR_SPAN     =   700;
     final double BASE_SEARCH_POWER    =   0.5;
     final double BASE_RUN_POWER       =   1.0;
 
@@ -262,7 +270,7 @@ public class SamJoints {
     final int    ARM_POS_EXTENDED_MIN = +1600;
     final int    ARM_POS_MIN          =    +0; // MIN USER
 
-    //    final int    ARM_SENSOR_SPAN      =   450;
+    final int    ARM_SENSOR_SPAN      =   450;
     final double ARM_SEARCH_POWER     =   0.5;
     final double ARM_RUN_POWER        =   1.0;
 
