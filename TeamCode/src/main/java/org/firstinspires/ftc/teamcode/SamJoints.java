@@ -249,6 +249,7 @@ public class SamJoints {
                 break;
             case ARENA:
                 activatePose(pose, 8450, 1050, 0.65);
+                activatePose(pose, 8450, 1050, 0.65);
                   break;
             case HIGHBAR:
                 activatePose(pose, 4756, 2325, 0.50);
@@ -257,6 +258,7 @@ public class SamJoints {
 //                activatePose(pose, 4500, 4000, 7000);
                 break;
             case RAIL:
+                activatePose(pose, 6450, 0, 0.65);
                 activatePose(pose, 6450, 0, 0.65);
                 break;
             case RAIL_UP:
@@ -269,6 +271,7 @@ public class SamJoints {
     }
 
     // BASE MOTOR
+    final int    BASE_POS_MAX         = +8500; // MAX USER
     final int    BASE_POS_MAX         = +8500; // MAX USER
     final int    BASE_POS_FORWARD_MIN = +5300;
 //    final int    BASE_POS_VERTICAL    = +3200;
