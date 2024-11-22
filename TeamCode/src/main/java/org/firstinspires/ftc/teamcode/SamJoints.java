@@ -154,6 +154,20 @@ public class SamJoints {
         // Terminate active preset if motors stopped
         if (activePreset != Pose.NONE && !areMotorsBusy()) {
             terminateActivePreset();
+        } else {
+            // Also reduce power when approaching ZERO to match search power used when calibrating
+            double basePower = baseMotor.getPower();
+            int basePos = baseMotor.getCurrentPosition();
+            if (isBaseCalibrated && isApproachingZero(basePower, basePos, BASE_SENSOR_SPAN)) {
+                double maxBasePower = BASE_SEARCH_POWER;
+                baseMotor.setPower(Range.clip(basePower, -maxBasePower, maxBasePower));
+            }
+            double armPower = armMotor.getPower();
+            int armPos = armMotor.getCurrentPosition();
+            if (isArmCalibrated && isApproachingZero(armPower, armPos, ARM_SENSOR_SPAN)) {
+                double maxArmPower = ARM_SEARCH_POWER;
+                armMotor .setPower(Range.clip(armPower,  -maxArmPower,  maxArmPower));
+            }
         }
     }
 
