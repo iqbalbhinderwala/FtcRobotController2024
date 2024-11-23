@@ -252,7 +252,7 @@ public class SamJoints {
                 activatePose(pose, 8450, 1050, 0.65);
                   break;
             case HIGHBAR:
-                activatePose(pose, 4756, 2325, 0.50);
+                activatePose(pose, 4760, 2570, 0.50);
                 break;
             case LOWBAR:
 //                activatePose(pose, 4500, 4000, 7000);

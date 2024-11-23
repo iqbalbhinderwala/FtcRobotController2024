@@ -40,6 +40,8 @@ import com.qualcomm.robotcore.util.Range;
 import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit;
 import org.firstinspires.ftc.robotcore.external.navigation.YawPitchRollAngles;
 
+import android.util.Log;
+
 /* FROM SAMPLES RobotAutoDriveToAprilTagOmni.java and RobotAutoDriveByGyro_Linear.java
  *
  */
@@ -243,10 +245,17 @@ public class SamIMUOmniDriveTrain
      * Start
      */
     public void start() {
+        // TODO: CHECK IF THIS WORKS AS INTENDED
+
         // Reset all encoders
         for (DcMotor motor : new DcMotor[]{leftFrontDrive, leftBackDrive, rightFrontDrive, rightBackDrive, odometerX, odometerY}) {
             motor.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
         }
+    }
+
+    public void resetOdometers(){
+        odometerX.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+        odometerY.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
     }
 
     /**
@@ -284,8 +293,16 @@ public class SamIMUOmniDriveTrain
         moveRobot(forward, -right, 0);
     }
 
+    public double getCurrentInchesOdometerX() {
+        return odometerX.getCurrentPosition() * ODOMETER_INCH_PER_COUNT; // inches
+    }
+
+    public double getCurrentInchesOdometerY() {
+        return odometerY.getCurrentPosition() * ODOMETER_INCH_PER_COUNT; // inches
+    }
+
     /**
-     * Drive by distance
+     * Drive by distance in inches
      * <p>
      * Positive X is forward
      * <p>
@@ -318,6 +335,8 @@ public class SamIMUOmniDriveTrain
             y = odometerY.getCurrentPosition() * ODOMETER_INCH_PER_COUNT; // inches
             errX = targetX - x;
             errY = targetY - y;
+
+            // Log.d(TAG+"driveDistance", "err "+errX+","+errY);
         }
         stopMotors();
     }
@@ -346,4 +365,6 @@ public class SamIMUOmniDriveTrain
     static final double ODOMETER_COUNT_PER_REVOLUTION = 2000;
     static final double ODOMETER_MM_PER_COUNT = (ODOMETER_DIAMETER_MM * Math.PI) / ODOMETER_COUNT_PER_REVOLUTION;
     static final double ODOMETER_INCH_PER_COUNT = ODOMETER_MM_PER_COUNT / 25.4;
+
+    private static final String TAG = "SAM::"; // Define your tag
 }
