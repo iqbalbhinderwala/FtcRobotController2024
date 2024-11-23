@@ -99,14 +99,14 @@ public class SamJoints {
         }
 
         // Limit Base Forward | Arm Extension
-//        if (isBaseForward()) {
-//            // If base is forward, restrict arm from extending
-//            armPower = cutPowerIfMovingPastLimits(armPower, armPos, ARM_POS_MIN, ARM_POS_EXTENDED_MIN);
-//        }
-//        if (isArmExtended()) {
-//            // If arm is extended, restrict base being forward
-//            basePower = cutPowerIfMovingPastLimits(basePower, basePos, BASE_POS_MIN, BASE_POS_FORWARD_MIN);
-//        }
+        if (isBaseForward() && isMovingPastLimits(armPower, armPos, ARM_POS_MIN, ARM_POS_EXTENDED_MIN)) {
+            // If base is forward, restrict arm from extending
+            armPower = 0;
+        }
+        if (isArmExtended() && isMovingPastLimits(basePower, basePos, BASE_POS_MIN, BASE_POS_FORWARD_MIN)) {
+            // If arm is extended, restrict base being forward
+            basePower = 0;
+        }
 
         double maxBasePower  = isBaseCalibrated ? BASE_RUN_POWER : BASE_SEARCH_POWER;
         double maxArmPower   = isArmCalibrated  ? ARM_RUN_POWER  : ARM_SEARCH_POWER;
@@ -272,8 +272,7 @@ public class SamJoints {
 
     // BASE MOTOR
     final int    BASE_POS_MAX         = +8500; // MAX USER
-    final int    BASE_POS_MAX         = +8500; // MAX USER
-    final int    BASE_POS_FORWARD_MIN = +5300;
+    final int    BASE_POS_FORWARD_MIN = +6000;
 //    final int    BASE_POS_VERTICAL    = +3200;
 
     final int    BASE_POS_MIN         =    +0; // MIN USER
@@ -284,7 +283,7 @@ public class SamJoints {
     // ARM MOTOR
     final int    ARM_POS_MAX          = +8300; // MAX USER
 //    final int    ARM_POS_90DEG        = +3900;
-    final int    ARM_POS_EXTENDED_MIN = +1600;
+    final int    ARM_POS_EXTENDED_MIN = +2000;
     final int    ARM_POS_MIN          =    +0; // MIN USER
 
     final int    ARM_SENSOR_SPAN      =   450;

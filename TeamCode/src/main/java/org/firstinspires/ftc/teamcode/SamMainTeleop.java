@@ -45,6 +45,7 @@ public class SamMainTeleop extends LinearOpMode {
 
         // Start components.
         joints.start();
+        claw.closed();
 
         // Run until the end of the match (driver presses STOP)
         while (opModeIsActive()) {
