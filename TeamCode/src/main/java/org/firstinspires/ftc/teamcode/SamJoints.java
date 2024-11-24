@@ -248,8 +248,7 @@ public class SamJoints {
                 activatePose(pose, 0, 0, 0);
                 break;
             case ARENA:
-                activatePose(pose, 8450, 1050, 0.65);
-                activatePose(pose, 8450, 1050, 0.65);
+                activatePose(pose, 8450, 1050, 0.50);
                   break;
             case HIGHBAR:
                 activatePose(pose, 4760, 2570, 0.50);
@@ -258,11 +257,10 @@ public class SamJoints {
 //                activatePose(pose, 4500, 4000, 7000);
                 break;
             case RAIL:
-                activatePose(pose, 6450, 0, 0.65);
-                activatePose(pose, 6450, 0, 0.65);
+                activatePose(pose, 6450, 0, 0.55);
                 break;
             case RAIL_UP:
-                activatePose(pose, 6450-1500, 0, 0.65);
+                activatePose(pose, 6450-1500, 0, 0.55);
                 break;
             case TRANSITION:
 //                activatePose(pose, BASE_POS_FORWARD_MIN, ARM_POS_EXTENDED_MIN, 5000);
