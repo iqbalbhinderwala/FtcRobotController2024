@@ -316,6 +316,10 @@ public class SamIMUOmniDriveTrain
         double targetX = x + errX;
         double targetY = y + errY;
 
+        ElapsedTime timer = new ElapsedTime();
+        timer.reset();
+        double prevErr = Math.sqrt(errX*errX + errY*errY);
+
         while(opMode.opModeIsActive() &&
                 (Math.abs(errX) > MOVE_THRESHOLD_INCH || Math.abs(errY) > MOVE_THRESHOLD_INCH)) {
             // Multiply the error by the gain to determine the required correction
@@ -336,7 +340,18 @@ public class SamIMUOmniDriveTrain
             errX = targetX - x;
             errY = targetY - y;
 
-            // Log.d(TAG+"driveDistance", "err "+errX+","+errY);
+            double newErr = Math.sqrt(errX*errX + errY*errY);
+            Log.d(TAG+"driveDistance", "err "+errX+","+errY+","+newErr);
+
+            if (timer.seconds() > 0.1) {
+                timer.reset();
+                if (prevErr <= newErr) {
+                    Log.d(TAG+"driveDistance", "OBSTACLE DETECTED. ABORT.");
+                    break;
+                }
+                prevErr = newErr;
+            }
+
         }
         stopMotors();
     }

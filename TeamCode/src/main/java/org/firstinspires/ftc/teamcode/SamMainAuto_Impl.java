@@ -63,7 +63,7 @@ public class SamMainAuto_Impl {
 
         // Clipping checkpoints (assume 47 inch to bar):
         final double X_START        =  0;
-        final double X_CLIPBAR      = 23;
+        final double X_CLIPBAR      = 22;
         final double X_PRESET_SAFE  = X_CLIPBAR - 8;
         final double X_CLIPPED      = X_CLIPBAR + 4;
         final double X_PARKED       = 6; 
@@ -83,7 +83,7 @@ public class SamMainAuto_Impl {
             joints.activatePreset(SamJoints.Pose.HIGHBAR);
         }
 
-        // Drive a little whie preset is active (blocking)
+        // Drive a little while preset is active (blocking)
         if (opMode.opModeIsActive()) {
             nav.driveDistance(X_PRESET_SAFE, 0, 1);
             Log.d("SAM::AUTO", "PRESET "+(nav.getCurrentInchesOdometerX()));
@@ -104,6 +104,8 @@ public class SamMainAuto_Impl {
         if (opMode.opModeIsActive()) {
             claw.open();
         }
+
+        opMode.sleep(1000);
 
         // Drive back to 6 inches from rail at high power (blocking)
         if (opMode.opModeIsActive()) {
