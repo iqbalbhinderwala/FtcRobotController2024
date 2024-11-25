@@ -72,6 +72,11 @@ public class SamMainAuto_Impl {
         final double Y_PARKED       = -50; // park right (negative)
 
 
+        if (startSide == Alliance.Side.LEFT) {
+            nav.driveDistance(0, -6, .3);
+            opMode.sleep(500);
+        }
+
         // Close the claw so we don't drop the pre-loaded specimen
         if (opMode.opModeIsActive()) {
             claw.closed();
