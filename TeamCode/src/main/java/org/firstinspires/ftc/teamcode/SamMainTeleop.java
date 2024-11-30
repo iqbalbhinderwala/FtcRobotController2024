@@ -16,8 +16,8 @@ public class SamMainTeleop extends LinearOpMode {
     public SamJoints joints = null;
     public SamClaw claw = null;
 
-    double MAX_DRIVE_SPEED  = 0.8;
-    double MAX_STRAFE_SPEED = 0.8;
+    double MAX_DRIVE_SPEED  = 1;
+    double MAX_STRAFE_SPEED = 1;
     double MAX_TURN_SPEED   = 0.8;
 
     ElapsedTime lastPress = new ElapsedTime();
