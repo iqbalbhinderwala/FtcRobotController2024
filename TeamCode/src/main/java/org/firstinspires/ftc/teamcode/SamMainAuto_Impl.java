@@ -69,8 +69,10 @@ public class SamMainAuto_Impl {
         final double X_PARKED       = 6; 
 
         final double Y_START        = 0;
+        final double Y_CORRIDOR     = -26.5; // observation corridor (negative)
         final double Y_PARKED       = -50; // park right (negative)
 
+        final int IDLE_DRIVE_TIME = 100; // Idle time between drive tasks (mSec)
 
         if (startSide == Alliance.Side.LEFT) {
             nav.driveDistance(0, -6, .3);
@@ -110,63 +112,57 @@ public class SamMainAuto_Impl {
             claw.open();
         }
 
-        opMode.sleep(1000);
-
         // Drive back to 6 inches from rail at high power (blocking)
         if (opMode.opModeIsActive()) {
+            opMode.sleep(500);
             nav.driveDistance(X_PARKED-nav.getCurrentInchesOdometerX(), 0, .7);
             Log.d("SAM::AUTO", "PARKED"+(nav.getCurrentInchesOdometerX()));
         }
 
-         // Initiate PARKED joints preset (non-blocking)
-         if (opMode.opModeIsActive()) {
-             joints.activatePreset(SamJoints.Pose.PARKED);
-         }
+        // Initiate PARKED joints preset (non-blocking)
+        if (opMode.opModeIsActive()) {
+            joints.activatePreset(SamJoints.Pose.PARKED);
+        }
 
-         // Strafe right to parking zone (blocking)
-         if (opMode.opModeIsActive()) {
-             nav.driveDistance(0, Y_PARKED, 1);
-         }
+        if (startSide == Alliance.Side.LEFT) {
+            // Strafe right to parking zone (blocking)
+            if (opMode.opModeIsActive()) {
+                nav.driveDistance(0, Y_PARKED, 1);
+            }
+        }
 
-         // Wait for PARKED preset to complete
+        // Push floor pieces into observation zone
+        if (startSide == Alliance.Side.RIGHT) {
+            // Strafe right to the corridor to get behind the pieces on the floor
+            if (opMode.opModeIsActive()) {
+                nav.driveDistance(0, Y_CORRIDOR, 1);
+                opMode.sleep(IDLE_DRIVE_TIME);
+            }
+
+            for (int i = 0; i < 3; i++) {
+                // Drive back to 6 inches from rail at high power (blocking)
+                if (opMode.opModeIsActive()) {
+                    nav.driveDistance(50 - nav.getCurrentInchesOdometerX(), 0, 1);
+                    opMode.sleep(IDLE_DRIVE_TIME);
+                }
+
+                // Strafe right to parking zone (blocking)
+                if (opMode.opModeIsActive()) {
+                    nav.driveDistance(0, -9, 1);
+                    opMode.sleep(IDLE_DRIVE_TIME);
+                }
+
+                // Drive back to 6 inches from rail at high power (blocking)
+                if (opMode.opModeIsActive()) {
+                    nav.driveDistance(6 - nav.getCurrentInchesOdometerX(), 0, 1);
+                    opMode.sleep(IDLE_DRIVE_TIME);
+                }
+            }
+        }
+
+        // Wait for PARKED preset to complete
          while(opMode.opModeIsActive() && joints.isPresetActive()) {
              joints.stepActivePreset();
          }
-
-         // TUrn from 0 to 90 to 180 degree heading
-//         nav.turnToHeading(1, 90);
-//         nav.turnToHeading(1, 180);
-
-        // joints.activatePreset(SamJoints.Pose.RAIL);
-
-        // nav.driveDistance(-3, 0, .3);
-
-        // // Wait for RAIL preset to complete
-        // while(opMode.opModeIsActive() && joints.isPresetActive()) {
-        //     joints.stepActivePreset();
-        // }
-
-        // nav.driveDistance(5, 0, .2);
-        // opMode.sleep(500);
-        // claw.closed();
-        // opMode.sleep(500);
-        // joints.activatePreset(SamJoints.Pose.RAIL_UP);
-        // opMode.sleep(100);
-        // nav.driveDistance(-5, 0, 0.2);
-
-        // // Turn from 180 to 90 to 0 heading
-        // nav.turnToHeading(1, 90);
-        // nav.turnToHeading(1, 0);
-
-        // joints.activatePreset(SamJoints.Pose.HIGHBAR);
-        // // Wait for HIGHBAR preset to complete
-        // while(opMode.opModeIsActive() && joints.isPresetActive()) {
-        //     joints.stepActivePreset();
-        // }
-
-        // nav.driveDistance(-12, 0, 1);
-
-        // nav.driveDistance(0, DISTANCE_PARKING_TO_HIGHBAR, 1);
-
     }
 }
