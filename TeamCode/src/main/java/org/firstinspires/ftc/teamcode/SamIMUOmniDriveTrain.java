@@ -346,7 +346,7 @@ public class SamIMUOmniDriveTrain
             if (timer.seconds() > 0.1) {
                 timer.reset();
                 if (prevErr <= newErr) {
-                    Log.d(TAG+"driveDistance", "OBSTACLE DETECTED. ABORT.");
+                    Log.d(TAG+"driveDistance", "OBSTRACTION DETECTED. ABORT.");
                     break;
                 }
                 prevErr = newErr;
