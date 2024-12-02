@@ -8,6 +8,7 @@ import android.util.Log;
 public class SamMainAuto_Impl {
     private LinearOpMode opMode;   // gain access to methods in the calling OpMode.
     private Alliance.Side startSide;
+    private boolean pushPiecesToMatchingZone;
 
     /* Declare Component members. */
     public SamIMUOmniDriveTrain nav = null;
@@ -16,9 +17,10 @@ public class SamMainAuto_Impl {
 
     private ElapsedTime runtime = new ElapsedTime();
 
-    public SamMainAuto_Impl(LinearOpMode opMode, Alliance.Side startSide) {
+    public SamMainAuto_Impl(LinearOpMode opMode, Alliance.Side startSide, boolean pushPiecesToMatchingZone) {
         this.opMode = opMode;
         this.startSide = startSide;
+        this.pushPiecesToMatchingZone = pushPiecesToMatchingZone;
     }
 
     // Initialize all hardware components.
@@ -53,13 +55,13 @@ public class SamMainAuto_Impl {
 
         // ------ Start performing tasks ------
 
-        // High clip bar is in front: 23in
+        // High clip bar is in front: 22in
         //   Split the drive in 2 segments:
         //      Close the claw so we don't drop the pre-loaded specimen
         //      Activate HIGHBAR joints preset
-        //      Drive forward 23-8 inches at high power
+        //      Drive forward fast a safe distance while preset is active
         //      Wait for the HIGHBAR preset to complete without hitting the bar
-        //      Drive 8 inches at much slower power to perform the clipping
+        //      Drive at much slower power to perform the clipping
 
         // Clipping checkpoints (assume 47 inch to bar):
         final double X_START        =  0;
@@ -68,20 +70,20 @@ public class SamMainAuto_Impl {
         final double X_CLIPPED      = X_CLIPBAR + 4;
         final double X_PARKED       = 6; 
 
-        final double Y_START        = 0;
-        final double Y_CORRIDOR     = -26.5; // observation corridor (negative)
-        final double Y_PARKED       = -50; // park right (negative)
+        final double Y_START        = 0; // -1.5 inches from middle of central seam
+        final double Y_CORRIDOR     = -26.5; // observation corridor (negative towards right)
 
         final int BRAKING_TIME = 200; // Idle time between drive tasks (mSec)
-
-        if (startSide == Alliance.Side.LEFT) {
-            nav.driveDistance(0, -6, .3);
-            opMode.sleep(500);
-        }
 
         // Close the claw so we don't drop the pre-loaded specimen
         if (opMode.opModeIsActive()) {
             claw.closed();
+        }
+
+        // If starting on left side, move slightly right to clear the left bar
+        if (startSide == Alliance.Side.LEFT) {
+            nav.driveDistance(0, -6, .3);
+            opMode.sleep(BRAKING_TIME);
         }
         Log.d("SAM::AUTO", "START "+(nav.getCurrentInchesOdometerX()));
 
@@ -110,11 +112,11 @@ public class SamMainAuto_Impl {
         // Open the claw
         if (opMode.opModeIsActive()) {
             claw.open();
+            opMode.sleep(500);
         }
 
         // Drive back to 6 inches from rail at high power (blocking)
         if (opMode.opModeIsActive()) {
-            opMode.sleep(500);
             nav.driveDistance(X_PARKED-nav.getCurrentInchesOdometerX(), 0, .7);
             Log.d("SAM::AUTO", "PARKED"+(nav.getCurrentInchesOdometerX()));
         }
@@ -124,18 +126,13 @@ public class SamMainAuto_Impl {
             joints.activatePreset(SamJoints.Pose.PARKED);
         }
 
-        if (startSide == Alliance.Side.LEFT) {
-            // Strafe right to parking zone (blocking)
-            if (opMode.opModeIsActive()) {
-                nav.driveDistance(0, Y_PARKED, 1);
-            }
-        }
+        // Push floor pieces into observation zone OR park
+        if (pushPiecesToMatchingZone) {
+            double mirrorY_if_LEFT_SIDE = (startSide == Alliance.Side.LEFT) ? -1 : 1;
 
-        // Push floor pieces into observation zone
-        if (startSide == Alliance.Side.RIGHT) {
-            // Strafe right to the corridor to get behind the pieces on the floor
+            // Strafe to the matching corridor to get behind the pieces on the floor
             if (opMode.opModeIsActive()) {
-                nav.driveDistance(0, Y_CORRIDOR, 1);
+                nav.driveDistance(0, Y_CORRIDOR*mirrorY_if_LEFT_SIDE - nav.getCurrentInchesOdometerY(), 1);
                 opMode.sleep(BRAKING_TIME);
             }
 
@@ -148,7 +145,7 @@ public class SamMainAuto_Impl {
 
                 // Strafe right to parking zone (blocking)
                 if (opMode.opModeIsActive()) {
-                    nav.driveDistance(0, -9, 1);
+                    nav.driveDistance(0, -9*mirrorY_if_LEFT_SIDE, 1);
                     opMode.sleep(BRAKING_TIME);
                 }
 
@@ -157,13 +154,21 @@ public class SamMainAuto_Impl {
                     nav.driveDistance(6 - nav.getCurrentInchesOdometerX(), 0, 1);
                     opMode.sleep(BRAKING_TIME);
                 }
-            }
-        }
+            } // for
 
-        // Strafe away from wall (blocking)
-        if (opMode.opModeIsActive()) {
-            nav.driveDistance(0, 6, 1);
-            opMode.sleep(BRAKING_TIME);
+            // Strafe away from wall (blocking)
+            if (opMode.opModeIsActive()) {
+                nav.driveDistance(0, 6*mirrorY_if_LEFT_SIDE, 1);
+                opMode.sleep(BRAKING_TIME);
+            }
+
+        } else {
+            // If not pushing pieces, then just park into observation zone on the right
+
+            // Strafe right 2 tiles to parking zone (blocking)
+            if (opMode.opModeIsActive()) {
+                nav.driveDistance(0, -50, 1);
+            }
         }
 
         // Wait for PARKED preset to complete
