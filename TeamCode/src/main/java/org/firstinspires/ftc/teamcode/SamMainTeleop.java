@@ -18,7 +18,7 @@ public class SamMainTeleop extends LinearOpMode {
 
     double MAX_DRIVE_SPEED  = 1;
     double MAX_STRAFE_SPEED = 1;
-    double MAX_TURN_SPEED   = 0.8;
+    double MAX_TURN_SPEED   = 1;
 
     ElapsedTime lastPress = new ElapsedTime();
     ElapsedTime lastLeftBumper = new ElapsedTime();
