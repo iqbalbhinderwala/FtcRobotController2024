@@ -72,7 +72,7 @@ public class SamMainAuto_Impl {
         final double Y_CORRIDOR     = -26.5; // observation corridor (negative)
         final double Y_PARKED       = -50; // park right (negative)
 
-        final int IDLE_DRIVE_TIME = 100; // Idle time between drive tasks (mSec)
+        final int BRAKING_TIME = 200; // Idle time between drive tasks (mSec)
 
         if (startSide == Alliance.Side.LEFT) {
             nav.driveDistance(0, -6, .3);
@@ -136,28 +136,34 @@ public class SamMainAuto_Impl {
             // Strafe right to the corridor to get behind the pieces on the floor
             if (opMode.opModeIsActive()) {
                 nav.driveDistance(0, Y_CORRIDOR, 1);
-                opMode.sleep(IDLE_DRIVE_TIME);
+                opMode.sleep(BRAKING_TIME);
             }
 
             for (int i = 0; i < 3; i++) {
                 // Drive back to 6 inches from rail at high power (blocking)
                 if (opMode.opModeIsActive()) {
                     nav.driveDistance(50 - nav.getCurrentInchesOdometerX(), 0, 1);
-                    opMode.sleep(IDLE_DRIVE_TIME);
+                    opMode.sleep(BRAKING_TIME);
                 }
 
                 // Strafe right to parking zone (blocking)
                 if (opMode.opModeIsActive()) {
                     nav.driveDistance(0, -9, 1);
-                    opMode.sleep(IDLE_DRIVE_TIME);
+                    opMode.sleep(BRAKING_TIME);
                 }
 
                 // Drive back to 6 inches from rail at high power (blocking)
                 if (opMode.opModeIsActive()) {
                     nav.driveDistance(6 - nav.getCurrentInchesOdometerX(), 0, 1);
-                    opMode.sleep(IDLE_DRIVE_TIME);
+                    opMode.sleep(BRAKING_TIME);
                 }
             }
+        }
+
+        // Strafe away from wall (blocking)
+        if (opMode.opModeIsActive()) {
+            nav.driveDistance(0, 6, 1);
+            opMode.sleep(BRAKING_TIME);
         }
 
         // Wait for PARKED preset to complete
