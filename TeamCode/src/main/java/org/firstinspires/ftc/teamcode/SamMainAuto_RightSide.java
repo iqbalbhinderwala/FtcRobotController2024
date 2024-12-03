@@ -4,7 +4,7 @@ import com.qualcomm.robotcore.eventloop.opmode.Autonomous;
 import com.qualcomm.robotcore.eventloop.opmode.Disabled;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 
-@Autonomous(name="[Sam] *** Auto - Start RIGHT Side (MAIN) ***", group="Sam")
+@Autonomous(name="[Sam] (1) Start RIGHT Side (MAIN)", group="Sam")
 //@Disabled
 public class SamMainAuto_RightSide extends LinearOpMode
 {

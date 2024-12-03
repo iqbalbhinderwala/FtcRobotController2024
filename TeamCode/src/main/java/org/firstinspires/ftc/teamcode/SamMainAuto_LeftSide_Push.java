@@ -3,7 +3,7 @@ package org.firstinspires.ftc.teamcode;
 import com.qualcomm.robotcore.eventloop.opmode.Autonomous;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 
-@Autonomous(name="[Sam] * Auto - Start LEFT Side (CLIP+PUSH Pieces) *", group="Sam")
+@Autonomous(name="[Sam] (2) Start LEFT Side (PUSH Pieces)", group="Sam")
 //@Disabled
 public class SamMainAuto_LeftSide_Push extends LinearOpMode
 {

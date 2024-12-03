@@ -68,7 +68,7 @@ public class SamMainAuto_Impl {
         final double X_CLIPBAR      = 22;
         final double X_PRESET_SAFE  = X_CLIPBAR - 8;
         final double X_CLIPPED      = X_CLIPBAR + 4;
-        final double X_PARKED       = 6; 
+        final double X_PARKED       = 10;
 
         final double Y_START        = 0; // -1.5 inches from middle of central seam
         final double Y_CORRIDOR     = -26.5; // observation corridor (negative towards right)
@@ -82,7 +82,7 @@ public class SamMainAuto_Impl {
 
         // If starting on left side, move slightly right to clear the left bar
         if (startSide == Alliance.Side.LEFT) {
-            nav.driveDistance(0, -6, .3);
+            nav.driveDistance(0, -6, 1);
             opMode.sleep(BRAKING_TIME);
         }
         Log.d("SAM::AUTO", "START "+(nav.getCurrentInchesOdometerX()));
@@ -115,7 +115,7 @@ public class SamMainAuto_Impl {
             opMode.sleep(500);
         }
 
-        // Drive back to 6 inches from rail at high power (blocking)
+        // Drive back to 10 inches from rail at high power (blocking)
         if (opMode.opModeIsActive()) {
             nav.driveDistance(X_PARKED-nav.getCurrentInchesOdometerX(), 0, .7);
             Log.d("SAM::AUTO", "PARKED"+(nav.getCurrentInchesOdometerX()));
@@ -139,7 +139,7 @@ public class SamMainAuto_Impl {
             for (int i = 0; i < 3; i++) {
                 // Drive back to 6 inches from rail at high power (blocking)
                 if (opMode.opModeIsActive()) {
-                    nav.driveDistance(50 - nav.getCurrentInchesOdometerX(), 0, 1);
+                    nav.driveDistance(51 - nav.getCurrentInchesOdometerX(), 0, 1);
                     opMode.sleep(BRAKING_TIME);
                 }
 
@@ -149,9 +149,9 @@ public class SamMainAuto_Impl {
                     opMode.sleep(BRAKING_TIME);
                 }
 
-                // Drive back to 6 inches from rail at high power (blocking)
+                // Drive back to 10 inches from rail at high power (blocking)
                 if (opMode.opModeIsActive()) {
-                    nav.driveDistance(6 - nav.getCurrentInchesOdometerX(), 0, 1);
+                    nav.driveDistance(X_PARKED - nav.getCurrentInchesOdometerX(), 0, 1);
                     opMode.sleep(BRAKING_TIME);
                 }
             } // for
