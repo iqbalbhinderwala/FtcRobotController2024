@@ -69,11 +69,14 @@ public class SamMainAuto_Impl {
         final double X_PRESET_SAFE  = X_CLIPBAR - 8;
         final double X_CLIPPED      = X_CLIPBAR + 4;
         final double X_PARKED       = 10;
+        final double X_PUSH         = 51;
 
         final double Y_START        = 0; // -1.5 inches from middle of central seam
         final double Y_CORRIDOR     = -26.5; // observation corridor (negative towards right)
 
         final int BRAKING_TIME = 200; // Idle time between drive tasks (mSec)
+
+        LogCurrentState("START");
 
         // Close the claw so we don't drop the pre-loaded specimen
         if (opMode.opModeIsActive()) {
@@ -84,8 +87,8 @@ public class SamMainAuto_Impl {
         if (startSide == Alliance.Side.LEFT) {
             nav.driveDistance(0, -6, 1);
             opMode.sleep(BRAKING_TIME);
+            LogCurrentState("Strafe by dY=-6");
         }
-        Log.d("SAM::AUTO", "START "+(nav.getCurrentInchesOdometerX()));
 
         // Initiate HIGHBAR joints preset (non-blocking)
         if (opMode.opModeIsActive()) {
@@ -95,7 +98,7 @@ public class SamMainAuto_Impl {
         // Drive a little while preset is active (blocking)
         if (opMode.opModeIsActive()) {
             nav.driveDistance(X_PRESET_SAFE, 0, 1);
-            Log.d("SAM::AUTO", "PRESET "+(nav.getCurrentInchesOdometerX()));
+            LogCurrentState("Go to X_PRESET_SAFE="+X_PRESET_SAFE);
         }
 
         // Wait for the HIGHBAR preset to complete
@@ -106,7 +109,7 @@ public class SamMainAuto_Impl {
         // Perform clipping by driving forward slowly to CLIPPING position.
         if (opMode.opModeIsActive()) {
             nav.driveDistance(X_CLIPPED-nav.getCurrentInchesOdometerX(), 0, 0.3);
-            Log.d("SAM::AUTO", "CLIPPED"+(nav.getCurrentInchesOdometerX()));
+            LogCurrentState("Go to X_CLIPPED="+X_CLIPPED);
         }
 
         // Open the claw
@@ -118,7 +121,7 @@ public class SamMainAuto_Impl {
         // Drive back to 10 inches from rail at high power (blocking)
         if (opMode.opModeIsActive()) {
             nav.driveDistance(X_PARKED-nav.getCurrentInchesOdometerX(), 0, .7);
-            Log.d("SAM::AUTO", "PARKED"+(nav.getCurrentInchesOdometerX()));
+            LogCurrentState("Go to X_PARKED="+X_PARKED);
         }
 
         // Initiate PARKED joints preset (non-blocking)
@@ -134,25 +137,29 @@ public class SamMainAuto_Impl {
             if (opMode.opModeIsActive()) {
                 nav.driveDistance(0, Y_CORRIDOR*mirrorY_if_LEFT_SIDE - nav.getCurrentInchesOdometerY(), 1);
                 opMode.sleep(BRAKING_TIME);
+                LogCurrentState("Go to Y_CORRIDOR="+(Y_CORRIDOR*mirrorY_if_LEFT_SIDE));
             }
 
             for (int i = 0; i < 3; i++) {
                 // Drive back to 6 inches from rail at high power (blocking)
                 if (opMode.opModeIsActive()) {
-                    nav.driveDistance(51 - nav.getCurrentInchesOdometerX(), 0, 1);
+                    nav.driveDistance(X_PUSH - nav.getCurrentInchesOdometerX(), 0, 1);
                     opMode.sleep(BRAKING_TIME);
+                    LogCurrentState("Go to X_PUSH="+X_PUSH);
                 }
 
                 // Strafe right to parking zone (blocking)
                 if (opMode.opModeIsActive()) {
                     nav.driveDistance(0, -9*mirrorY_if_LEFT_SIDE, 1);
                     opMode.sleep(BRAKING_TIME);
+                    LogCurrentState("Move by dY="+(-9*mirrorY_if_LEFT_SIDE));
                 }
 
                 // Drive back to 10 inches from rail at high power (blocking)
                 if (opMode.opModeIsActive()) {
                     nav.driveDistance(X_PARKED - nav.getCurrentInchesOdometerX(), 0, 1);
                     opMode.sleep(BRAKING_TIME);
+                    LogCurrentState("Go to X_PARKED="+X_PARKED);
                 }
             } // for
 
@@ -160,6 +167,7 @@ public class SamMainAuto_Impl {
             if (opMode.opModeIsActive()) {
                 nav.driveDistance(0, 6*mirrorY_if_LEFT_SIDE, 1);
                 opMode.sleep(BRAKING_TIME);
+                LogCurrentState("Move by dY="+(6*mirrorY_if_LEFT_SIDE));
             }
 
         } else {
@@ -168,6 +176,8 @@ public class SamMainAuto_Impl {
             // Strafe right 2 tiles to parking zone (blocking)
             if (opMode.opModeIsActive()) {
                 nav.driveDistance(0, -50, 1);
+                opMode.sleep(BRAKING_TIME);
+                LogCurrentState("Move by dY=-50");
             }
         }
 
@@ -175,5 +185,10 @@ public class SamMainAuto_Impl {
          while(opMode.opModeIsActive() && joints.isPresetActive()) {
              joints.stepActivePreset();
          }
+    }
+
+    private void LogCurrentState(String phase) {
+        Log.d("SAM::AUTO", "X_in: "+nav.getCurrentInchesOdometerX()
+                + " Y_in: "+nav.getCurrentInchesOdometerY() + " H_deg: "+nav.getHeading() + " - " + phase);
     }
 }
