@@ -78,6 +78,8 @@ public class SamMainTeleop extends LinearOpMode {
                 joints.activatePreset(SamJoints.Pose.RAIL);
             } else if (gamepad2.dpad_up) {
                 joints.activatePreset(SamJoints.Pose.HIGHBAR);
+            } else if (gamepad2.y) {
+                joints.activatePreset(SamJoints.Pose.BASKET_LOW);
             } else if (gamepad2.dpad_right) {
                 joints.activatePreset(SamJoints.Pose.RAIL_UP);
             } else if (gamepad2.back) {
@@ -106,7 +108,7 @@ public class SamMainTeleop extends LinearOpMode {
                 telemetry.addData(">", "Arena Pose: DPAD_DOWN");
                 telemetry.addData(">", "Rail Pose: DPAD_LEFT");
                 telemetry.addData(">", "Highbar Pose: DPAD_UP");
-                telemetry.addData(">", "Lowbar Pose: DPAD_RIGHT");
+                telemetry.addData(">", "Basket Pose: Y");
             }
             telemetry.update();
         }

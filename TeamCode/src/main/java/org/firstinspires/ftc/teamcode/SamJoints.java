@@ -235,6 +235,7 @@ public class SamJoints {
         LOWBAR,
         RAIL,
         RAIL_UP,
+        BASKET_LOW,
         TRANSITION,
     }
 
@@ -261,6 +262,9 @@ public class SamJoints {
                 break;
             case RAIL_UP:
                 activatePose(pose, 6450-1500, 0, 0.49);
+                break;
+            case BASKET_LOW:
+                activatePose(pose, 4800, 5800, 1.0);
                 break;
             case TRANSITION:
 //                activatePose(pose, BASE_POS_FORWARD_MIN, ARM_POS_EXTENDED_MIN, 5000);
