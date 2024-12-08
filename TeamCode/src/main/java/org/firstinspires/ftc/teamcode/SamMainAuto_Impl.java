@@ -8,6 +8,7 @@ import android.util.Log;
 public class SamMainAuto_Impl {
     private LinearOpMode opMode;   // gain access to methods in the calling OpMode.
     private Alliance.Side startSide;
+    private boolean enableClip;
     private boolean pushPiecesToMatchingZone;
 
     /* Declare Component members. */
@@ -17,9 +18,10 @@ public class SamMainAuto_Impl {
 
     private ElapsedTime runtime = new ElapsedTime();
 
-    public SamMainAuto_Impl(LinearOpMode opMode, Alliance.Side startSide, boolean pushPiecesToMatchingZone) {
+    public SamMainAuto_Impl(LinearOpMode opMode, Alliance.Side startSide, boolean enableClip, boolean pushPiecesToMatchingZone) {
         this.opMode = opMode;
         this.startSide = startSide;
+        this.enableClip = enableClip;
         this.pushPiecesToMatchingZone = pushPiecesToMatchingZone;
     }
 
@@ -69,7 +71,7 @@ public class SamMainAuto_Impl {
         final double X_CLIPBAR      = 22;
         final double X_PRESET_SAFE  = X_CLIPBAR - 8;
         final double X_CLIPPED      = X_CLIPBAR + 4;
-        final double X_PARKED       = 10;
+        final double X_PARKED       = 9;
         final double X_PUSH         = 51;
 
         final double Y_START        = 0; // -1.5 inches from middle of central seam
@@ -79,38 +81,41 @@ public class SamMainAuto_Impl {
 
         LogCurrentState("START");
 
-        // Close the claw so we don't drop the pre-loaded specimen
-        if (opMode.opModeIsActive()) {
-            claw.closed();
-        }
+        if (enableClip) {
 
-        // If starting on left side, move slightly right to clear the left bar
-        if (startSide == Alliance.Side.LEFT) {
-            nav.driveDistance(0, -6, 1);
-            opMode.sleep(BRAKING_TIME);
-            LogCurrentState("Strafe by dY=-6");
-        }
+            // Close the claw so we don't drop the pre-loaded specimen
+            if (opMode.opModeIsActive()) {
+                claw.closed();
+            }
 
-        // Initiate HIGHBAR joints preset (non-blocking)
-        if (opMode.opModeIsActive()) {
-            joints.activatePreset(SamJoints.Pose.HIGHBAR);
-        }
+            // If starting on left side, move slightly right to clear the left bar
+            if (startSide == Alliance.Side.LEFT) {
+                nav.driveDistance(0, -6, 1);
+                opMode.sleep(BRAKING_TIME);
+                LogCurrentState("Strafe by dY=-6");
+            }
 
-        // Drive a little while preset is active (blocking)
-        if (opMode.opModeIsActive()) {
-            nav.driveDistance(X_PRESET_SAFE, 0, 1);
-            LogCurrentState("Go to X_PRESET_SAFE="+X_PRESET_SAFE);
-        }
+            // Initiate HIGHBAR joints preset (non-blocking)
+            if (opMode.opModeIsActive()) {
+                joints.activatePreset(SamJoints.Pose.HIGHBAR);
+            }
 
-        // Wait for the HIGHBAR preset to complete
-        while(opMode.opModeIsActive() && joints.isPresetActive()) {
-            joints.stepActivePreset();
-        }
+            // Drive a little while preset is active (blocking)
+            if (opMode.opModeIsActive()) {
+                nav.driveDistance(X_PRESET_SAFE, 0, 1);
+                LogCurrentState("Go to X_PRESET_SAFE=" + X_PRESET_SAFE);
+            }
 
-        // Perform clipping by driving forward slowly to CLIPPING position.
-        if (opMode.opModeIsActive()) {
-            nav.driveDistance(X_CLIPPED-nav.getCurrentInchesOdometerX(), 0, 0.3);
-            LogCurrentState("Go to X_CLIPPED="+X_CLIPPED);
+            // Wait for the HIGHBAR preset to complete
+            while (opMode.opModeIsActive() && joints.isPresetActive()) {
+                joints.stepActivePreset();
+            }
+
+            // Perform clipping by driving forward slowly to CLIPPING position.
+            if (opMode.opModeIsActive()) {
+                nav.driveDistance(X_CLIPPED - nav.getCurrentInchesOdometerX(), 0, 0.3);
+                LogCurrentState("Go to X_CLIPPED=" + X_CLIPPED);
+            }
         }
 
         // Open the claw
@@ -122,7 +127,7 @@ public class SamMainAuto_Impl {
         // During clipping, the robot may have rotated. Ensure still heading zero deg.
         if (opMode.opModeIsActive()) {
             nav.turnToHeading(1, 0);
-            LogCurrentState("Heading=0"+X_CLIPPED);
+            LogCurrentState("Heading=0");
         }
 
         // Drive back to 10 inches from rail at high power (blocking)

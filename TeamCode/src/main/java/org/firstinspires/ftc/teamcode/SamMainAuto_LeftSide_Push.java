@@ -9,7 +9,7 @@ public class SamMainAuto_LeftSide_Push extends LinearOpMode
 {
     @Override
     public void runOpMode() {
-        SamMainAuto_Impl impl = new SamMainAuto_Impl(this, Alliance.Side.LEFT, true);
+        SamMainAuto_Impl impl = new SamMainAuto_Impl(this, Alliance.Side.LEFT, false, true);
         impl.runOpMode();
     }
 }
