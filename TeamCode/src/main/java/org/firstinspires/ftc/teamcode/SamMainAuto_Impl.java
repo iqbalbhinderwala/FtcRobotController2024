@@ -52,6 +52,7 @@ public class SamMainAuto_Impl {
         // Start components.
         joints.start();
         nav.resetOdometers(); // reset odometer encoders
+        nav.resetHeading(); // reset IMU heading (yaw)
 
         // ------ Start performing tasks ------
 
@@ -118,6 +119,12 @@ public class SamMainAuto_Impl {
             opMode.sleep(500);
         }
 
+        // During clipping, the robot may have rotated. Ensure still heading zero deg.
+        if (opMode.opModeIsActive()) {
+            nav.turnToHeading(1, 0);
+            LogCurrentState("Heading=0"+X_CLIPPED);
+        }
+
         // Drive back to 10 inches from rail at high power (blocking)
         if (opMode.opModeIsActive()) {
             nav.driveDistance(X_PARKED-nav.getCurrentInchesOdometerX(), 0, .7);
@@ -127,6 +134,12 @@ public class SamMainAuto_Impl {
         // Initiate PARKED joints preset (non-blocking)
         if (opMode.opModeIsActive()) {
             joints.activatePreset(SamJoints.Pose.PARKED);
+        }
+
+        // Zero heading
+        if (opMode.opModeIsActive()) {
+            nav.turnToHeading(1, 0);
+            LogCurrentState("Heading=0");
         }
 
         // Push floor pieces into observation zone OR park
@@ -140,8 +153,14 @@ public class SamMainAuto_Impl {
                 LogCurrentState("Go to Y_CORRIDOR="+(Y_CORRIDOR*mirrorY_if_LEFT_SIDE));
             }
 
+            // Zero heading
+            if (opMode.opModeIsActive()) {
+                nav.turnToHeading(1, 0);
+                LogCurrentState("Heading=0");
+            }
+
             for (int i = 0; i < 3; i++) {
-                // Drive back to 6 inches from rail at high power (blocking)
+                // Drive forward to PUSH PIECES at high power (blocking)
                 if (opMode.opModeIsActive()) {
                     nav.driveDistance(X_PUSH - nav.getCurrentInchesOdometerX(), 0, 1);
                     opMode.sleep(BRAKING_TIME);
@@ -153,6 +172,20 @@ public class SamMainAuto_Impl {
                     nav.driveDistance(0, -9*mirrorY_if_LEFT_SIDE, 1);
                     opMode.sleep(BRAKING_TIME);
                     LogCurrentState("Move by dY="+(-9*mirrorY_if_LEFT_SIDE));
+                }
+
+                if (startSide == Alliance.Side.LEFT && i == 0) {
+                    if (opMode.opModeIsActive()) {
+                        nav.turnToHeading(1, -10);
+                        LogCurrentState("Heading=-10");
+                    }
+                }
+
+                if (startSide == Alliance.Side.LEFT && i == 1) {
+                    if (opMode.opModeIsActive()) {
+                        nav.turnToHeading(1, 0);
+                        LogCurrentState("Heading=0");
+                    }
                 }
 
                 // Drive back to 10 inches from rail at high power (blocking)
