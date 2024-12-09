@@ -46,5 +46,5 @@ public class SamClaw {
     }
 
     final double OPEN_POS   = 0.0;
-    final double CLOSED_POS = 0.20;
+    final double CLOSED_POS = 0.21;
 }

@@ -258,10 +258,10 @@ public class SamJoints {
 //                activatePose(pose, 4500, 4000, 7000);
                 break;
             case RAIL:
-                activatePose(pose, 6450, 0, 0.49);
+                activatePose(pose, 6450, 0, 0.48);
                 break;
             case RAIL_UP:
-                activatePose(pose, 6450-1500, 0, 0.49);
+                activatePose(pose, 6450-1500, 0, 0.48);
                 break;
             case BASKET_LOW:
                 activatePose(pose, 4800, 5800, 1.0);
@@ -283,7 +283,7 @@ public class SamJoints {
     final double BASE_RUN_POWER       =   1.0;
 
     // ARM MOTOR
-    final int    ARM_POS_MAX          = +8300; // MAX USER
+    final int    ARM_POS_MAX          = +2900; // MAX USER
 //    final int    ARM_POS_90DEG        = +3900;
     final int    ARM_POS_EXTENDED_MIN = +2000;
     final int    ARM_POS_MIN          =    +0; // MIN USER
