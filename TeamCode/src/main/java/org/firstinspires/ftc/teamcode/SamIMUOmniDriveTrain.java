@@ -91,10 +91,10 @@ public class SamIMUOmniDriveTrain
 
         // Nominal Direction of Motor Rotation
         leftFrontDrive .setDirection(DcMotor.Direction.REVERSE);
-        leftBackDrive  .setDirection(DcMotor.Direction.FORWARD);
+        leftBackDrive  .setDirection(DcMotor.Direction.REVERSE);
         rightFrontDrive.setDirection(DcMotor.Direction.FORWARD);
-        rightBackDrive .setDirection(DcMotor.Direction.REVERSE);
-        odometerX.setDirection(DcMotor.Direction.REVERSE); // +-ve forward
+        rightBackDrive .setDirection(DcMotor.Direction.FORWARD);
+        odometerX.setDirection(DcMotor.Direction.FORWARD); // +-ve forward
         odometerY.setDirection(DcMotor.Direction.FORWARD); // +-ve left
 
         // Configure operating modes

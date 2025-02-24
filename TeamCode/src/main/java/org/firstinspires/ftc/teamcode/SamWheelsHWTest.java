@@ -123,11 +123,11 @@ public class SamWheelsHWTest extends LinearOpMode {
         // Reverse the direction (flip FORWARD <-> REVERSE ) of any wheel that runs backward
         // Keep testing until ALL the wheels move the robot forward when you push the left joystick forward.
         leftFrontDrive .setDirection(DcMotor.Direction.REVERSE);
-        leftBackDrive  .setDirection(DcMotor.Direction.FORWARD);
+        leftBackDrive  .setDirection(DcMotor.Direction.REVERSE);
         rightFrontDrive.setDirection(DcMotor.Direction.FORWARD);
-        rightBackDrive .setDirection(DcMotor.Direction.REVERSE);
+        rightBackDrive .setDirection(DcMotor.Direction.FORWARD);
 
-        odometerX.setDirection(DcMotor.Direction.REVERSE); // +-ve forward
+        odometerX.setDirection(DcMotor.Direction.FORWARD); // +-ve forward
         odometerY.setDirection(DcMotor.Direction.FORWARD); // +-ve left
     }
 
