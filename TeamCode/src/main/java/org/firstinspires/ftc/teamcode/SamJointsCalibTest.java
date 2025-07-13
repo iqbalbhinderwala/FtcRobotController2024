@@ -1,11 +1,12 @@
 package org.firstinspires.ftc.teamcode;
 
+import com.qualcomm.robotcore.eventloop.opmode.Disabled;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 import com.qualcomm.robotcore.util.ElapsedTime;
 
 @TeleOp(name="[Sam] Calibrate Joints", group="SamTest")
-//@Disabled
+@Disabled
 public class SamJointsCalibTest extends LinearOpMode {
 
     // Declare OpMode members.

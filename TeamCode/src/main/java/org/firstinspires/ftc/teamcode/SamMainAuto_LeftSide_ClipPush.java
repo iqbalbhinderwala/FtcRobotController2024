@@ -1,10 +1,11 @@
 package org.firstinspires.ftc.teamcode;
 
 import com.qualcomm.robotcore.eventloop.opmode.Autonomous;
+import com.qualcomm.robotcore.eventloop.opmode.Disabled;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 
 @Autonomous(name="[Sam] (4) Start LEFT Side (CLIP+PUSH)", group="Sam")
-//@Disabled
+@Disabled
 public class SamMainAuto_LeftSide_ClipPush extends LinearOpMode
 {
     @Override

@@ -1,13 +1,14 @@
 package org.firstinspires.ftc.teamcode;
 
 import com.qualcomm.robotcore.eventloop.opmode.Autonomous;
+import com.qualcomm.robotcore.eventloop.opmode.Disabled;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.util.ElapsedTime;
 
 // Simple autonomous program to test driving in a straight line or rotate 90 degrees.
 
 @Autonomous(name="[Sam] Sam Auto Drive Sample", group="SamTest")
-//@Disabled
+@Disabled
 public class SamAutoDriveSample extends LinearOpMode
 {
     SamIMUOmniDriveTrain robot = new SamIMUOmniDriveTrain(this);
