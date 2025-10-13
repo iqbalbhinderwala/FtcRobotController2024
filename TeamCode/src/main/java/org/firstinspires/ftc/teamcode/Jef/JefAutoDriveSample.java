@@ -1,6 +1,7 @@
 package org.firstinspires.ftc.teamcode.Jef;
 
 import com.qualcomm.robotcore.eventloop.opmode.Autonomous;
+import com.qualcomm.robotcore.eventloop.opmode.Disabled;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.util.ElapsedTime;
 
@@ -9,7 +10,7 @@ import org.firstinspires.ftc.teamcode.Jef.JefIMUOmniDriveTrain;
 // Simple autonomous program to test driving in a straight line or rotate 90 degrees.
 
 @Autonomous(name="[Jef] Jef Auto Drive Sample", group="JefTest")
-//@Disabled
+@Disabled
 public class JefAutoDriveSample extends LinearOpMode
 {
     JefIMUOmniDriveTrain robot = new JefIMUOmniDriveTrain(this);
