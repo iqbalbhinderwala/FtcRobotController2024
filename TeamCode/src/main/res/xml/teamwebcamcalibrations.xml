@@ -4,7 +4,7 @@
   Each calibration is for a particular camera (indicated by USB vid & pid pair) and a particular
   capture resolution for the camera. Note: it is very important when capturing images used to calibrate
   a camera that the image acquisition tool can actually control this capture resolution within the camera
-  itself and that you use this setting correctly. Many image acquistion tools do not in fact provide
+  itself and that you use this setting correctly. Many image acquisition tools do not in fact provide
   this level of control.
 
   Beyond simply providing additional, new camera calibrations, calibrations provided herein can
@@ -155,6 +155,18 @@
             distortionCoefficients="-0.0449369, 1.17277, 0, 0, -3.63244, 0, 0, 0"
             />
     </Camera> -->
+
+    <!-- ======================================================================================= -->
+
+    <!-- Logitech HD Webcam C270 Calibration - By ShortCircuit 2025 - Via OpenCV -->
+    <Camera vid="Logitech" pid="0x0825">
+        <Calibration
+            size="640 480"
+            focalLength="950.853f, 953.232f"
+            principalPoint="320.369f, 245.388f"
+            distortionCoefficients="0.00289705, 2.03227, 0, 0, -13.6883, 0, 0, 0"
+            />
+    </Camera>
 
     <!-- ======================================================================================= -->
 
