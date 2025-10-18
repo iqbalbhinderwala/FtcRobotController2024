@@ -60,7 +60,7 @@ import java.util.Locale;
  */
 
 @TeleOp(name = "[Utility] Webcam Frame Capture", group = "Utility")
-@Disabled
+//@Disabled
 public class UtilityWebcamFrameCapture extends LinearOpMode
 {
     /*
@@ -68,8 +68,21 @@ public class UtilityWebcamFrameCapture extends LinearOpMode
      */
     final boolean USING_WEBCAM = true;
     final BuiltinCameraDirection INTERNAL_CAM_DIR = BuiltinCameraDirection.BACK;
-    final int RESOLUTION_WIDTH = 640;
-    final int RESOLUTION_HEIGHT = 480;
+
+//    final int RESOLUTION_WIDTH  = 640;
+//    final int RESOLUTION_HEIGHT = 480;
+
+//    final int RESOLUTION_WIDTH  = 800;
+//    final int RESOLUTION_HEIGHT = 600;
+
+//    final int RESOLUTION_WIDTH  = 800;
+//    final int RESOLUTION_HEIGHT = 448;
+
+//    final int RESOLUTION_WIDTH  = 960;
+//    final int RESOLUTION_HEIGHT = 540;
+
+    final int RESOLUTION_WIDTH = 1280;
+    final int RESOLUTION_HEIGHT = 720;
 
     // Internal state
     boolean lastX;
@@ -102,7 +115,8 @@ public class UtilityWebcamFrameCapture extends LinearOpMode
 
             if (x && !lastX)
             {
-                portal.saveNextFrameRaw(String.format(Locale.US, "CameraFrameCapture-%06d", frameCount++));
+                portal.saveNextFrameRaw(String.format(Locale.US, "%dx%d-Frame%04d",
+                        RESOLUTION_WIDTH, RESOLUTION_HEIGHT, frameCount++));
                 capReqTime = System.currentTimeMillis();
             }
 
@@ -112,6 +126,7 @@ public class UtilityWebcamFrameCapture extends LinearOpMode
             telemetry.addLine(String.format(Locale.US, " > Resolution: %dx%d", RESOLUTION_WIDTH, RESOLUTION_HEIGHT));
             telemetry.addLine(" > Press X (or Square) to capture a frame");
             telemetry.addData(" > Camera Status", portal.getCameraState());
+            telemetry.addData(" > Frames Captured", frameCount);
 
             if (capReqTime != 0)
             {
