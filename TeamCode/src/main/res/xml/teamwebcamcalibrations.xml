@@ -162,10 +162,58 @@
     <Camera vid="Logitech" pid="0x0825">
         <Calibration
             size="640 480"
-            focalLength="950.853f, 953.232f"
-            principalPoint="320.369f, 245.388f"
-            distortionCoefficients="0.00289705, 2.03227, 0, 0, -13.6883, 0, 0, 0"
+            focalLength="934.535f, 937.056f"
+            principalPoint="320.579f, 248.857f"
+            distortionCoefficients="0.0337432, 1.0149, 0, 0, -5.59536, 0, 0, 0"
             />
+    </Camera>
+
+    <!-- ======================================================================================= -->
+
+    <!-- Logitech Webcam C930e Calibration - By ShortCircuit 2025 - Via OpenCV -->
+    <Camera vid="Logitech" pid="0x0843">
+        <Calibration
+            size="640 480"
+            focalLength="505.557f, 505.889f"
+            principalPoint="322.415f, 240.768f"
+            distortionCoefficients="0.08697, -0.178974, 0, 0, 0.0322967, 0, 0, 0"
+            />
+
+        <Calibration
+            size="800 448"
+            focalLength="474.221f, 474.765f"
+            principalPoint="401.261f, 225.834f"
+            distortionCoefficients="0.0855723, -0.211516, 0, 0, 0.0926699, 0, 0, 0"
+            />
+
+        <Calibration
+            size="800 600"
+            focalLength="634.818f, 635.500f"
+            principalPoint="402.550f, 303.209f"
+            distortionCoefficients="0.0818193, -0.179812, 0, 0, 0.0420121, 0, 0, 0"
+            />
+
+        <Calibration
+            size="848 480"
+            focalLength="509.214f, 509.249f"
+            principalPoint="428.143f, 240.697f"
+            distortionCoefficients="0.0928546, -0.23879, 0, 0, 0.116481, 0, 0, 0"
+            />
+
+        <Calibration
+            size="960 540"
+            focalLength="571.943f, 572.533f"
+            principalPoint="482.271f, 271.040f"
+            distortionCoefficients="0.0862141, -0.209382, 0, 0, 0.0853056, 0, 0, 0"
+            />
+
+        <Calibration
+            size="1280 720"
+            focalLength="762.104f, 763.296f"
+            principalPoint="643.440f, 362.273f"
+            distortionCoefficients="0.0951816, -0.236103, 0, 0, 0.109562, 0, 0, 0"
+            />
+
     </Camera>
 
     <!-- ======================================================================================= -->

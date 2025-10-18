@@ -1,14 +1,50 @@
 # From: https://docs.opencv.org/4.x/dc/dbb/tutorial_py_calibration.html
 
+# ------------------------------------------------------------------------------------------------
 # pip install -r requirements.txt
+# ------------------------------------------------------------------------------------------------
 
 import numpy as np
 import cv2 as cv
 import glob
 
+# ------------------------------------------------------------------------------------------------
+# Logitech HD Webcam C270
+# ------------------------------------------------------------------------------------------------
+
+# NAME = "Logitech HD Webcam C270"
+# VID  = "Logitech"
+# PID  = "0x0825"
+# IMAGE_DIR = 'C:/ftc/LogitechC270/*.png'
+
+# ------------------------------------------------------------------------------------------------
+# Logitech Webcam C930e
+# ------------------------------------------------------------------------------------------------
+
+NAME = "Logitech Webcam C930e"
+VID  = "Logitech"
+PID  = "0x0843"
+IMAGE_DIR = 'C:/ftc/LogitechC930e_640x480/*.png'
+# IMAGE_DIR = 'C:/ftc/LogitechC930e_800x448/*.png'
+# IMAGE_DIR = 'C:/ftc/LogitechC930e_800x600/*.png'
+# IMAGE_DIR = 'C:/ftc/LogitechC930e_848x480/*.png'
+# IMAGE_DIR = 'C:/ftc/LogitechC930e_960x540/*.png'
+# IMAGE_DIR = 'C:/ftc/LogitechC930e_1280x720/*.png'
+
+# ------------------------------------------------------------------------------------------------
+# Set INSPECT_FRAMES to True to inspect each frame, False for quick run 
+# If any detected corner is not good in a given image, delete that image from the set and rerun
+# ------------------------------------------------------------------------------------------------
+INSPECT_FRAMES = True 
+# INSPECT_FRAMES = False
+
+# ------------------------------------------------------------------------------------------------
 # Grid size (number of corners)
+# ------------------------------------------------------------------------------------------------
 NC = 8
 NR = 6
+
+# ------------------------------------------------------------------------------------------------
 
 # Termination criteria
 criteria = (cv.TERM_CRITERIA_EPS + cv.TERM_CRITERIA_MAX_ITER, 30, 0.001)
@@ -21,8 +57,7 @@ objp[:,:2] = np.mgrid[0:NC,0:NR].T.reshape(-1,2)
 objpoints = [] # 3d point in real world space
 imgpoints = [] # 2d points in image plane.
  
-images = glob.glob('C:/ftc/LogitechC270/*.png')
- 
+images = glob.glob(IMAGE_DIR)
 for fname in images:
     img = cv.imread(fname)
     gray = cv.cvtColor(img, cv.COLOR_BGR2GRAY)
@@ -39,8 +74,13 @@ for fname in images:
  
         # Draw and display the corners
         cv.drawChessboardCorners(img, (NC,NR), corners2, ret)
-        cv.imshow('img', img)
-        cv.waitKey(100)
+
+        if INSPECT_FRAMES:
+            cv.imshow(fname, img)
+            cv.waitKey()
+        else:
+            cv.imshow("img", img)
+            cv.waitKey(100)
  
 cv.destroyAllWindows()
 
@@ -50,7 +90,8 @@ cv.destroyAllWindows()
 
 # Calibration
 flags = None
-flags = cv.CALIB_ZERO_TANGENT_DIST # | cv.CALIB_FIX_ASPECT_RATIO | cv.CALIB_RATIONAL_MODEL
+flags = cv.CALIB_ZERO_TANGENT_DIST 
+# flags = cv.CALIB_RATIONAL_MODEL  
 ret, mtx, dist, rvecs, tvecs = cv.calibrateCamera(
     objpoints, imgpoints, gray.shape[::-1], None, None, flags=flags
 )
@@ -62,11 +103,21 @@ for i in range(len(objpoints)):
     error = cv.norm(imgpoints[i], imgpoints2, cv.NORM_L2)/len(imgpoints2)
     mean_error += error
 
-print("Total error: {}".format(mean_error/len(objpoints)) )
-print("Camera matrix :")
+print('=======================================================================================')
+print(NAME)
+print(IMAGE_DIR)
+print('=======================================================================================')
+
+print("\nCamera matrix :")
 print(mtx)
-print("Distortion Coefficients:")
+print("\nDistortion Coefficients:")
 print(dist.flatten())
+print('=======================================================================================')
+print("Total error: {:.4f}".format(mean_error/len(objpoints)) )
+if mean_error/len(objpoints) > 0.04:
+    print("WARNING: High reprojection error. Consider redoing calibration with better images.")
+    # Set INSPECT_FRAMES = True and delete bad images!
+print('=======================================================================================')
 
 dist8 = np.zeros((8, 1))
 flat_dist = dist.flatten()
@@ -76,13 +127,14 @@ for i in range(min(8, len(flat_dist))):
     dist8[i, 0] = flat_dist[i]
 
 
+print(' ')
 print('Add the following to TeamCode/src/main/res/xml/teamwebcamcalibrations.xml:')
 print(' ')
 
 print('<!-- ======================================================================================= -->')
 print('')
-print('<!-- Logitech HD Webcam C270 Calibration - By ShortCircuit 2025 - Via OpenCV -->')
-print('<Camera vid="Logitech" pid="0x0825">')
+print('<!-- {} Calibration - By ShortCircuit 2025 - Via OpenCV -->'.format(NAME))
+print('<Camera vid="{}" pid="{}">'.format(VID, PID))
 print('    <Calibration')
 print('        size="{} {}"'.format(gray.shape[1], gray.shape[0]))
 print('        focalLength="{:.3f}f, {:.3f}f"'.format(mtx[0,0], mtx[1,1]))

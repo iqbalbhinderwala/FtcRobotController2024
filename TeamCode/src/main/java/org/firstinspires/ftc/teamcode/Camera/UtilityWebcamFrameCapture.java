@@ -43,6 +43,8 @@ import org.firstinspires.ftc.robotcore.external.hardware.camera.BuiltinCameraDir
 import org.firstinspires.ftc.robotcore.external.hardware.camera.WebcamName;
 import org.firstinspires.ftc.vision.VisionPortal;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Locale;
 
 /*
@@ -69,21 +71,6 @@ public class UtilityWebcamFrameCapture extends LinearOpMode
     final boolean USING_WEBCAM = true;
     final BuiltinCameraDirection INTERNAL_CAM_DIR = BuiltinCameraDirection.BACK;
 
-//    final int RESOLUTION_WIDTH  = 640;
-//    final int RESOLUTION_HEIGHT = 480;
-
-//    final int RESOLUTION_WIDTH  = 800;
-//    final int RESOLUTION_HEIGHT = 600;
-
-//    final int RESOLUTION_WIDTH  = 800;
-//    final int RESOLUTION_HEIGHT = 448;
-
-//    final int RESOLUTION_WIDTH  = 960;
-//    final int RESOLUTION_HEIGHT = 540;
-
-    final int RESOLUTION_WIDTH = 1280;
-    final int RESOLUTION_HEIGHT = 720;
-
     // Internal state
     boolean lastX;
     int frameCount;
@@ -92,20 +79,67 @@ public class UtilityWebcamFrameCapture extends LinearOpMode
     @Override
     public void runOpMode()
     {
+        List<Size> resolutions = new ArrayList<>();
+        resolutions.add(new Size(640, 480));
+        resolutions.add(new Size(800, 448));
+        resolutions.add(new Size(800, 600));
+        resolutions.add(new Size(848, 480));
+        resolutions.add(new Size(960, 540));
+        resolutions.add(new Size(1280, 720));
+
+        int selectionIndex = 0;
+        boolean lastDpadUp = false;
+        boolean lastDpadDown = false;
+
+        while (!isStarted() && !isStopRequested()) {
+            telemetry.addLine("Select Resolution");
+            telemetry.addLine();
+
+            for (int i = 0; i < resolutions.size(); i++) {
+                String line = String.format(Locale.US, "%s %dx%d",
+                        i == selectionIndex ? "[ -> ] " : "[ ] ",
+                        resolutions.get(i).getWidth(), resolutions.get(i).getHeight());
+                telemetry.addLine(line);
+            }
+
+            telemetry.addLine();
+            telemetry.addLine("Use D-Pad Up/Down to select, A to confirm.");
+            telemetry.update();
+
+            boolean dpadUp = gamepad1.dpad_up;
+            if (dpadUp && !lastDpadUp) {
+                selectionIndex = (selectionIndex - 1 + resolutions.size()) % resolutions.size();
+            }
+            lastDpadUp = dpadUp;
+
+            boolean dpadDown = gamepad1.dpad_down;
+            if (dpadDown && !lastDpadDown) {
+                selectionIndex = (selectionIndex + 1) % resolutions.size();
+            }
+            lastDpadDown = dpadDown;
+
+            if (gamepad1.a) {
+                break;
+            }
+        }
+
+
+        Size selectedResolution = resolutions.get(selectionIndex);
+
         VisionPortal portal;
 
         if (USING_WEBCAM)
         {
             portal = new VisionPortal.Builder()
                     .setCamera(hardwareMap.get(WebcamName.class, "Webcam 1"))
-                    .setCameraResolution(new Size(RESOLUTION_WIDTH, RESOLUTION_HEIGHT))
+                    .setCameraResolution(selectedResolution)
                     .build();
         }
         else
         {
             portal = new VisionPortal.Builder()
                     .setCamera(INTERNAL_CAM_DIR)
-                    .setCameraResolution(new Size(RESOLUTION_WIDTH, RESOLUTION_HEIGHT))
+                    .setCameraResolution(selectedResolution)
                     .build();
         }
 
@@ -116,21 +150,21 @@ public class UtilityWebcamFrameCapture extends LinearOpMode
             if (x && !lastX)
             {
                 portal.saveNextFrameRaw(String.format(Locale.US, "%dx%d-Frame%04d",
-                        RESOLUTION_WIDTH, RESOLUTION_HEIGHT, frameCount++));
+                        selectedResolution.getWidth(), selectedResolution.getHeight(), frameCount++));
                 capReqTime = System.currentTimeMillis();
             }
 
             lastX = x;
 
             telemetry.addLine("######## Camera Capture Utility ########");
-            telemetry.addLine(String.format(Locale.US, " > Resolution: %dx%d", RESOLUTION_WIDTH, RESOLUTION_HEIGHT));
+            telemetry.addLine(String.format(Locale.US, " > Resolution: %dx%d", selectedResolution.getWidth(), selectedResolution.getHeight()));
             telemetry.addLine(" > Press X (or Square) to capture a frame");
             telemetry.addData(" > Camera Status", portal.getCameraState());
             telemetry.addData(" > Frames Captured", frameCount);
 
             if (capReqTime != 0)
             {
-                telemetry.addLine("\nCaptured Frame!");
+                telemetry.addLine("Captured Frame!");
             }
 
             if (capReqTime != 0 && System.currentTimeMillis() - capReqTime > 1000)
