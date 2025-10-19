@@ -47,8 +47,8 @@ import java.util.List;
  *
  */
 
-@TeleOp(name = "[Utility] AprilTag Res Switch", group = "Utility")
-public class AprilTagResolutionTest extends LinearOpMode {
+@TeleOp(name = "[Utility] Optimize AprilTag Resolution", group = "Utility")
+public class AprilTagOptimizeResolution extends LinearOpMode {
 
     private static final boolean USE_WEBCAM = true;  // true for webcam, false for phone camera
 
