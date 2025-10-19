@@ -72,8 +72,31 @@ public class VexAutoDriveSample extends LinearOpMode
             if(gamepad1.b) {
                 robot.driveDistance(0, -DISTANCE_INCH, MAX_DRIVE_POWER);
             }
+            // diagonal forward-left
+            if(gamepad1.left_bumper) {
+                robot.driveDistance(DISTANCE_INCH, DISTANCE_INCH, MAX_DRIVE_POWER);
+            }
+            // diagonal forward-right
+            if(gamepad1.right_bumper) {
+                robot.driveDistance(DISTANCE_INCH, -DISTANCE_INCH, MAX_DRIVE_POWER);
+            }
+            // diagonal backward-left
+            if(gamepad1.left_trigger > 0.5) {
+                robot.driveDistance(-DISTANCE_INCH, DISTANCE_INCH, MAX_DRIVE_POWER);
+            }
+            // diagonal backward-right
+            if(gamepad1.right_trigger > 0.5) {
+                robot.driveDistance(-DISTANCE_INCH, -DISTANCE_INCH, MAX_DRIVE_POWER);
+            }
 
             // Telemetry
+            telemetry.addLine("=== Controls ===");
+            telemetry.addLine("Y: Forward | A: Back");
+            telemetry.addLine("X: Left | B: Right");
+            telemetry.addLine("D-Pad Left/Right: Turn 90°");
+            telemetry.addLine("Bumpers: Diagonal Forward (L/R)");
+            telemetry.addLine("Triggers: Diagonal Back (L/R)");
+            telemetry.addData("Distance", "%.1f inches", DISTANCE_INCH);
             telemetry.addData("Drive Speed", "%.2f", MAX_DRIVE_POWER);
             telemetry.addData("Turn Speed", "%.2f", MAX_TURN_SPEED);
             telemetry.addData("Heading error", "%.1f", targetHeading-robot.getHeading());
