@@ -32,7 +32,6 @@ package org.firstinspires.ftc.teamcode.Vex;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 import com.qualcomm.robotcore.hardware.DcMotor;
-import com.qualcomm.robotcore.hardware.DcMotorSimple;
 import com.qualcomm.robotcore.util.ElapsedTime;
 import com.qualcomm.robotcore.util.Range;
 
@@ -91,9 +90,9 @@ public class VexWheelsHWTest extends LinearOpMode {
     private DcMotor rightFrontDrive = null;
     private DcMotor rightBackDrive = null;
 
-    private DcMotor odometerXL = null;
-    private DcMotor odometerXR = null;
-    private DcMotor odometerY = null;
+    private DcMotor odometerL = null; // axial left
+    private DcMotor odometerR = null; // axial right
+    private DcMotor odometerH = null; // lateral (horizontal)
 
     private final double PRESS_DELAY = 0.25;
     double maxPower = 0.5;
@@ -111,9 +110,9 @@ public class VexWheelsHWTest extends LinearOpMode {
         leftBackDrive   = hardwareMap.get(DcMotor.class, "wheel back left");
         rightBackDrive  = hardwareMap.get(DcMotor.class, "wheel back right");
 
-        odometerXL = hardwareMap.get(DcMotor.class, "odometer axial left");
-        odometerXR = hardwareMap.get(DcMotor.class, "odometer axial right");
-        odometerY = hardwareMap.get(DcMotor.class, "odometer lateral");
+        odometerL = hardwareMap.get(DcMotor.class, "odometer axial left");
+        odometerR = hardwareMap.get(DcMotor.class, "odometer axial right");
+        odometerH = hardwareMap.get(DcMotor.class, "odometer lateral");
 
         // ########################################################################################
         // !!!            IMPORTANT Drive Information. Test your motor directions.            !!!!!
@@ -130,9 +129,9 @@ public class VexWheelsHWTest extends LinearOpMode {
         rightFrontDrive.setDirection(DcMotor.Direction.REVERSE);
         rightBackDrive .setDirection(DcMotor.Direction.REVERSE);
 
-        odometerXL.setDirection(DcMotor.Direction.FORWARD); // +-ve forward
-        odometerXR.setDirection(DcMotor.Direction.REVERSE); // +-ve forward
-        odometerY .setDirection(DcMotor.Direction.REVERSE); // +-ve left
+        odometerL.setDirection(DcMotor.Direction.FORWARD); // Y +-ve forward
+        odometerR.setDirection(DcMotor.Direction.REVERSE); // Y +-ve forward
+        odometerH.setDirection(DcMotor.Direction.FORWARD); // X +-ve right
     }
 
     private void toggleForwardDirection() {
@@ -148,13 +147,13 @@ public class VexWheelsHWTest extends LinearOpMode {
         leftBackDrive = rightFrontDrive;
         rightFrontDrive = temp;
 
-        // Swap odometerXL <-> odometerXR
-        temp = odometerXL;
-        odometerXL = odometerXR;
-        odometerXR = temp;
+        // Swap odometerL <-> odometerR
+        temp = odometerL;
+        odometerL = odometerR;
+        odometerR = temp;
 
         // Invert motor / odometer encoder direction
-        for (DcMotor motor : Arrays.asList(odometerXL, odometerXR, odometerY,
+        for (DcMotor motor : Arrays.asList(odometerL, odometerR, odometerH,
                 leftFrontDrive, leftBackDrive, rightFrontDrive, rightBackDrive))
         {
             if (motor.getDirection() == DcMotor.Direction.FORWARD) {
@@ -182,7 +181,7 @@ public class VexWheelsHWTest extends LinearOpMode {
                 motor.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
             }
         }
-        for (DcMotor motor : Arrays.asList(odometerXL, odometerXR, odometerY)) {
+        for (DcMotor motor : Arrays.asList(odometerL, odometerR, odometerH)) {
             motor.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
         }
     }
@@ -222,14 +221,15 @@ public class VexWheelsHWTest extends LinearOpMode {
             // POV Mode uses left joystick to go forward & strafe, and right joystick to rotate.
             double axial = -gamepad1.left_stick_y;  // Note: pushing stick forward gives negative value so negate for +ve forward
             double lateral = gamepad1.left_stick_x; // +ve strife right
-            double yaw = gamepad1.right_stick_x;    // +ve turn right cw
+            double yaw = -gamepad1.right_stick_x;   // +ve turn left ccw
+            // NOTE: Assuming robot +X is right and +Y is forward, then +Z-rotation is CCW.
 
             // Combine the joystick requests for each axis-motion to determine each wheel's power.
             // Set up a variable for each drive wheel to save the power level for telemetry.
-            double leftFrontPower = axial + lateral + yaw;
-            double rightFrontPower = axial - lateral - yaw;
-            double leftBackPower = axial - lateral + yaw;
-            double rightBackPower = axial + lateral - yaw;
+            double leftFrontPower = axial + lateral - yaw;
+            double rightFrontPower = axial - lateral + yaw;
+            double leftBackPower = axial - lateral - yaw;
+            double rightBackPower = axial + lateral + yaw;
 
             // Normalize the values so no wheel power exceeds 100%
             // This ensures that the robot maintains the desired motion.
@@ -316,12 +316,12 @@ public class VexWheelsHWTest extends LinearOpMode {
             telemetry.addData("Velocity Back  Left/Right", "%4.2f, %4.2f /s", leftBackVelocity, rightBackVelocity);
             telemetry.addData("Encoder Front Left/Right", "%d, %d", leftFrontDrive.getCurrentPosition(), rightFrontDrive.getCurrentPosition());
             telemetry.addData("Encoder Back  Left/Right", "%d, %d", leftBackDrive.getCurrentPosition(), rightBackDrive.getCurrentPosition());
-            telemetry.addData("Odometer (xL/xR , y)", "(%d/%d , %d) CNT",
-                    odometerXL.getCurrentPosition(), odometerXR.getCurrentPosition(), odometerY.getCurrentPosition());
-            telemetry.addData("Odometer (xL/xR , y)", "(%.1f/%.1f , %.1f) INCH",
-                    odometerXL.getCurrentPosition()*ODOMETER_INCH_PER_COUNT,
-                    odometerXR.getCurrentPosition()*ODOMETER_INCH_PER_COUNT,
-                    odometerY.getCurrentPosition()*ODOMETER_INCH_PER_COUNT);
+            telemetry.addData("Odometer (L/R , H)", "(%d/%d , %d) CNT",
+                    odometerL.getCurrentPosition(), odometerR.getCurrentPosition(), odometerH.getCurrentPosition());
+            telemetry.addData("Odometer (L/R , H)", "(%.1f/%.1f , %.1f) INCH",
+                    odometerL.getCurrentPosition()*ODOMETER_INCH_PER_COUNT,
+                    odometerR.getCurrentPosition()*ODOMETER_INCH_PER_COUNT,
+                    odometerH.getCurrentPosition()*ODOMETER_INCH_PER_COUNT);
             telemetry.update();
         }
     }

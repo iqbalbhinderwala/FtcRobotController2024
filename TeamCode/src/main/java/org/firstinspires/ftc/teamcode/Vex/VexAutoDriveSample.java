@@ -38,11 +38,12 @@ public class VexAutoDriveSample extends LinearOpMode
         // Started
         while (opModeIsActive())
         {
-            // Drive using manual POV Joystick mode.  Slow things down to make the robot more controlable.
+            // Drive using manual POV Joystick mode.  Slow things down to make the robot more controllable.
             double drive  = -gamepad1.left_stick_y  * MAX_DRIVE_POWER;
             double strafe = -gamepad1.left_stick_x  * MAX_DRIVE_POWER;
             double turn   = -gamepad1.right_stick_x * MAX_TURN_SPEED;
             telemetry.addData("Manual", "Drive %5.2f, Strafe %5.2f, Turn %5.2f ", drive, strafe, turn);
+            telemetry.addData("Heading", "%.1f", robot.getHeading());
             robot.moveRobot(drive, strafe, turn);
 
             // Rotate robot 90 degrees using DPAD left/right buttons.
