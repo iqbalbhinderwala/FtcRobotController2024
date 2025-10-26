@@ -102,6 +102,6 @@ public class VexAutoOdometryTest extends LinearOpMode
         }
 
         // Turn the motors off.
-        robot.moveRobot(0, 0, 0);
+        robot.stopMotors();
     }
 }

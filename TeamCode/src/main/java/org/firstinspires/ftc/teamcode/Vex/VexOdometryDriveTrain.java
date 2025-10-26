@@ -110,6 +110,14 @@ public class VexOdometryDriveTrain {
     }
 
     /**
+     * Gets the current heading of the robot from the IMU.
+     * @return The robot's heading in degrees.
+     */
+    public double getHeading() {
+        return headingProvider.getHeading();
+    }
+
+    /**
      * Sets the robot's starting position and heading on the field.
      * @param startX Initial field X-coordinate in inches.
      * @param startY Initial field Y-coordinate in inches.
@@ -290,7 +298,7 @@ public class VexOdometryDriveTrain {
     /**
      * Stops all drivetrain motion.
      */
-    private void stopMotors() {
+    public void stopMotors() {
         moveRobot(0, 0, 0);
     }
 
@@ -298,7 +306,7 @@ public class VexOdometryDriveTrain {
      * Gets the current position of the left odometer in inches.
      * @return Position in inches.
      */
-    private double getLeftOdometerInches() {
+    public double getLeftOdometerInches() {
         return leftOdometer.getCurrentPosition() * ODOMETER_INCH_PER_COUNT;
     }
 
@@ -306,7 +314,7 @@ public class VexOdometryDriveTrain {
      * Gets the current position of the right odometer in inches.
      * @return Position in inches.
      */
-    private double getRightOdometerInches() {
+    public double getRightOdometerInches() {
         return rightOdometer.getCurrentPosition() * ODOMETER_INCH_PER_COUNT;
     }
 
@@ -314,7 +322,7 @@ public class VexOdometryDriveTrain {
      * Gets the current position of the horizontal odometer in inches.
      * @return Position in inches.
      */
-    private double getHorizontalOdometerInches() {
+    public double getHorizontalOdometerInches() {
         return horizontalOdometer.getCurrentPosition() * ODOMETER_INCH_PER_COUNT;
     }
 
