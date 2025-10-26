@@ -25,7 +25,7 @@ public class VexOdometryDriveTrain {
 
     // Core Components
     private IMUHeadingProvider headingProvider;
-    private LinearOdometry odometry;
+    private TwistOdometry odometry;
 
     // Hardware
     private DcMotor leftFrontDrive, rightFrontDrive, leftBackDrive, rightBackDrive;
@@ -38,7 +38,7 @@ public class VexOdometryDriveTrain {
      */
     public VexOdometryDriveTrain(LinearOpMode opMode) {
         this.opMode = opMode;
-        this.odometry = new LinearOdometry();
+        this.odometry = new TwistOdometry(ODOMETER_TRACK_WIDTH_INCH, ODOMETER_CENTER_WHEEL_OFFSET_INCH);
     }
 
     /**
@@ -130,17 +130,30 @@ public class VexOdometryDriveTrain {
     }
 
     /**
-     * Gets the current calculated pose of the robot after an update.
-     * @return A Pose3D object representing the robot's current state.
+     * Updates the odometry with the latest sensor readings.
+     * This should be called on each loop iteration.
      */
-    public Pose3D getPose() {
-        // First, update the odometry with the latest sensor readings
+    public void update() {
+        // Update the odometry with the latest sensor readings
+        updateOdometry();
+    }
+
+    private void updateOdometry() {
         odometry.update(
                 headingProvider.getHeading(),
                 getLeftOdometerInches(),
                 getRightOdometerInches(),
                 getHorizontalOdometerInches()
         );
+    }
+
+    /**
+     * Gets the current calculated pose of the robot after an update.
+     * @return A Pose3D object representing the robot's current state.
+     */
+    public Pose3D getPose() {
+        // First, update the odometry with the latest sensor readings
+        updateOdometry();
 
         // Return the 3d pose
         Position position = new Position(DistanceUnit.INCH,
@@ -175,6 +188,9 @@ public class VexOdometryDriveTrain {
 
             // Send power to the robot to make it turn. No forward or strafe movement.
             moveRobot(0, 0, turnPower);
+
+            // Update odometry to keep track of the robot's position.
+            updateOdometry();
 
             // Recalculate the heading error for the next loop iteration.
             headingError = targetHeading - headingProvider.getHeading();
@@ -340,6 +356,10 @@ public class VexOdometryDriveTrain {
     static final double ODOMETER_COUNT_PER_REVOLUTION = 2000;
     static final double ODOMETER_MM_PER_COUNT = (ODOMETER_DIAMETER_MM * Math.PI) / ODOMETER_COUNT_PER_REVOLUTION;
     static final double ODOMETER_INCH_PER_COUNT = ODOMETER_MM_PER_COUNT / 25.4;
+
+    // Odometry Calibration: See VexOdometryCalibration.java
+    static final double ODOMETER_TRACK_WIDTH_INCH = 14.0302;
+    static final double ODOMETER_CENTER_WHEEL_OFFSET_INCH = 1.9841;
 
     private static final String TAG = "VEX::";
 }

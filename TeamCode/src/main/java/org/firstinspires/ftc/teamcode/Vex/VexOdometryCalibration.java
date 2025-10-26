@@ -29,7 +29,8 @@ public class VexOdometryCalibration extends LinearOpMode {
 
     // Constants for the calibration routine
     final double CALIBRATION_TURN_SPEED = 1; // Power for turning during calibration
-    final double TARGET_ANGLE_DEGREES = 360.0; // The angle to turn
+    final double TARGET_ANGLE_DEGREES_QUICK = 360.0; // The angle to turn (quick)
+    final double TARGET_ANGLE_DEGREES_EXTRA = 10 * 360.0; // The angle to turn (slow)
     final double BUTTON_DELAY_SEC = 0.5; // Prevent accidental double-presses
 
     ElapsedTime buttonTimer = new ElapsedTime();
@@ -44,6 +45,7 @@ public class VexOdometryCalibration extends LinearOpMode {
         telemetry.addLine(">>> Odometry Calibration <<<");
         telemetry.addLine("Place robot on a flat surface.");
         telemetry.addLine("Press 'A' to start the 360-degree rotation test.");
+        telemetry.addLine("Press 'X' to start the 10x360-degree rotation test.");
         telemetry.update();
 
         waitForStart();
@@ -55,12 +57,13 @@ public class VexOdometryCalibration extends LinearOpMode {
             // Check if the 'A' button is pressed to start calibration
             if (gamepad1.a && buttonTimer.seconds() > BUTTON_DELAY_SEC) {
                 buttonTimer.reset();
-                runCalibrationRoutine();
-                while(opModeIsActive() && !gamepad1.b) {
-                    sleep(250);
-                }
+                runCalibrationRoutine(TARGET_ANGLE_DEGREES_QUICK);
             }
-
+            // Check if the 'X' button is pressed to start calibration
+            if (gamepad1.x && buttonTimer.seconds() > BUTTON_DELAY_SEC) {
+                buttonTimer.reset();
+                runCalibrationRoutine(TARGET_ANGLE_DEGREES_EXTRA);
+            }
             // Display live telemetry data
             displayTelemetry();
         }
@@ -72,7 +75,7 @@ public class VexOdometryCalibration extends LinearOpMode {
     /**
      * Executes the automated calibration sequence.
      */
-    private void runCalibrationRoutine() {
+    private void runCalibrationRoutine(double targetAnglesDeg) {
         // 1. Prepare for calibration
         calibrationStatus = "Calibrating...";
         displayTelemetry();
@@ -90,7 +93,7 @@ public class VexOdometryCalibration extends LinearOpMode {
 
         // 3. Loop until the target angle is reached
         while (opModeIsActive() && !complete_loop_and_exit) {
-            if (cumulativeDegrees >= TARGET_ANGLE_DEGREES) {
+            if (cumulativeDegrees >= targetAnglesDeg) {
                 calibrationStatus = "Target achieved! Stopping Motors";
                 // 4. Stop the robot's movement
                 robot.stopMotors();
@@ -125,7 +128,9 @@ public class VexOdometryCalibration extends LinearOpMode {
             double calculatedTrackWidth = (deltaRight - deltaLeft) / finalAngleRad;
 
             // The horizontal movement is directly proportional to the offset and the angle turned.
-            double calculatedCenterWheelOffset = deltaHorizontal / finalAngleRad;
+            // To match the TwistOdometry convention (where offset is the physical Y-coordinate),
+            //      pure turn: 0 == deltaHorizontal + (centerWheelOffset * angleRad)
+            double calculatedCenterWheelOffset = -deltaHorizontal / finalAngleRad;
 
             // Update status and show results
             calibrationStatus = "Complete! Record these values:";
@@ -135,15 +140,18 @@ public class VexOdometryCalibration extends LinearOpMode {
             calibrationStatus = "Error: Robot did not turn enough.";
         }
 
+        telemetry.addLine("Press 'B' to continue.");
         telemetry.update();
-        // The results will remain on screen until the next action.
+        while(opModeIsActive() && !gamepad1.b) {
+            sleep(250);
+        }
     }
 
     /**
      * Displays relevant telemetry data on the Driver Station.
      */
     private void displayTelemetry() {
-        telemetry.addLine("Press 'A' to start calibration.");
+        telemetry.addLine("Press 'A' or 'X' to start calibration.");
         telemetry.addData("Status", calibrationStatus);
         telemetry.addLine("--- Live Data ---");
         telemetry.addData("Heading (Deg)", "%.2f", robot.getHeading());
