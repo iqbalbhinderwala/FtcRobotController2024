@@ -1,10 +1,13 @@
 package org.firstinspires.ftc.teamcode.Vex;
 
+import android.util.Log;
+
 import com.qualcomm.hardware.rev.RevHubOrientationOnRobot;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.hardware.DcMotor;
 import com.qualcomm.robotcore.hardware.HardwareMap;
 import com.qualcomm.robotcore.hardware.IMU;
+import com.qualcomm.robotcore.util.ElapsedTime;
 import com.qualcomm.robotcore.util.Range;
 
 import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit;
@@ -173,14 +176,18 @@ public class VexOdometryDriveTrain {
         stopMotors();
     }
 
-    public void driveTo(double targetX, double targetY) {
+    public boolean driveTo(double targetX, double targetY, double maxPower) {
         // Get the current pose to calculate the initial error
         Pose3D currentPose = getPose();
         double errorX = targetX - currentPose.getPosition().x;
         double errorY = targetY - currentPose.getPosition().y;
 
+        ElapsedTime timer = new ElapsedTime();
+        double prevErr = Double.MAX_VALUE;
+        double newErr = Math.hypot(errorX, errorY);
+
         // Loop until the robot is within the move threshold for both axes and the opmode is active
-        while (opMode.opModeIsActive() && (Math.abs(errorX) > MOVE_THRESHOLD_INCH || Math.abs(errorY) > MOVE_THRESHOLD_INCH)) {
+        while (opMode.opModeIsActive() && (newErr > MOVE_THRESHOLD_INCH)) {
             // Update the robot's current position and heading
             currentPose = getPose();
             double currentHeading = currentPose.getOrientation().getYaw(AngleUnit.DEGREES);
@@ -188,6 +195,18 @@ public class VexOdometryDriveTrain {
             // Recalculate the field-centric error
             errorX = targetX - currentPose.getPosition().x;
             errorY = targetY - currentPose.getPosition().y;
+            newErr = Math.hypot(errorX, errorY);
+            Log.d(TAG+"driveTo", "err "+errorX+","+errorY+","+newErr);
+
+            if (timer.seconds() > 0.1) {
+                timer.reset();
+                if (prevErr <= newErr) {
+                    Log.d(TAG, "driveTo: OBSTRUCTION DETECTED. ABORT.");
+                    stopMotors();
+                    return false;
+                }
+                prevErr = newErr;
+            }
 
             // --- Transform field-centric error into robot-centric power commands ---
             // This rotates the (errorX, errorY) vector from field coordinates to robot coordinates.
@@ -200,27 +219,28 @@ public class VexOdometryDriveTrain {
 
             // --- Apply Proportional Gain ---
             // Scale down the power as the robot gets closer.
-            forwardPower *= MOVE_GAIN;
-            strafePower  *= MOVE_GAIN;
+            // Adjust gain by the momentum. 
+            forwardPower *= MOVE_GAIN / maxPower;
+            strafePower  *= MOVE_GAIN / maxPower;
 
-            // --- Normalize the Power Vector ---
-            // This is the crucial change. Instead of clipping each power component independently,
-            // we scale them down together. This preserves the desired angle of travel
-            // even when the requested power exceeds 1.0, preventing the robot from being
-            // locked into a 45-degree path.
-            double max = Math.max(1.0, Math.abs(forwardPower) + Math.abs(strafePower));
-            forwardPower /= max;
-            strafePower  /= max;
+            // --- Limit power to maxPower while preserving direction ---
+            double largerPower = Math.max(Math.abs(forwardPower), Math.abs(strafePower));
+            if (largerPower > maxPower) {
+                double scale = maxPower / largerPower;
+                forwardPower *= scale;
+                strafePower *= scale;
+            }
 
             // --- Apply Minimum Power to Overcome Friction ---
             // If the calculated power is very small but non-zero, boost it to the minimum
             // to ensure the robot actually moves. This avoids getting stuck near the target.
-            if (Math.hypot(errorX, errorY) > MOVE_THRESHOLD_INCH) { // Only apply if we still need to move
-                if (Math.abs(forwardPower) > 0.01 && Math.abs(forwardPower) < MIN_MOVE_POWER) {
-                    forwardPower = Math.copySign(MIN_MOVE_POWER, forwardPower);
+            if (newErr > MOVE_THRESHOLD_INCH) { // Only apply if we still need to move
+                double minPower = Math.min(maxPower, MIN_MOVE_POWER);
+                if (Math.abs(forwardPower) > 0.01 && Math.abs(forwardPower) < minPower) {
+                    forwardPower = Math.copySign(minPower, forwardPower);
                 }
-                if (Math.abs(strafePower) > 0.01 && Math.abs(strafePower) < MIN_MOVE_POWER) {
-                    strafePower = Math.copySign(MIN_MOVE_POWER, strafePower);
+                if (Math.abs(strafePower) > 0.01 && Math.abs(strafePower) < minPower) {
+                    strafePower = Math.copySign(minPower, strafePower);
                 }
             }
 
@@ -238,6 +258,7 @@ public class VexOdometryDriveTrain {
 
         // Stop all motion once the robot has reached the target location.
         stopMotors();
+        return true;
     }
 
 
@@ -304,11 +325,13 @@ public class VexOdometryDriveTrain {
 
     static final double MOVE_THRESHOLD_INCH = 0.5;
     static final double MIN_MOVE_POWER = 0.1;
-    static final double MOVE_GAIN = 1.0 / 3.0;      // Move Control "Gain". Start reducing power at 3 inches
+    static final double MOVE_GAIN = 1.0 / 5.0;      // Move Control "Gain". Start reducing power at 5 inches assuming full power.
 
     // https://www.gobilda.com/swingarm-odometry-pod-48mm-wheel/
     static final double ODOMETER_DIAMETER_MM = 48;
     static final double ODOMETER_COUNT_PER_REVOLUTION = 2000;
     static final double ODOMETER_MM_PER_COUNT = (ODOMETER_DIAMETER_MM * Math.PI) / ODOMETER_COUNT_PER_REVOLUTION;
     static final double ODOMETER_INCH_PER_COUNT = ODOMETER_MM_PER_COUNT / 25.4;
+
+    private static final String TAG = "VEX::";
 }

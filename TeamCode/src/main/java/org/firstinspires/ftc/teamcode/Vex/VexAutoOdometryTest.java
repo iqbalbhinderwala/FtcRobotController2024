@@ -4,6 +4,7 @@ import com.qualcomm.robotcore.eventloop.opmode.Autonomous;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 import com.qualcomm.robotcore.util.ElapsedTime;
+import com.qualcomm.robotcore.util.Range;
 
 import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit;
 import org.firstinspires.ftc.robotcore.external.navigation.Pose3D;
@@ -14,7 +15,7 @@ import org.firstinspires.ftc.robotcore.external.navigation.Pose3D;
 public class VexAutoOdometryTest extends LinearOpMode
 {
     VexOdometryDriveTrain robot = new VexOdometryDriveTrain(this);
-    double MAX_DRIVE_POWER = 0.7;
+    double MAX_DRIVE_POWER = 1;
     double MAX_TURN_SPEED = 1;
     double targetHeading = 0; // angle in degrees
 
@@ -35,13 +36,26 @@ public class VexAutoOdometryTest extends LinearOpMode
         robot.init();
         robot.setPose(0, 0, 0);
 
+        double maxDrivePower = MAX_DRIVE_POWER;
+
         // Started
         while (opModeIsActive())
         {
+            // Select max speed (don't drive full power)
+            if(gamepad1.dpad_up && lastClick.seconds() >= BUTTON_DELAY_SEC) {
+                lastClick.reset();
+                maxDrivePower += 0.1;
+                maxDrivePower =  Range.clip(maxDrivePower, 0, 1);
+            } else if (gamepad1.dpad_down && lastClick.seconds() >= BUTTON_DELAY_SEC) {
+                lastClick.reset();
+                maxDrivePower -= 0.1;
+                maxDrivePower =  Range.clip(maxDrivePower, 0, 1);
+            }
+
             // Drive using manual POV Joystick mode.  Slow things down to make the robot more controllable.
-            double drive  = -gamepad1.left_stick_y  * MAX_DRIVE_POWER; // Note: pushing stick forward gives negative value so negate for +ve forward
-            double strafe =  gamepad1.left_stick_x  * MAX_DRIVE_POWER; // +ve right
-            double turn   = -gamepad1.right_stick_x * MAX_TURN_SPEED;  // +ve counter-clockwise
+            double drive  = -gamepad1.left_stick_y  * maxDrivePower; // Note: pushing stick forward gives negative value so negate for +ve forward
+            double strafe =  gamepad1.left_stick_x  * maxDrivePower; // +ve right
+            double turn   = -gamepad1.right_stick_x * MAX_TURN_SPEED; // +ve counter-clockwise
 
             telemetry.addData("Manual", "Drive %5.2f, Strafe %5.2f, Turn %5.2f ", drive, strafe, turn);
             robot.moveRobot(drive, strafe, turn);
@@ -58,16 +72,16 @@ public class VexAutoOdometryTest extends LinearOpMode
                 robot.turnToHeading(targetHeading);
             }
             if(gamepad1.a) {
-                robot.driveTo(0, 0);
+                robot.driveTo(0, 0, maxDrivePower);
             }
             if(gamepad1.y) {
-                robot.driveTo(0, 10);
+                robot.driveTo(0, 10, maxDrivePower);
             }
             if(gamepad1.x) {
-                robot.driveTo(-5, 5);
+                robot.driveTo(-5, 5, maxDrivePower);
             }
             if(gamepad1.b) {
-                robot.driveTo(5, 5);
+                robot.driveTo(5, 5, maxDrivePower);
             }
 
             // Telemetry
@@ -78,7 +92,8 @@ public class VexAutoOdometryTest extends LinearOpMode
             telemetry.addLine("X: Drive to (-5,  5)");
             telemetry.addLine("B: Drive to ( 5,  5)");
             telemetry.addLine("D-Pad Left/Right: Turn 90°");
-            telemetry.addData("Drive Speed", "%.2f", MAX_DRIVE_POWER);
+            telemetry.addLine("D-Pad Up/Down: Adjust drive speed");
+            telemetry.addData("Drive Speed", "%.2f", maxDrivePower);
             telemetry.addData("Turn Speed", "%.2f", MAX_TURN_SPEED);
             telemetry.addData("X", "%.1f", pose.getPosition().x);
             telemetry.addData("Y", "%.1f", pose.getPosition().y);
