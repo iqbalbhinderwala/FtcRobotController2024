@@ -92,18 +92,42 @@ public class TwistOdometry {
         // Note the PLUS sign, which allows centerWheelOffset to match the physical Y-coordinate given a CCW turn.
         double localDeltaX = deltaHorizontal + (centerWheelOffset * deltaAngleRad);
 
-        // --- Rotate the local changes into the global field coordinate frame ---
-        // Convert the current heading to radians for Math functions
+        // --- Accurately model the robot's motion as an arc to "untwist" the local deltas ---
+        // This calculates the equivalent straight-line displacement vector relative to the robot's
+        // orientation at the START of the update cycle. If the robot turned, we update
+        // localDeltaX/Y to be the chord of the arc traveled.
+        boolean correct_twist = false;
+        if (correct_twist && Math.abs(deltaAngleRad) > 1e-6) { // Check for non-zero rotation (curved path)
+            // If the robot is turning, we model the path as an arc.
+            // These formulas use trigonometric identities to find the endpoint of the arc.
+            double sinDeltaAngle = Math.sin(deltaAngleRad);
+            double cosDeltaAngle = Math.cos(deltaAngleRad);
+
+            // The terms (sin(d_theta)/d_theta) and ((1-cos(d_theta))/d_theta) can be thought of as
+            // averaging factors that account for the continuous change in heading over the arc.
+            double sineTerm = sinDeltaAngle / deltaAngleRad;
+            double cosTerm = (1.0 - cosDeltaAngle) / deltaAngleRad;
+
+            double twistedLocalDeltaX = localDeltaX;
+            double twistedLocalDeltaY = localDeltaY;
+            // Update localDeltaX to the "untwisted" value
+            localDeltaX = (twistedLocalDeltaX * sineTerm) - (twistedLocalDeltaY * cosTerm);
+            // Update localDeltaY to the "untwisted" value
+            localDeltaY = (twistedLocalDeltaX * cosTerm) + (twistedLocalDeltaY * sineTerm);
+        }
+        // If the robot did not turn, localDeltaX and localDeltaY are already the correct untwisted values.
+
+
+        // --- Rotate the untwisted local displacement into the global field coordinate frame ---
+        // We use the robot's absolute heading (from the IMU) to perform this rotation.
         double headingRad = Math.toRadians(heading);
         double sinHeading = Math.sin(headingRad);
         double cosHeading = Math.cos(headingRad);
 
-        // The change in the field's X coordinate is a combination of local forward and strafe movements
         double globalDeltaX = localDeltaX * cosHeading - localDeltaY * sinHeading;
-        // The change in the field's Y coordinate is also a combination of both local movements
         double globalDeltaY = localDeltaX * sinHeading + localDeltaY * cosHeading;
 
-        // Update the global pose by adding the calculated displacement.
+        // Update the global pose by adding the final calculated displacement.
         this.x += globalDeltaX;
         this.y += globalDeltaY;
 

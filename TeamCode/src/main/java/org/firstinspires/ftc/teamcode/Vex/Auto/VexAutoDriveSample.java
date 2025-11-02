@@ -1,11 +1,10 @@
-package org.firstinspires.ftc.teamcode.Vex;
+package org.firstinspires.ftc.teamcode.Vex.Auto;
 
 import com.qualcomm.robotcore.eventloop.opmode.Autonomous;
-import com.qualcomm.robotcore.eventloop.opmode.Disabled;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.util.ElapsedTime;
 
-import org.firstinspires.ftc.teamcode.Sam.SamIMUOmniDriveTrain;
+import org.firstinspires.ftc.teamcode.Vex.Hardware.VexIMUOmniDriveTrain;
 
 // Simple autonomous program to test driving in a straight line or rotate 90 degrees.
 

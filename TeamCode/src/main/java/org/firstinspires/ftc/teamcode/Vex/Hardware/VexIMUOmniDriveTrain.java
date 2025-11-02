@@ -27,7 +27,7 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.firstinspires.ftc.teamcode.Vex;
+package org.firstinspires.ftc.teamcode.Vex.Hardware;
 
 import android.util.Log;
 

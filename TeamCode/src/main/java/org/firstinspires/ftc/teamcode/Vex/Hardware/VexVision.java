@@ -1,4 +1,4 @@
-package org.firstinspires.ftc.teamcode.Vex;
+package org.firstinspires.ftc.teamcode.Vex.Hardware;
 
 import android.annotation.SuppressLint;
 import android.util.Size;
