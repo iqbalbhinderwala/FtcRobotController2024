@@ -91,15 +91,20 @@ public class VexIMUOmniDriveTrain
         leftBackDrive   = hardwareMap.get(DcMotor.class, "wheel back left");
         rightBackDrive  = hardwareMap.get(DcMotor.class, "wheel back right");
 
-        odometerXL = hardwareMap.get(DcMotor.class, "odometer axial left");
-        odometerXR = hardwareMap.get(DcMotor.class, "odometer axial right");
-        odometerY = hardwareMap.get(DcMotor.class, "odometer lateral");
+        odometerXL = hardwareMap.get(DcMotor.class, "wheel front left");
+        odometerXR = hardwareMap.get(DcMotor.class, "wheel front right");
+        odometerY = hardwareMap.get(DcMotor.class, "m3");
+
+        odometerXL.setDirection(DcMotor.Direction.REVERSE); // Y +-ve forward
+        odometerXR.setDirection(DcMotor.Direction.FORWARD); // Y +-ve forward
+        odometerY.setDirection(DcMotor.Direction.FORWARD); // X +-ve right
 
         // Nominal Direction of Motor Rotation
+
         leftFrontDrive .setDirection(DcMotor.Direction.FORWARD);
         leftBackDrive  .setDirection(DcMotor.Direction.REVERSE);
         rightFrontDrive.setDirection(DcMotor.Direction.REVERSE);
-        rightBackDrive .setDirection(DcMotor.Direction.REVERSE);
+        rightBackDrive .setDirection(DcMotor.Direction.FORWARD);
 
         odometerXL.setDirection(DcMotor.Direction.REVERSE); // +-ve forward
         odometerXR.setDirection(DcMotor.Direction.FORWARD); // +-ve forward

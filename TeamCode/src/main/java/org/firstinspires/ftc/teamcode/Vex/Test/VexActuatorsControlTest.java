@@ -34,18 +34,25 @@ import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 import com.qualcomm.robotcore.util.ElapsedTime;
 
 import org.firstinspires.ftc.teamcode.Vex.Hardware.VexActuators;
+import org.firstinspires.ftc.teamcode.Vex.Hardware.VexOdometryDriveTrain;
 
 @TeleOp(name="[Vex] Actuators Control Test", group="VexTest")
 public class VexActuatorsControlTest extends LinearOpMode {
 
     private VexActuators actuators = new VexActuators(this);
+    private VexOdometryDriveTrain driveTrain;
 
     @Override
     public void runOpMode() {
 
         actuators.init(hardwareMap);
+        driveTrain = new VexOdometryDriveTrain(this);
+        driveTrain.init();
+        driveTrain.setPose(0,0,0);
+
 
         telemetry.addData("Status", "Initialized");
+        telemetry.addData(">", "Driver orientation is set to face the +Y-Axis (0 deg).");
         telemetry.update();
 
         // Wait for the game to start (driver presses PLAY)
@@ -58,6 +65,25 @@ public class VexActuatorsControlTest extends LinearOpMode {
 
         // run until the end of the match (driver presses STOP)
         while (opModeIsActive()) {
+
+            // --- READ JOYSTICK INPUTS ---
+
+            // Get raw joystick values for movement and turning.
+            double forwardInput = -gamepad1.left_stick_y; // Positive is "forward"
+            double strafeInput  =  gamepad1.left_stick_x;  // Positive is "right"
+            double turnInput    = -gamepad1.right_stick_x; // Positive is counter-clockwise
+
+            // --- CALL DRIVETRAIN METHOD ---
+
+            // Get the robot's current heading from the IMU.
+            double robotHeading = driveTrain.getHeading();
+
+            // Define the driver's fixed orientation. 0 degrees means facing along the +Y axis.
+            double humanDirection = 0.0;
+
+            // Call the centralized driving function within the drivetrain class,
+            // passing all necessary inputs. The drivetrain now handles all calculations.
+            driveTrain.moveHumanCentric(forwardInput, strafeInput, turnInput, robotHeading, humanDirection);
 
             // --- Adjust Powers ---
             double POWER_INCREMENT = 0.05;
@@ -120,15 +146,25 @@ public class VexActuatorsControlTest extends LinearOpMode {
                 }
             }
 
+            driveTrain.update();
+            telemetry.addData("--- Driving ---", "");
+            telemetry.addData("Left Stick Y (Fwd)", "%.2f", forwardInput);
+            telemetry.addData("Left Stick X (Str)", "%.2f", strafeInput);
+            telemetry.addData("Right Stick X (Trn)", "%.2f", turnInput);
+            telemetry.addData("Heading (Deg)", "%.1f", driveTrain.getHeading());
+            telemetry.addData("Pose", driveTrain.getPose().toString());
+
+            telemetry.addData("--- Actuators ---", "");
             telemetry.addData(">", "A: Intake, B: Reverse, Y: Auto-Shoot, X: Manual-Shoot");
             telemetry.addData(">", "DPad U/D: Shooter pwr, L/R: Intake pwr");
             telemetry.addData(">", "L/R Bumper/Trigger: Manual Gate Control");
-            telemetry.addData("", "--------------------------------");
             telemetry.addData("Intake Power", "%.2f", intakePower);
             telemetry.addData("Shooter Power", "%.2f", shooterPower);
             telemetry.addData("Gate A Pos", "%.2f", actuators.getGateAPosition());
             telemetry.addData("Gate B Pos", "%.2f", actuators.getGateBPosition());
             telemetry.update();
         }
+
+        driveTrain.stopMotors();
     }
 }

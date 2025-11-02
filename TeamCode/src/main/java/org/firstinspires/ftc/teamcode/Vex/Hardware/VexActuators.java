@@ -21,9 +21,9 @@ public class VexActuators {
 
     public void init(HardwareMap hardwareMap) {
         // Initialize the hardware variables.
-        intakeMotor = hardwareMap.get(DcMotor.class, "intake");
-        topShooterMotor = hardwareMap.get(DcMotor.class, "top shooter");
-        bottomShooterMotor = hardwareMap.get(DcMotor.class, "bottom shooter");
+        intakeMotor = hardwareMap.get(DcMotor.class, "m2");
+        topShooterMotor = hardwareMap.get(DcMotor.class, "m0");
+        bottomShooterMotor = hardwareMap.get(DcMotor.class, "m1");
 
         firstGateServo = hardwareMap.get(Servo.class, "gate a");
         secondGateServo = hardwareMap.get(Servo.class, "gate b");
@@ -75,24 +75,25 @@ public class VexActuators {
         setShooterPower(shooterPower);
         opMode.sleep(1000); // Give motors time to spin up
 
+        long DELAY = 250;
         // Run sequence up to 3 times, can be interrupted by releasing Y
-        for (int i = 0; i < 3; i++) {
+        while (true) {
             if (!opMode.opModeIsActive() || !opMode.gamepad1.y) break;
             // CLOSE GATE 2
             closeGateB(); // Closed
-            opMode.sleep(250);
+            opMode.sleep(DELAY);
             if (!opMode.opModeIsActive() || !opMode.gamepad1.y) break;
             // OPEN GATE 1
             openGateA(); // Open
-            opMode.sleep(250);
+            opMode.sleep(DELAY);
             if (!opMode.opModeIsActive() || !opMode.gamepad1.y) break;
             // CLOSE GATE 1
             closeGateA(); // Closed
-            opMode.sleep(250);
+            opMode.sleep(DELAY);
             if (!opMode.opModeIsActive() || !opMode.gamepad1.y) break;
             // OPEN GATE 2
             openGateB(); // Open
-            opMode.sleep(250);
+            opMode.sleep(DELAY);
         }
 
         // Turn off shooters and wait for Y release
@@ -106,7 +107,7 @@ public class VexActuators {
 
     // Constants
     public final double GATE_A_OPEN = 0.0;
-    public final double GATE_A_CLOSED = 0.30;
+    public final double GATE_A_CLOSED = 0.20;
     public final double GATE_B_OPEN = 0.35;
     public final double GATE_B_CLOSED = 0.65;
 }

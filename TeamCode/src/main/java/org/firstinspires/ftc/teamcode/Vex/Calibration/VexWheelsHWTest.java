@@ -103,35 +103,25 @@ public class VexWheelsHWTest extends LinearOpMode {
 
 
     private void initMotors() {
-        // Initialize the hardware variables. Note that the strings used here must correspond
-        // to the names assigned during the robot configuration step on the DS or RC devices.
+        // --- Initialize Drivetrain Motors ---
         leftFrontDrive  = hardwareMap.get(DcMotor.class, "wheel front left");
         rightFrontDrive = hardwareMap.get(DcMotor.class, "wheel front right");
         leftBackDrive   = hardwareMap.get(DcMotor.class, "wheel back left");
         rightBackDrive  = hardwareMap.get(DcMotor.class, "wheel back right");
 
-        odometerL = hardwareMap.get(DcMotor.class, "odometer axial left");
-        odometerR = hardwareMap.get(DcMotor.class, "odometer axial right");
-        odometerH = hardwareMap.get(DcMotor.class, "odometer lateral");
-
-        // ########################################################################################
-        // !!!            IMPORTANT Drive Information. Test your motor directions.            !!!!!
-        // ########################################################################################
-        // Most robots need the motors on one side to be reversed to drive forward.
-        // The motor reversals shown here are for a "direct drive" robot (the wheels turn the same direction as the motor shaft)
-        // If your robot has additional gear reductions or uses a right-angled drive, it's important to ensure
-        // that your motors are turning in the correct direction.  So, start out with the reversals here, BUT
-        // when you first test your robot, push the left joystick forward and observe the direction the wheels turn.
-        // Reverse the direction (flip FORWARD <-> REVERSE ) of any wheel that runs backward
-        // Keep testing until ALL the wheels move the robot forward when you push the left joystick forward.
         leftFrontDrive .setDirection(DcMotor.Direction.FORWARD);
         leftBackDrive  .setDirection(DcMotor.Direction.REVERSE);
         rightFrontDrive.setDirection(DcMotor.Direction.REVERSE);
-        rightBackDrive .setDirection(DcMotor.Direction.REVERSE);
+        rightBackDrive .setDirection(DcMotor.Direction.FORWARD);
+
+        // --- Initialize Odometry Pods ---
+        odometerL = hardwareMap.get(DcMotor.class, "wheel front left");
+        odometerR = hardwareMap.get(DcMotor.class, "wheel front right");
+        odometerH = hardwareMap.get(DcMotor.class, "m3");
 
         odometerL.setDirection(DcMotor.Direction.REVERSE); // Y +-ve forward
         odometerR.setDirection(DcMotor.Direction.FORWARD); // Y +-ve forward
-        odometerH.setDirection(DcMotor.Direction.REVERSE); // X +-ve right
+        odometerH.setDirection(DcMotor.Direction.FORWARD); // X +-ve right
     }
 
     private void toggleForwardDirection() {

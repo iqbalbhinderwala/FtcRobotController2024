@@ -139,7 +139,7 @@ public class VexVision {
      Manually set the camera gain and exposure.
      This can only be called AFTER calling initAprilTag(), and only works for Webcams;
     */
-    private void    setManualExposure(int exposureMS, int gain) {
+    private void setManualExposure(int exposureMS, int gain) {
         // Wait for the camera to be open, then use the controls
 
         if (visionPortal == null) {
@@ -174,6 +174,35 @@ public class VexVision {
     }
 
     /**
+     * Get the most accurate AprilTag "BlueTarget" or "RedTarget" detection from a list of current detections.
+     * The most accurate detection is the one with the highest decision margin.
+     *
+     * @return The most accurate detection, or null if the list is empty or contains no valid metadata.
+     */
+    public AprilTagDetection getMostAccurateTarget() {
+
+        List<AprilTagDetection> currentDetections = aprilTag.getDetections();
+        if (currentDetections == null || currentDetections.isEmpty()) {
+            return null;
+        }
+
+        AprilTagDetection best = null;
+        double maxMargin = 0;
+
+        for (AprilTagDetection detection : currentDetections) {
+            // Ensure the detection has metadata and a valid pose
+            if (detection.metadata != null && detection.metadata.name.contains("Target")
+                    && detection.decisionMargin > maxMargin) {
+
+                maxMargin = detection.decisionMargin;
+                best = detection;
+            }
+        }
+
+        return best;
+    }
+
+    /**
      * Get the closest AprilTag "BlueTarget" or "RedTarget" detection from a list of current detections.
      *
      * @return The closest detection, or null if the list is empty or contains no valid metadata.
@@ -203,7 +232,7 @@ public class VexVision {
 
     @SuppressLint("DefaultLocale")
     public void addTelemetry() {
-        AprilTagDetection detection = getClosestTarget();
+        AprilTagDetection detection = getMostAccurateTarget();
         if (detection == null) {
             telemetry.addLine("No AprilTag detections.");
             return;
@@ -211,6 +240,8 @@ public class VexVision {
 
         // DEBUG
         telemetry.addLine(String.format("\n==== (ID %d) %s", detection.id, detection.metadata.name));
+        telemetry.addLine(String.format("Decision Margin %6.2f, Hamming %d", detection.decisionMargin, detection.hamming));
+
         telemetry.addLine(String.format("XYZ %6.1f %6.1f %6.1f  (inch)", detection.ftcPose.x, detection.ftcPose.y, detection.ftcPose.z));
         telemetry.addLine(String.format("PRY %6.1f %6.1f %6.1f  (deg)", detection.ftcPose.pitch, detection.ftcPose.roll, detection.ftcPose.yaw));
         telemetry.addLine(String.format("RBE %6.1f %6.1f %6.1f  (inch, deg, deg)", detection.ftcPose.range, detection.ftcPose.bearing, detection.ftcPose.elevation));

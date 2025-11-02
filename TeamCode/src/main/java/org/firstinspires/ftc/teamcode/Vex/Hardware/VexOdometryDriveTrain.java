@@ -56,34 +56,34 @@ public class VexOdometryDriveTrain {
      */
     private void initMotors(HardwareMap hardwareMap) {
         // --- Initialize Drivetrain Motors ---
-        leftFrontDrive = hardwareMap.get(DcMotor.class, "wheel front left");
+        leftFrontDrive  = hardwareMap.get(DcMotor.class, "wheel front left");
         rightFrontDrive = hardwareMap.get(DcMotor.class, "wheel front right");
-        leftBackDrive = hardwareMap.get(DcMotor.class, "wheel back left");
-        rightBackDrive = hardwareMap.get(DcMotor.class, "wheel back right");
+        leftBackDrive   = hardwareMap.get(DcMotor.class, "wheel back left");
+        rightBackDrive  = hardwareMap.get(DcMotor.class, "wheel back right");
 
-        leftFrontDrive.setDirection(DcMotor.Direction.FORWARD);
-        leftBackDrive.setDirection(DcMotor.Direction.REVERSE);
+        leftFrontDrive .setDirection(DcMotor.Direction.FORWARD);
+        leftBackDrive  .setDirection(DcMotor.Direction.REVERSE);
         rightFrontDrive.setDirection(DcMotor.Direction.REVERSE);
-        rightBackDrive.setDirection(DcMotor.Direction.REVERSE);
+        rightBackDrive .setDirection(DcMotor.Direction.FORWARD);
 
+        // --- Initialize Odometry Pods ---
+        leftOdometer = hardwareMap.get(DcMotor.class, "wheel front left");
+        rightOdometer = hardwareMap.get(DcMotor.class, "wheel front right");
+        horizontalOdometer = hardwareMap.get(DcMotor.class, "m3");
+
+        leftOdometer.setDirection(DcMotor.Direction.REVERSE); // Y +-ve forward
+        rightOdometer.setDirection(DcMotor.Direction.FORWARD); // Y +-ve forward
+        horizontalOdometer.setDirection(DcMotor.Direction.FORWARD); // X +-ve right
+
+        // TurnToHeading() relies on encoders being disabled.
         for (DcMotor motor : new DcMotor[]{leftFrontDrive, leftBackDrive, rightFrontDrive, rightBackDrive}) {
-            // TurnToHeading() relies on encoders being disabled.
             motor.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
             motor.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
         }
 
-        // --- Initialize Odometry Pods ---
-        leftOdometer = hardwareMap.get(DcMotor.class, "odometer axial left");
-        rightOdometer = hardwareMap.get(DcMotor.class, "odometer axial right");
-        horizontalOdometer = hardwareMap.get(DcMotor.class, "odometer lateral");
-
-        leftOdometer.setDirection(DcMotor.Direction.REVERSE); // Y +-ve forward
-        rightOdometer.setDirection(DcMotor.Direction.FORWARD); // Y +-ve forward
-        horizontalOdometer.setDirection(DcMotor.Direction.REVERSE); // X +-ve right
-
         // Reset all odometer encoders
         for (DcMotor motor : new DcMotor[]{leftOdometer, rightOdometer, horizontalOdometer}) {
-            motor.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+            motor.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
         }
     }
 

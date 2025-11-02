@@ -35,7 +35,7 @@ import com.qualcomm.robotcore.hardware.DcMotor;
 import com.qualcomm.robotcore.hardware.Servo;
 import com.qualcomm.robotcore.util.ElapsedTime;
 
-@TeleOp(name="[Vex] Joints Hardware Test", group="VexTest")
+@TeleOp(name="[Vex] Actuators Hardware Test", group="VexTest")
 //@Disabled
 public class VexActuatorsHWTest extends LinearOpMode {
 
@@ -50,9 +50,10 @@ public class VexActuatorsHWTest extends LinearOpMode {
         // Initialize the hardware variables. Note that the strings used here as parameters
         // to 'get' must correspond to the names assigned during the robot configuration
         // step (using the FTC Robot Controller app on the phone).
-        intakeMotor = hardwareMap.get(DcMotor.class, "intake");
-        topShooterMotor = hardwareMap.get(DcMotor.class, "top shooter");
-        bottomShooterMotor = hardwareMap.get(DcMotor.class, "bottom shooter");
+
+        intakeMotor = hardwareMap.get(DcMotor.class, "m2");
+        topShooterMotor = hardwareMap.get(DcMotor.class, "m0");
+        bottomShooterMotor = hardwareMap.get(DcMotor.class, "m1");
 
         gateAServo = hardwareMap.get(Servo.class, "gate a");
         gateBServo = hardwareMap.get(Servo.class, "gate b");

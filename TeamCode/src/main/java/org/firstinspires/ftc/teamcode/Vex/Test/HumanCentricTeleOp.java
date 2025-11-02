@@ -2,7 +2,11 @@ package org.firstinspires.ftc.teamcode.Vex.Test;
 
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
+import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit;
+import org.firstinspires.ftc.robotcore.external.navigation.Pose3D;
 import org.firstinspires.ftc.teamcode.Vex.Hardware.VexOdometryDriveTrain;
+import org.firstinspires.ftc.teamcode.Vex.Hardware.VexVision;
+import org.firstinspires.ftc.vision.apriltag.AprilTagDetection;
 
 /**
  * This TeleOp program provides human-centric control for a robot by utilizing the
@@ -19,6 +23,7 @@ public class HumanCentricTeleOp extends LinearOpMode {
 
     // Declare our drivetrain from the VexOdometryDriveTrain class
     private VexOdometryDriveTrain driveTrain;
+    private VexVision vision;
 
     @Override
     public void runOpMode() throws InterruptedException {
@@ -28,17 +33,51 @@ public class HumanCentricTeleOp extends LinearOpMode {
         driveTrain = new VexOdometryDriveTrain(this);
         driveTrain.init();
 
-        // --- SET INITIAL POSE ---
-        // Set the robot's starting position and heading on the field to (0, 0, 0).
-        double startX = 0.0; // inches
-        double startY = 0.0; // inches
-        double startHeading = 0.0; // degrees
-        driveTrain.setPose(0, 0, 0);
+        // Initialize vision
+        vision = new VexVision(this);
+        vision.init();
 
-        telemetry.addData("Status", "Initialized");
+        // Send telemetry message to signify robot waiting
+        telemetry.addData("Status", "Ready to start.");
+        telemetry.update();
+        
+        AprilTagDetection detection = null;
+
+        // Loop while waiting for start and look for AprilTags
+        while (!isStarted() && !isStopRequested()) {
+            detection = vision.getMostAccurateTarget();
+            if (detection != null && detection.robotPose != null) {
+                telemetry.addLine("AprilTag found! Pose will be initialized from this tag.");
+                vision.addTelemetry();
+            } else {
+                telemetry.addLine("Searching for AprilTag... Press PLAY to start without one.");
+            }
+            telemetry.update();
+            sleep(100);
+        }
+
+        // Don't do anything if Stop was requested
+        if (isStopRequested()) {
+             vision.stop();
+             return;
+        }
+
+        // Re-check detection in case it was found right before starting.
+        if (detection == null) {
+            detection = vision.getMostAccurateTarget();
+        }
+
+        // Use vision to set pose if found, otherwise default to 0,0,0
+        if (detection != null && detection.robotPose != null) {
+            Pose3D robotPose = detection.robotPose;
+            driveTrain.setPose(robotPose.getPosition().x, robotPose.getPosition().y, robotPose.getOrientation().getYaw(AngleUnit.DEGREES));
+            telemetry.addLine("Pose initialized from AprilTag.");
+        } else {
+            driveTrain.setPose(0, 0, 0);
+            telemetry.addLine("No AprilTag found, starting at (0,0,0).");
+        }
         telemetry.addData(">", "Press Play to start controlling the robot.");
         telemetry.addData(">", "Driver orientation is set to face the Negative X-Axis (+90 deg).");
-        telemetry.addData("Initial Pose", "X: %.1f, Y: %.1f, H: %.1f", startX, startY, startHeading);
         telemetry.update();
 
         // Wait for the driver to press the START button on the driver station.
@@ -47,6 +86,14 @@ public class HumanCentricTeleOp extends LinearOpMode {
         // --- TELEOP LOOP ---
 
         while (opModeIsActive()) {
+            // Check for AprilTag detections to update pose
+            AprilTagDetection newDetection = vision.getMostAccurateTarget();
+            if (newDetection != null && newDetection.robotPose != null) {
+                Pose3D robotPose = newDetection.robotPose;
+                driveTrain.setPose(robotPose.getPosition().x, robotPose.getPosition().y, robotPose.getOrientation().getYaw(AngleUnit.DEGREES));
+                telemetry.addLine("!!! POSE UPDATED FROM VISION !!!");
+            }
+
             // --- READ JOYSTICK INPUTS ---
 
             // Get raw joystick values for movement and turning.
@@ -67,12 +114,15 @@ public class HumanCentricTeleOp extends LinearOpMode {
             driveTrain.moveHumanCentric(forwardInput, strafeInput, turnInput, robotHeading, humanDirection);
 
             // --- TELEMETRY ---
+
             updateTelemetry(forwardInput, strafeInput, turnInput);
         }
 
         // --- CLEANUP ---
+
         // Ensure the robot stops moving when the OpMode is stopped.
         driveTrain.stopMotors();
+        vision.stop();
     }
 
     /**
@@ -89,7 +139,9 @@ public class HumanCentricTeleOp extends LinearOpMode {
         telemetry.addData("--- Robot ---", "");
         telemetry.addData("Heading (Deg)", "%.1f", driveTrain.getHeading());
         telemetry.addData("Pose", driveTrain.getPose().toString());
+        
+        vision.addTelemetry();
+        
         telemetry.update();
     }
 }
-
