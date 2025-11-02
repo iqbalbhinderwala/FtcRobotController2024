@@ -124,14 +124,14 @@ public class VexWheelsHWTest extends LinearOpMode {
         // when you first test your robot, push the left joystick forward and observe the direction the wheels turn.
         // Reverse the direction (flip FORWARD <-> REVERSE ) of any wheel that runs backward
         // Keep testing until ALL the wheels move the robot forward when you push the left joystick forward.
-        leftFrontDrive .setDirection(DcMotor.Direction.REVERSE);
+        leftFrontDrive .setDirection(DcMotor.Direction.FORWARD);
         leftBackDrive  .setDirection(DcMotor.Direction.REVERSE);
         rightFrontDrive.setDirection(DcMotor.Direction.REVERSE);
         rightBackDrive .setDirection(DcMotor.Direction.REVERSE);
 
-        odometerL.setDirection(DcMotor.Direction.FORWARD); // Y +-ve forward
-        odometerR.setDirection(DcMotor.Direction.REVERSE); // Y +-ve forward
-        odometerH.setDirection(DcMotor.Direction.FORWARD); // X +-ve right
+        odometerL.setDirection(DcMotor.Direction.REVERSE); // Y +-ve forward
+        odometerR.setDirection(DcMotor.Direction.FORWARD); // Y +-ve forward
+        odometerH.setDirection(DcMotor.Direction.REVERSE); // X +-ve right
     }
 
     private void toggleForwardDirection() {
@@ -224,6 +224,21 @@ public class VexWheelsHWTest extends LinearOpMode {
             double yaw = -gamepad1.right_stick_x;   // +ve turn left ccw
             // NOTE: Assuming robot +X is right and +Y is forward, then +Z-rotation is CCW.
 
+            // D-pad for strafing and straight driving, overrides joystick
+            if (gamepad1.dpad_up) {
+                axial = 1.0;
+                lateral = 0.0;
+            } else if (gamepad1.dpad_down) {
+                axial = -1.0;
+                lateral = 0.0;
+            } else if (gamepad1.dpad_left) {
+                axial = 0.0;
+                lateral = -1.0;
+            } else if (gamepad1.dpad_right) {
+                axial = 0.0;
+                lateral = 1.0;
+            }
+
             // Combine the joystick requests for each axis-motion to determine each wheel's power.
             // Set up a variable for each drive wheel to save the power level for telemetry.
             double leftFrontPower = axial + lateral - yaw;
@@ -268,11 +283,11 @@ public class VexWheelsHWTest extends LinearOpMode {
             }
 
             // Select max speed (don't drive full power)
-            if(gamepad1.dpad_up && lastPress.seconds() >= PRESS_DELAY) {
+            if(gamepad1.right_stick_button && lastPress.seconds() >= PRESS_DELAY) {
                 lastPress.reset();
                 maxPower += 0.1;
                 maxPower =  Range.clip(maxPower, 0, 1);
-            } else if (gamepad1.dpad_down && lastPress.seconds() >= PRESS_DELAY) {
+            } else if (gamepad1.left_stick_button && lastPress.seconds() >= PRESS_DELAY) {
                 lastPress.reset();
                 maxPower -= 0.1;
                 maxPower =  Range.clip(maxPower, 0, 1);
@@ -301,7 +316,8 @@ public class VexWheelsHWTest extends LinearOpMode {
                 rightBackLastPos = rightBackDrive.getCurrentPosition();
             }
             // Show the elapsed game time and wheel power.
-            telemetry.addData(">", "DPad U/D Adjust power");
+            telemetry.addData(">", "DPad for strafe/straight drive");
+            telemetry.addData(">", "Stick Buttons L/R to adjust power");
             telemetry.addData(">", "X/Y: Front Wheels (L/R)");
             telemetry.addData(">", "A/B: Back  Wheels (L/R)");
             telemetry.addData(">", "BACK button: Invert forward direction");

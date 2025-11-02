@@ -60,7 +60,7 @@ public class VexOdometryDriveTrain {
         leftBackDrive = hardwareMap.get(DcMotor.class, "wheel back left");
         rightBackDrive = hardwareMap.get(DcMotor.class, "wheel back right");
 
-        leftFrontDrive.setDirection(DcMotor.Direction.REVERSE);
+        leftFrontDrive.setDirection(DcMotor.Direction.FORWARD);
         leftBackDrive.setDirection(DcMotor.Direction.REVERSE);
         rightFrontDrive.setDirection(DcMotor.Direction.REVERSE);
         rightBackDrive.setDirection(DcMotor.Direction.REVERSE);
@@ -76,9 +76,9 @@ public class VexOdometryDriveTrain {
         rightOdometer = hardwareMap.get(DcMotor.class, "odometer axial right");
         horizontalOdometer = hardwareMap.get(DcMotor.class, "odometer lateral");
 
-        leftOdometer.setDirection(DcMotor.Direction.FORWARD); // Y +-ve forward
-        rightOdometer.setDirection(DcMotor.Direction.REVERSE); // Y +-ve forward
-        horizontalOdometer .setDirection(DcMotor.Direction.FORWARD); // X +-ve right
+        leftOdometer.setDirection(DcMotor.Direction.REVERSE); // Y +-ve forward
+        rightOdometer.setDirection(DcMotor.Direction.FORWARD); // Y +-ve forward
+        horizontalOdometer.setDirection(DcMotor.Direction.REVERSE); // X +-ve right
 
         // Reset all odometer encoders
         for (DcMotor motor : new DcMotor[]{leftOdometer, rightOdometer, horizontalOdometer}) {
@@ -97,7 +97,7 @@ public class VexOdometryDriveTrain {
          * To Do:  EDIT these two lines to match YOUR mounting configuration.
          */
         RevHubOrientationOnRobot.LogoFacingDirection logoDirection = RevHubOrientationOnRobot.LogoFacingDirection.UP;
-        RevHubOrientationOnRobot.UsbFacingDirection  usbDirection  = RevHubOrientationOnRobot.UsbFacingDirection.LEFT;
+        RevHubOrientationOnRobot.UsbFacingDirection  usbDirection  = RevHubOrientationOnRobot.UsbFacingDirection.RIGHT;
         RevHubOrientationOnRobot orientationOnRobot = new RevHubOrientationOnRobot(logoDirection, usbDirection);
 
         // Now initialize the IMU with this mounting orientation
@@ -259,12 +259,13 @@ public class VexOdometryDriveTrain {
             // If the calculated power is very small but non-zero, boost it to the minimum
             // to ensure the robot actually moves. This avoids getting stuck near the target.
             if (newErr > MOVE_THRESHOLD_INCH) { // Only apply if we still need to move
-                double minPower = Math.min(maxPower, MIN_MOVE_POWER);
-                if (Math.abs(forwardPower) > 0.01 && Math.abs(forwardPower) < minPower) {
-                    forwardPower = Math.copySign(minPower, forwardPower);
+                double minForwardPower = Math.min(maxPower, MIN_FORWARD_POWER);
+                if (Math.abs(forwardPower) > 0.01 && Math.abs(forwardPower) < minForwardPower) {
+                    forwardPower = Math.copySign(minForwardPower, forwardPower);
                 }
-                if (Math.abs(strafePower) > 0.01 && Math.abs(strafePower) < minPower) {
-                    strafePower = Math.copySign(minPower, strafePower);
+                double minStrafePower = Math.min(maxPower, MIN_STRAFE_POWER);
+                if (Math.abs(strafePower) > 0.01 && Math.abs(strafePower) < minStrafePower) {
+                    strafePower = Math.copySign(minStrafePower, strafePower);
                 }
             }
 
@@ -312,6 +313,34 @@ public class VexOdometryDriveTrain {
     }
 
     /**
+     * Calculates and applies motor powers for human-centric driving.
+     *
+     * @param forward The forward/backward input from the joystick (-1 to 1).
+     * @param strafe The left/right strafe input from the joystick (-1 to 1).
+     * @param turn The rotational input from the joystick (-1 to 1).
+     * @param robotHeadingDeg The robot's current absolute heading from the IMU, in degrees.
+     * @param humanHeadingDeg The direction the human driver is facing, in degrees.
+     */
+    public void moveHumanCentric(double forward, double strafe, double turn, double robotHeadingDeg, double humanHeadingDeg) {
+        // Get the robot's heading relative to the human's heading.
+        double effectiveHeadingDeg = robotHeadingDeg - humanHeadingDeg;
+        double headingRad = Math.toRadians(effectiveHeadingDeg);
+
+        // Pre-calculate the sine and cosine of the effective heading.
+        double sinH = Math.sin(headingRad);
+        double cosH = Math.cos(headingRad);
+
+        // Rotate the joystick input vector by the negative of the robot's effective heading.
+        // This transforms the driver's human-centric commands into robot-centric commands
+        // that the moveRobot() method can understand.
+        double robotForward = (forward * cosH) - (strafe * sinH);
+        double robotStrafe  = (forward * sinH) + (strafe * cosH);
+
+        // Pass the calculated robot-centric power values and turn value to the drivetrain.
+        moveRobot(robotForward, robotStrafe, turn);
+    }
+
+    /**
      * Stops all drivetrain motion.
      */
     public void stopMotors() {
@@ -344,12 +373,13 @@ public class VexOdometryDriveTrain {
 
     // --- Constants copied from VexIMUOmniDriveTrain ---
     static final double HEADING_THRESHOLD = 2.0 ;   // How close must the heading get to the target before moving to next step.
-    static final double MIN_TURN_SPEED = 0.1;
-    static final double TURN_GAIN = 1.0 / 15.0 ;    // Turn Control "Gain". Start reducing power at 15 degrees.
+    static final double MIN_TURN_SPEED = 0.25;
+    static final double TURN_GAIN = 1.0 / 75.0 ;    // Turn Control "Gain". Start reducing power at 15 degrees.
 
     static final double MOVE_THRESHOLD_INCH = 0.5;
-    static final double MIN_MOVE_POWER = 0.1;
-    static final double MOVE_GAIN = 1.0 / 5.0;      // Move Control "Gain". Start reducing power at 5 inches assuming full power.
+    static final double MIN_FORWARD_POWER = 0.3;
+    static final double MIN_STRAFE_POWER = 0.1;
+    static final double MOVE_GAIN = 1.0 / 25.0;      // Move Control "Gain". Start reducing power at 5 inches assuming full power.
 
     // https://www.gobilda.com/swingarm-odometry-pod-48mm-wheel/
     static final double ODOMETER_DIAMETER_MM = 48;

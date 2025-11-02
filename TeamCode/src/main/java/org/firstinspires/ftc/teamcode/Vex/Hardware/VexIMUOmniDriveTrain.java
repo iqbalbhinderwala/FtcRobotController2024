@@ -96,13 +96,13 @@ public class VexIMUOmniDriveTrain
         odometerY = hardwareMap.get(DcMotor.class, "odometer lateral");
 
         // Nominal Direction of Motor Rotation
-        leftFrontDrive .setDirection(DcMotor.Direction.REVERSE);
+        leftFrontDrive .setDirection(DcMotor.Direction.FORWARD);
         leftBackDrive  .setDirection(DcMotor.Direction.REVERSE);
         rightFrontDrive.setDirection(DcMotor.Direction.REVERSE);
         rightBackDrive .setDirection(DcMotor.Direction.REVERSE);
 
-        odometerXL.setDirection(DcMotor.Direction.FORWARD); // +-ve forward
-        odometerXR.setDirection(DcMotor.Direction.REVERSE); // +-ve forward
+        odometerXL.setDirection(DcMotor.Direction.REVERSE); // +-ve forward
+        odometerXR.setDirection(DcMotor.Direction.FORWARD); // +-ve forward
         odometerY .setDirection(DcMotor.Direction.REVERSE); // +-ve left
 
         // Configure operating modes
@@ -123,7 +123,7 @@ public class VexIMUOmniDriveTrain
          * To Do:  EDIT these two lines to match YOUR mounting configuration.
          */
         RevHubOrientationOnRobot.LogoFacingDirection logoDirection = RevHubOrientationOnRobot.LogoFacingDirection.UP;
-        RevHubOrientationOnRobot.UsbFacingDirection  usbDirection  = RevHubOrientationOnRobot.UsbFacingDirection.LEFT;
+        RevHubOrientationOnRobot.UsbFacingDirection  usbDirection  = RevHubOrientationOnRobot.UsbFacingDirection.RIGHT;
         RevHubOrientationOnRobot orientationOnRobot = new RevHubOrientationOnRobot(logoDirection, usbDirection);
 
         // Now initialize the IMU with this mounting orientation
