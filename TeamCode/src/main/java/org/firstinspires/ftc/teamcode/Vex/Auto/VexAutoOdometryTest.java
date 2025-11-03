@@ -34,7 +34,7 @@ public class VexAutoOdometryTest extends LinearOpMode
         waitForStart();
 
         robot.init();
-        robot.setPose(0, 0, 0);
+        robot.resetPose(0, 0, 0);
 
         double maxDrivePower = MAX_DRIVE_POWER;
 

@@ -124,10 +124,20 @@ public class VexOdometryDriveTrain {
      * @param startY Initial field Y-coordinate in inches.
      * @param startHeading Initial field heading in degrees.
      */
-    public void setPose(double startX, double startY, double startHeading) {
+    public void resetPose(double startX, double startY, double startHeading) {
         odometry.initPose(startX, startY,
                 getLeftOdometerInches(), getRightOdometerInches(), getHorizontalOdometerInches());
         headingProvider.resetYaw(startHeading);
+    }
+
+    /**
+     * Updates the robot's position on the field without changing the heading.
+     * @param x The new field X-coordinate in inches.
+     * @param y The new field Y-coordinate in inches.
+     */
+    public void updatePosition(double x, double y) {
+        odometry.initPose(x, y,
+                getLeftOdometerInches(), getRightOdometerInches(), getHorizontalOdometerInches());
     }
 
     /**

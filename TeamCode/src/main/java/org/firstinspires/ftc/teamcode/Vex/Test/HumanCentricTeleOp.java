@@ -29,6 +29,10 @@ public class HumanCentricTeleOp extends LinearOpMode {
     public void runOpMode() throws InterruptedException {
         // --- INITIALIZATION ---
 
+        // Define the driver's fixed orientation. 0 degrees means facing along the +Y axis (Red Alliace).
+        double humanDirection = 0;
+
+
         // Initialize the drivetrain, which will handle all hardware mapping and setup.
         driveTrain = new VexOdometryDriveTrain(this);
         driveTrain.init();
@@ -70,10 +74,10 @@ public class HumanCentricTeleOp extends LinearOpMode {
         // Use vision to set pose if found, otherwise default to 0,0,0
         if (detection != null && detection.robotPose != null) {
             Pose3D robotPose = detection.robotPose;
-            driveTrain.setPose(robotPose.getPosition().x, robotPose.getPosition().y, robotPose.getOrientation().getYaw(AngleUnit.DEGREES));
+            driveTrain.resetPose(robotPose.getPosition().x, robotPose.getPosition().y, robotPose.getOrientation().getYaw(AngleUnit.DEGREES));
             telemetry.addLine("Pose initialized from AprilTag.");
         } else {
-            driveTrain.setPose(0, 0, 0);
+            driveTrain.resetPose(0, 0, 0);
             telemetry.addLine("No AprilTag found, starting at (0,0,0).");
         }
         telemetry.addData(">", "Press Play to start controlling the robot.");
@@ -90,7 +94,7 @@ public class HumanCentricTeleOp extends LinearOpMode {
             AprilTagDetection newDetection = vision.getMostAccurateTarget();
             if (newDetection != null && newDetection.robotPose != null) {
                 Pose3D robotPose = newDetection.robotPose;
-                driveTrain.setPose(robotPose.getPosition().x, robotPose.getPosition().y, robotPose.getOrientation().getYaw(AngleUnit.DEGREES));
+                driveTrain.updatePosition(robotPose.getPosition().x, robotPose.getPosition().y);
                 telemetry.addLine("!!! POSE UPDATED FROM VISION !!!");
             }
 
@@ -105,9 +109,6 @@ public class HumanCentricTeleOp extends LinearOpMode {
 
             // Get the robot's current heading from the IMU.
             double robotHeading = driveTrain.getHeading();
-
-            // Define the driver's fixed orientation. 0 degrees means facing along the +Y axis.
-            double humanDirection = +90.0;
 
             // Call the centralized driving function within the drivetrain class,
             // passing all necessary inputs. The drivetrain now handles all calculations.

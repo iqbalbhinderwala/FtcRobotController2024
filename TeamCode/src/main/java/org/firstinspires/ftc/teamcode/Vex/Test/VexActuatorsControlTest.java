@@ -48,7 +48,7 @@ public class VexActuatorsControlTest extends LinearOpMode {
         actuators.init(hardwareMap);
         driveTrain = new VexOdometryDriveTrain(this);
         driveTrain.init();
-        driveTrain.setPose(0,0,0);
+        driveTrain.resetPose(0,0,0);
 
 
         telemetry.addData("Status", "Initialized");

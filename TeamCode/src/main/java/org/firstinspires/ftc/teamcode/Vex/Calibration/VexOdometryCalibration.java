@@ -27,7 +27,7 @@ public class VexOdometryCalibration extends LinearOpMode {
     private double cumulativeDegrees = 0;
 
     // Constants for the calibration routine
-    final double CALIBRATION_TURN_SPEED = 1; // Power for turning during calibration
+    final double CALIBRATION_TURN_SPEED = 0.7; // Power for turning during calibration
     final double TARGET_ANGLE_DEGREES_QUICK = 360.0; // The angle to turn (quick)
     final double TARGET_ANGLE_DEGREES_EXTRA = 10 * 360.0; // The angle to turn (slow)
     final double BUTTON_DELAY_SEC = 0.5; // Prevent accidental double-presses
@@ -39,7 +39,7 @@ public class VexOdometryCalibration extends LinearOpMode {
     public void runOpMode() throws InterruptedException {
         // Initialize the robot's hardware
         robot.init();
-        robot.setPose(0, 0, 0);
+        robot.resetPose(0, 0, 0);
 
         telemetry.addLine(">>> Odometry Calibration <<<");
         telemetry.addLine("Place robot on a flat surface.");
