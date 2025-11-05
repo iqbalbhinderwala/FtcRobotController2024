@@ -8,6 +8,7 @@ import com.qualcomm.robotcore.hardware.DcMotor;
 import com.qualcomm.robotcore.hardware.HardwareMap;
 import com.qualcomm.robotcore.hardware.IMU;
 import com.qualcomm.robotcore.util.ElapsedTime;
+import com.qualcomm.robotcore.util.Range;
 
 import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit;
 import org.firstinspires.ftc.robotcore.external.navigation.DistanceUnit;
@@ -173,6 +174,28 @@ public class VexOdometryDriveTrain {
                 headingProvider.getHeading(), 0, 0, 0);
         return new Pose3D(position, orientation);
     }
+    
+    /**
+     * Calculates the power needed to turn to a target heading.
+     * @param targetHeading The desired heading in degrees.
+     * @param currentHeading The current heading in degrees.
+     * @return The turn power, from -1.0 to 1.0.
+     */
+    public double calculateTurnPower(double targetHeading, double currentHeading) {
+        double headingError = targetHeading - currentHeading;
+
+        // Normalize the error to be within +/- 180 degrees for the shortest turn.
+        while (headingError > 180)  headingError -= 360;
+        while (headingError <= -180) headingError += 360;
+
+        // Calculate the turning power using a proportional gain.
+        // The Range.clip function limits the power to the range [-1, 1].
+        double turnPower = Range.clip(headingError * TURN_GAIN, -1, 1);
+
+        // Apply a minimum power to overcome static friction and prevent stalling.
+        // Math.copySign ensures the direction of the minimum power is correct.
+        return Math.copySign(Math.max(MIN_TURN_SPEED, Math.abs(turnPower)), turnPower);
+    }
 
 
     /**
@@ -185,17 +208,7 @@ public class VexOdometryDriveTrain {
 
         // Loop until the robot is within the heading threshold and the opmode is active.
         while (opMode.opModeIsActive() && Math.abs(headingError) > HEADING_THRESHOLD) {
-            // Normalize the error to be within +/- 180 degrees for the shortest turn.
-            while (headingError > 180)  headingError -= 360;
-            while (headingError <= -180) headingError += 360;
-
-            // Calculate the turning power using a proportional gain.
-            // The Range.clip function limits the power to the range [-1, 1].
-            double turnPower = com.qualcomm.robotcore.util.Range.clip(headingError * TURN_GAIN, -1, 1);
-
-            // Apply a minimum power to overcome static friction and prevent stalling.
-            // Math.copySign ensures the direction of the minimum power is correct.
-            turnPower = Math.copySign(Math.max(MIN_TURN_SPEED, Math.abs(turnPower)), turnPower);
+            double turnPower = calculateTurnPower(targetHeading, headingProvider.getHeading());
 
             // Send power to the robot to make it turn. No forward or strafe movement.
             moveRobot(0, 0, turnPower);
