@@ -70,6 +70,17 @@ public class VexActuators {
         return secondGateServo.getPosition();
     }
 
+    /**
+     * Calculates the shooter power based on the distance to the alliance corner.
+     * The formula is power(x in) = (4.48 / 24 * x + 55.055) / 100.
+     * @return The calculated shooter power, a value between 0.0 and 1.0.
+     */
+    public double calculateDistanceBasedShooterPower(double distanceInInches) {
+        double power = (4.48 / 24.0 * distanceInInches + 55.055) / 100.0;
+        // Clamp the power to be between 0.0 and 1.0, which is what the motor can take.
+        return Math.max(0.0, Math.min(1.0, power));
+    }
+
     public void shootSequence(double shooterPower) {
         // Turn on shooters
         setShooterPower(shooterPower);

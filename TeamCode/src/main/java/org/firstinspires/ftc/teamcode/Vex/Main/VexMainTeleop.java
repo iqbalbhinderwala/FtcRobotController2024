@@ -8,7 +8,7 @@ import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit;
 import org.firstinspires.ftc.robotcore.external.navigation.DistanceUnit;
 import org.firstinspires.ftc.robotcore.external.navigation.Pose2D;
 import org.firstinspires.ftc.robotcore.external.navigation.Pose3D;
-import org.firstinspires.ftc.teamcode.Vex.DecodeField;
+import org.firstinspires.ftc.teamcode.Vex.Hardware.DecodeField;
 import org.firstinspires.ftc.teamcode.Vex.Hardware.VexActuators;
 import org.firstinspires.ftc.teamcode.Vex.Hardware.VexBlackboard;
 import org.firstinspires.ftc.teamcode.Vex.Hardware.VexOdometryDriveTrain;
@@ -52,13 +52,6 @@ public class VexMainTeleop extends LinearOpMode {
 
     // Alliance information
     private DecodeField.Alliance currentAlliance;
-
-    // Alliance corner coordinates (in inches).
-    // It's assumed that the odometry system uses inches as its unit.
-    private static final double RED_CORNER_X = -3.0 * 24.0; // -72 inches
-    private static final double RED_CORNER_Y = 3.0 * 24.0;  // +72 inches
-    private static final double BLUE_CORNER_X = -3.0 * 24.0; // -72 inches
-    private static final double BLUE_CORNER_Y = -3.0 * 24.0; // -72 inches
 
     // Shooting state machine
     private enum ShootingState { IDLE, SPIN_UP, SHOOTING_CYCLE }
@@ -280,17 +273,7 @@ public class VexMainTeleop extends LinearOpMode {
             // Align to the alliance corner
             telemetry.addData("Auto-Aligning to", currentAlliance.toString() + " Corner");
 
-            // 1. Get the target coordinates based on the current alliance.
-            double targetX = (currentAlliance == DecodeField.Alliance.RED) ? RED_CORNER_X : BLUE_CORNER_X;
-            double targetY = (currentAlliance == DecodeField.Alliance.RED) ? RED_CORNER_Y : BLUE_CORNER_Y;
-
-            // 2. Get the robot's current pose.
-            Pose3D currentPose = driveTrain.getPose();
-            double currentX = currentPose.getPosition().x;
-            double currentY = currentPose.getPosition().y;
-
-            // 3. Calculate the angle to the target.
-            targetHeading = Math.toDegrees(Math.atan2(targetY - currentY, targetX - currentX));
+            targetHeading = DecodeField.getTurnAngleToAllianceCorner(currentAlliance, driveTrain.getPose());
         } else {
             // Align to the closest 90-degree heading
             targetHeading = Math.round(currentHeading / 90.0) * 90.0;
@@ -299,38 +282,6 @@ public class VexMainTeleop extends LinearOpMode {
 
         // Use the helper function to calculate the turn power.
         return driveTrain.calculateTurnPower(targetHeading, currentHeading);
-    }
-    
-    /**
-     * Calculates the distance from the robot to the current alliance corner.
-     * @return The distance in inches.
-     */
-    private double getDistanceToCorner() {
-        // 1. Get the target coordinates based on the current alliance.
-        double targetX = (currentAlliance == DecodeField.Alliance.RED) ? RED_CORNER_X : BLUE_CORNER_X;
-        double targetY = (currentAlliance == DecodeField.Alliance.RED) ? RED_CORNER_Y : BLUE_CORNER_Y;
-
-        // 2. Get the robot's current pose.
-        Pose3D currentPose = driveTrain.getPose();
-        double currentX = currentPose.getPosition().x;
-        double currentY = currentPose.getPosition().y;
-
-        // 3. Calculate the distance using the distance formula.
-        double dx = targetX - currentX;
-        double dy = targetY - currentY;
-        return Math.sqrt(dx*dx + dy*dy);
-    }
-
-    /**
-     * Calculates the shooter power based on the distance to the alliance corner.
-     * The formula is power(x in) = (4.48 / 24 * x + 55.055) / 100.
-     * @return The calculated shooter power, a value between 0.0 and 1.0.
-     */
-    private double calculateDistanceBasedShooterPower() {
-        double distanceInInches = getDistanceToCorner();
-        double power = (4.48 / 24.0 * distanceInInches + 55.055) / 100.0;
-        // Clamp the power to be between 0.0 and 1.0, which is what the motor can take.
-        return Math.max(0.0, Math.min(1.0, power));
     }
 
     /**
@@ -368,7 +319,7 @@ public class VexMainTeleop extends LinearOpMode {
                     spinUpTimer.reset(); // Start the spin-up timer
 
                     // Automatically determine shooter power based on distance
-                    shooterPower = calculateDistanceBasedShooterPower();
+                    shooterPower = actuators.calculateDistanceBasedShooterPower(DecodeField.getDistanceToAllianceCorner(currentAlliance, driveTrain.getPose()));
                     actuators.setShooterPower(shooterPower);
 
                     actuators.closeGateA(); // Set gates to ready-to-shoot state
@@ -436,7 +387,6 @@ public class VexMainTeleop extends LinearOpMode {
         }
     }
 
-
     /**
      * Updates and displays all telemetry data on the Driver Station.
      */
@@ -449,7 +399,7 @@ public class VexMainTeleop extends LinearOpMode {
                 currentPose.getPosition().x,
                 currentPose.getPosition().y,
                 currentPose.getOrientation().getYaw(AngleUnit.DEGREES));
-        telemetry.addData("Dist to Corner", "%.2f in", getDistanceToCorner());
+        telemetry.addData("Dist to Corner", "%.2f in", DecodeField.getDistanceToAllianceCorner(currentAlliance, currentPose));
 
         telemetry.addData("--- Actuators ---", "");
         telemetry.addData("Shooting State", shootingState.toString());

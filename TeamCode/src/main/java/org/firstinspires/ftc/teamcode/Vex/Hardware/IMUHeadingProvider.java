@@ -1,4 +1,4 @@
-package org.firstinspires.ftc.teamcode.Vex;
+package org.firstinspires.ftc.teamcode.Vex.Hardware;
 
 import com.qualcomm.robotcore.hardware.IMU;
 import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit;

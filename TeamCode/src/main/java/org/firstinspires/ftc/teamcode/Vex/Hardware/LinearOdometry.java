@@ -1,4 +1,4 @@
-package org.firstinspires.ftc.teamcode.Vex;
+package org.firstinspires.ftc.teamcode.Vex.Hardware;
 
 /**
  * A simple odometry class that tracks the robot's position.

@@ -2,7 +2,7 @@ package org.firstinspires.ftc.teamcode.Vex.Main;
 
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
-import org.firstinspires.ftc.teamcode.Vex.DecodeField;
+import org.firstinspires.ftc.teamcode.Vex.Hardware.DecodeField;
 import org.firstinspires.ftc.teamcode.Vex.Hardware.VexBlackboard;
 
 import java.util.ArrayList;
