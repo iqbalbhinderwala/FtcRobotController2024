@@ -199,14 +199,18 @@ public class VexOdometryDriveTrain {
     /**
      * Turns the robot in place to a target heading.
      * @param targetHeading The desired heading in degrees.
+     * @param maxPower The maximum power to use for the turn, from 0.0 to 1.0.
      */
-    public void turnToHeading(double targetHeading) {
+    public void turnToHeading(double targetHeading, double maxPower) {
         // Calculate the initial heading error.
         double headingError = targetHeading - headingProvider.getHeading();
 
         // Loop until the robot is within the heading threshold and the opmode is active.
         while (opMode.opModeIsActive() && Math.abs(headingError) > HEADING_THRESHOLD) {
             double turnPower = calculateTurnPower(targetHeading, headingProvider.getHeading());
+
+            // Limit the turn power to the maxPower
+            turnPower = Range.clip(turnPower, -maxPower, maxPower);
 
             // Send power to the robot to make it turn. No forward or strafe movement.
             moveRobot(0, 0, turnPower);
@@ -308,6 +312,26 @@ public class VexOdometryDriveTrain {
         return true;
     }
 
+    /**
+     * Moves the robot by a relative distance (dx, dy) from its current position.
+     * @param dx The distance to move along the field's X-axis (in inches).
+     * @param dy The distance to move along the field's Y-axis (in inches).
+     * @param power The maximum power to use for movement.
+     * @return True if the movement completed successfully, false if it was obstructed.
+     */
+    public boolean driveRelative(double dx, double dy, double power) {
+        // 1. Get the current pose to determine the starting point.
+        Pose3D currentPose = getPose();
+        double startX = currentPose.getPosition().x;
+        double startY = currentPose.getPosition().y;
+
+        // 2. Calculate the absolute target coordinates.
+        double targetX = startX + dx;
+        double targetY = startY + dy;
+
+        // 3. Use the existing driveTo method to move to the calculated target.
+        return driveTo(targetX, targetY, power);
+    }
 
     /**
      * Sends power to the drivetrain motors. The inputs are robot-centric.

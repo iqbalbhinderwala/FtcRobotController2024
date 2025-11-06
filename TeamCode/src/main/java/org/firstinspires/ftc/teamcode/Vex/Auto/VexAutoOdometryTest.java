@@ -64,12 +64,12 @@ public class VexAutoOdometryTest extends LinearOpMode
             // turn 90 degrees right.
             if(gamepad1.dpad_right) {
                 targetHeading -= 90;
-                robot.turnToHeading(targetHeading);
+                robot.turnToHeading(targetHeading, MAX_TURN_SPEED);
             }
             // turn 90 degrees left.
             if(gamepad1.dpad_left) {
                 targetHeading += 90;
-                robot.turnToHeading(targetHeading);
+                robot.turnToHeading(targetHeading, MAX_TURN_SPEED);
             }
             if(gamepad1.a) {
                 robot.driveTo(0, 0, maxDrivePower);

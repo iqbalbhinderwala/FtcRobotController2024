@@ -24,10 +24,12 @@ public class DecodeField {
 
     // Alliance corner coordinates (in inches).
     // It's assumed that the odometry system uses inches as its unit.
-    public static final double RED_CORNER_X = -3.0 * 24.0; // -72 inches
-    public static final double RED_CORNER_Y = 3.0 * 24.0;  // +72 inches
-    public static final double BLUE_CORNER_X = -3.0 * 24.0; // -72 inches
-    public static final double BLUE_CORNER_Y = -3.0 * 24.0; // -72 inches
+    public static final double RED_CORNER_X = -3.0 * TILE; // -72 inches
+    public static final double RED_CORNER_Y = 3.0 * TILE;  // +72 inches
+    public static final double BLUE_CORNER_X = -3.0 * TILE; // -72 inches
+    public static final double BLUE_CORNER_Y = -3.0 * TILE; // -72 inches
+
+    public static final double MINIMUM_SHOOTING_DISTANCE = 2 * TILE * Math.sqrt(2);
 
     public enum Alliance { RED, BLUE, UNKNOWN }
 
@@ -112,5 +114,15 @@ public class DecodeField {
 
         // 3. Calculate the angle to the target.
         return Math.toDegrees(Math.atan2(targetY - currentY, targetX - currentX));
+    }
+
+    /**
+     * Checks if the robot is within the valid shooting range.
+     * @param currentAlliance The current alliance.
+     * @param robotPose The robot's current pose.
+     * @return True if the robot is far enough to shoot, false otherwise.
+     */
+    public static boolean isInRangeForShooting(Alliance currentAlliance, Pose3D robotPose) {
+        return getDistanceToAllianceCorner(currentAlliance, robotPose) >= MINIMUM_SHOOTING_DISTANCE;
     }
 }

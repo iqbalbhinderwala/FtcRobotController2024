@@ -334,10 +334,14 @@ public class VexMainTeleop extends LinearOpMode {
                     actuators.closeGateA(); // Set gates to ready-for-intake
                     actuators.openGateB();
                 } else if (bothTriggers && spinUpTimer.seconds() >= SPIN_UP_TIME_S) {
-                    // Spin-up complete, transition to SHOOTING_CYCLE
-                    shootingState = ShootingState.SHOOTING_CYCLE;
-                    gateCycleState = GateCycleState.STEP_1_CLOSE_B; // Start the cycle
-                    gateCycleTimer.reset(); // Reset timer for the first gate delay
+                    if (!DecodeField.isInRangeForShooting(currentAlliance, driveTrain.getPose())) {
+                        gamepad1.rumble(100);
+                    } else {
+                        // Spin-up complete, transition to SHOOTING_CYCLE
+                        shootingState = ShootingState.SHOOTING_CYCLE;
+                        gateCycleState = GateCycleState.STEP_1_CLOSE_B; // Start the cycle
+                        gateCycleTimer.reset(); // Reset timer for the first gate delay
+                    }
                 }
                 break;
             case SHOOTING_CYCLE:
