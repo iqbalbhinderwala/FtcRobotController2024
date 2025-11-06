@@ -5,7 +5,10 @@ import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 import com.qualcomm.robotcore.util.ElapsedTime;
 
 import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit;
+import org.firstinspires.ftc.robotcore.external.navigation.DistanceUnit;
+import org.firstinspires.ftc.robotcore.external.navigation.Pose2D;
 import org.firstinspires.ftc.robotcore.external.navigation.Pose3D;
+import org.firstinspires.ftc.teamcode.Vex.DecodeField;
 import org.firstinspires.ftc.teamcode.Vex.Hardware.VexActuators;
 import org.firstinspires.ftc.teamcode.Vex.Hardware.VexBlackboard;
 import org.firstinspires.ftc.teamcode.Vex.Hardware.VexOdometryDriveTrain;
@@ -23,7 +26,7 @@ import org.firstinspires.ftc.vision.apriltag.AprilTagDetection;
  * - Left Stick:  Controls strafing and forward/backward movement from the driver's perspective.
  * - Left Stick Button: Press to halve the driving power for finer control.
  * - Right Stick: Controls the robot's rotation (turning).
- * - Right Stick Button: Press to automatically align. Aligns to corner if shooting, else aligns to the closest 90 degrees.
+ * - Right Stick Button: Press to automatically align. Aligns to corner if shooting wheel spins, else aligns to the closest 90 degrees.
  * - Gamepad 1 Right Bumper: Runs the intake.
  * - Gamepad 1 'B': Reverses the intake.
  * - Triggers: Controls the shooting mechanism.
@@ -48,7 +51,7 @@ public class VexMainTeleop extends LinearOpMode {
     private final double POWER_INCREMENT = 0.05;
 
     // Alliance information
-    private VexBlackboard.Alliance currentAlliance;
+    private DecodeField.Alliance currentAlliance;
 
     // Alliance corner coordinates (in inches).
     // It's assumed that the odometry system uses inches as its unit.
@@ -116,16 +119,12 @@ public class VexMainTeleop extends LinearOpMode {
         lastPress = new ElapsedTime();
         gateCycleTimer = new ElapsedTime();
         spinUpTimer = new ElapsedTime();
-        humanDirection = 0; // Driver faces +Y axis
 
-        if (currentAlliance == VexBlackboard.Alliance.UNKNOWN) {
-            telemetry.addData("ERROR", "Alliance not selected! Please select an alliance in [Vex] Game Setup.");
+        if (currentAlliance == DecodeField.Alliance.BLUE) {
+            humanDirection = 180; // Driver faces -Y axis
         } else {
-            telemetry.addData("Alliance", currentAlliance.toString());
+            humanDirection = 0; // Driver faces +Y axis
         }
-        telemetry.addData("Status", "Initialization Complete.");
-        telemetry.addData(">", "Searching for AprilTag... Press PLAY to start without one.");
-        telemetry.update();
     }
 
     /**
@@ -133,13 +132,25 @@ public class VexMainTeleop extends LinearOpMode {
      * after init() and before start().
      */
     private void opModeInitLoop() {
+        // Add blackboard telemetry
+        blackboardHelper.addBlackboardTelemetry();
+
+        if (currentAlliance == DecodeField.Alliance.UNKNOWN) {
+            telemetry.addData("ERROR", "Alliance not selected! Please select an alliance in [Vex] Game Setup.");
+        } else {
+            telemetry.addData("Alliance", currentAlliance.toString());
+        }
+        telemetry.addData("Status", "Initialization Complete.");
+        telemetry.addData(">", "Searching for AprilTag... Press PLAY to start without one.");
+
         AprilTagDetection detection = vision.getMostAccurateTarget();
         if (detection != null && detection.robotPose != null) {
-            telemetry.addLine("AprilTag found! Pose will be initialized from this tag.");
+            telemetry.addLine("AprilTag found! Pose will be updated from this tag.");
             vision.addTelemetry();
         } else {
             telemetry.addLine("Searching for AprilTag...");
         }
+
         telemetry.update();
         sleep(50); // Small sleep to prevent busy-looping
     }
@@ -153,19 +164,36 @@ public class VexMainTeleop extends LinearOpMode {
         gateCycleTimer.reset();
         spinUpTimer.reset();
 
-        // Attempt to set initial pose from AprilTag one last time
-        AprilTagDetection detection = vision.getMostAccurateTarget();
-        if (detection != null && detection.robotPose != null) {
-            Pose3D robotPose = detection.robotPose;
-            driveTrain.resetPose(robotPose.getPosition().x, robotPose.getPosition().y, robotPose.getOrientation().getYaw(AngleUnit.DEGREES));
-            telemetry.addLine("Pose initialized from AprilTag.");
+        // Try to initialize pose from the blackboard first
+        Pose3D storedPose = blackboardHelper.getPose();
+        if (storedPose != null) {
+            driveTrain.resetPose(storedPose.getPosition().x, storedPose.getPosition().y, storedPose.getOrientation().getYaw(AngleUnit.DEGREES));
+            telemetry.addLine("Pose initialized from final pose of last OpMode.");
         } else {
-            driveTrain.resetPose(0, 0, 0);
-            telemetry.addLine("No AprilTag found, starting at (0,0,0).");
+            // If not, try to use the starting position from the setup
+            DecodeField.KeyLocation startingLocation = blackboardHelper.getStartingLocation();
+            if (startingLocation != DecodeField.KeyLocation.UNKNOWN) {
+                Pose2D startingPose = startingLocation.getPose();
+                driveTrain.resetPose(startingPose.getX(DistanceUnit.INCH), startingPose.getY(DistanceUnit.INCH), startingPose.getHeading(AngleUnit.DEGREES));
+                telemetry.addData("Pose initialized from", startingLocation.toString());
+            } else {
+                // If no blackboard pose, try to set initial pose from AprilTag
+                AprilTagDetection detection = vision.getMostAccurateTarget();
+                if (detection != null && detection.robotPose != null) {
+                    Pose3D robotPose = detection.robotPose;
+                    driveTrain.resetPose(robotPose.getPosition().x, robotPose.getPosition().y, robotPose.getOrientation().getYaw(AngleUnit.DEGREES));
+                    telemetry.addLine("Pose initialized from AprilTag.");
+                } else {
+                    driveTrain.resetPose(0, 0, 0);
+                    telemetry.addLine("No AprilTag, starting position, or stored pose found, starting at (0,0,0).");
+                }
+            }
         }
+
         telemetry.addData(">", "TeleOp Started. Driver orientation is set to face the +Y-Axis (0 deg).");
         telemetry.update();
     }
+
 
     /**
      * Replicates the loop() method of an Iterative OpMode. This code is looped
@@ -196,6 +224,12 @@ public class VexMainTeleop extends LinearOpMode {
      * when the OpMode is stopped.
      */
     private void opModeStop() {
+        // Save the robot's current pose to the blackboard for the next run
+        Pose3D finalPose = driveTrain.getPose();
+        if (finalPose != null) {
+            blackboardHelper.setPose(finalPose);
+        }
+
         driveTrain.stopMotors();
         vision.stop();
         actuators.setShooterPower(0);
@@ -247,8 +281,8 @@ public class VexMainTeleop extends LinearOpMode {
             telemetry.addData("Auto-Aligning to", currentAlliance.toString() + " Corner");
 
             // 1. Get the target coordinates based on the current alliance.
-            double targetX = (currentAlliance == VexBlackboard.Alliance.RED) ? RED_CORNER_X : BLUE_CORNER_X;
-            double targetY = (currentAlliance == VexBlackboard.Alliance.RED) ? RED_CORNER_Y : BLUE_CORNER_Y;
+            double targetX = (currentAlliance == DecodeField.Alliance.RED) ? RED_CORNER_X : BLUE_CORNER_X;
+            double targetY = (currentAlliance == DecodeField.Alliance.RED) ? RED_CORNER_Y : BLUE_CORNER_Y;
 
             // 2. Get the robot's current pose.
             Pose3D currentPose = driveTrain.getPose();
@@ -273,8 +307,8 @@ public class VexMainTeleop extends LinearOpMode {
      */
     private double getDistanceToCorner() {
         // 1. Get the target coordinates based on the current alliance.
-        double targetX = (currentAlliance == VexBlackboard.Alliance.RED) ? RED_CORNER_X : BLUE_CORNER_X;
-        double targetY = (currentAlliance == VexBlackboard.Alliance.RED) ? RED_CORNER_Y : BLUE_CORNER_Y;
+        double targetX = (currentAlliance == DecodeField.Alliance.RED) ? RED_CORNER_X : BLUE_CORNER_X;
+        double targetY = (currentAlliance == DecodeField.Alliance.RED) ? RED_CORNER_Y : BLUE_CORNER_Y;
 
         // 2. Get the robot's current pose.
         Pose3D currentPose = driveTrain.getPose();
@@ -416,11 +450,6 @@ public class VexMainTeleop extends LinearOpMode {
                 currentPose.getPosition().y,
                 currentPose.getOrientation().getYaw(AngleUnit.DEGREES));
         telemetry.addData("Dist to Corner", "%.2f in", getDistanceToCorner());
-
-        telemetry.addData("--- Driving ---", "");
-//        telemetry.addData("Left Stick Y (Fwd)", "%.2f", -gamepad1.left_stick_y);
-//        telemetry.addData("Left Stick X (Str)", "%.2f", gamepad1.left_stick_x);
-//        telemetry.addData("Right Stick X (Trn)", "%.2f", -gamepad1.right_stick_x);
 
         telemetry.addData("--- Actuators ---", "");
         telemetry.addData("Shooting State", shootingState.toString());
