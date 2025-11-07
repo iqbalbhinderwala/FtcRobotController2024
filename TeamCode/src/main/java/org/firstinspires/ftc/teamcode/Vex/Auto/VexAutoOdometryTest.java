@@ -15,8 +15,8 @@ import org.firstinspires.ftc.teamcode.Vex.Hardware.VexOdometryDriveTrain;
 public class VexAutoOdometryTest extends LinearOpMode
 {
     VexOdometryDriveTrain robot = new VexOdometryDriveTrain(this);
-    double MAX_DRIVE_POWER = 1;
-    double MAX_TURN_SPEED = 1;
+    double MAX_DRIVE_POWER = 0.5;
+    double MAX_TURN_SPEED = 0.5;
     double targetHeading = 0; // angle in degrees
 
     ElapsedTime lastClick = new ElapsedTime();

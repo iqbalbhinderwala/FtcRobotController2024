@@ -419,13 +419,13 @@ public class VexOdometryDriveTrain {
 
     // --- Constants copied from VexIMUOmniDriveTrain ---
     static final double HEADING_THRESHOLD = 2.0 ;   // How close must the heading get to the target before moving to next step.
-    static final double MIN_TURN_SPEED = 0.25;
-    static final double TURN_GAIN = 1.0 / 75.0 ;    // Turn Control "Gain". Start reducing power at 15 degrees.
+    static final double MIN_TURN_SPEED = 0.1;
+    static final double TURN_GAIN = 1.0 / 15.0 ;    // Turn Control "Gain". Start reducing power at 15 degrees.
 
     static final double MOVE_THRESHOLD_INCH = 0.5;
-    static final double MIN_FORWARD_POWER = 0.3;
+    static final double MIN_FORWARD_POWER = 0.1;
     static final double MIN_STRAFE_POWER = 0.1;
-    static final double MOVE_GAIN = 1.0 / 25.0;      // Move Control "Gain". Start reducing power at 5 inches assuming full power.
+    static final double MOVE_GAIN = 1.0 / 5.0;      // Move Control "Gain". Start reducing power at 5 inches assuming full power.
 
     // https://www.gobilda.com/swingarm-odometry-pod-48mm-wheel/
     static final double ODOMETER_DIAMETER_MM = 48;
@@ -434,8 +434,8 @@ public class VexOdometryDriveTrain {
     static final double ODOMETER_INCH_PER_COUNT = ODOMETER_MM_PER_COUNT / 25.4;
 
     // Odometry Calibration: See VexOdometryCalibration.java
-    static final double ODOMETER_TRACK_WIDTH_INCH = 14.0302;
-    static final double ODOMETER_CENTER_WHEEL_OFFSET_INCH = 1.9841;
+    static final double ODOMETER_TRACK_WIDTH_INCH = 8 + 3.0/8; // 8.375 in
+    static final double ODOMETER_CENTER_WHEEL_OFFSET_INCH = -17.25/2 + (7+7.0/16); // -1.1875 in
 
     private static final String TAG = "VEX::";
 }

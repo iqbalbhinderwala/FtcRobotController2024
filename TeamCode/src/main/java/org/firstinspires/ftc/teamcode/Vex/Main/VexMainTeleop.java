@@ -3,6 +3,7 @@ package org.firstinspires.ftc.teamcode.Vex.Main;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 import com.qualcomm.robotcore.util.ElapsedTime;
+import com.qualcomm.robotcore.util.Range;
 
 import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit;
 import org.firstinspires.ftc.robotcore.external.navigation.DistanceUnit;
@@ -33,7 +34,7 @@ import org.firstinspires.ftc.vision.apriltag.AprilTagDetection;
  *   - One trigger pulled: Spins up the shooter wheels, gates in ready state (A closed, B open).
  *   - Both triggers pulled: Activates the gate cycle to shoot (after a 1-second spin-up).
  */
-@TeleOp(name = "Vex Main TeleOp", group = "Vex")
+@TeleOp(name = "[Vex] Main TeleOp", group = "Vex")
 public class VexMainTeleop extends LinearOpMode {
 
     // Hardware Classes
@@ -44,6 +45,9 @@ public class VexMainTeleop extends LinearOpMode {
 
     // OpMode Members
     private ElapsedTime lastPress;
+    double MAX_DRIVE_SPEED  = 0.7;
+    double MAX_STRAFE_SPEED = 0.7;
+    double MAX_TURN_SPEED   = 0.5;
     private double intakePower = 1.0;
     private double shooterPower = 0.6;
     private double humanDirection;
@@ -63,6 +67,7 @@ public class VexMainTeleop extends LinearOpMode {
     private final long GATE_DELAY_MS = 250;
     private final double SPIN_UP_TIME_S = 1.0;
 
+    private double targetHeading;
 
     @Override
     public void runOpMode() throws InterruptedException {
@@ -125,15 +130,15 @@ public class VexMainTeleop extends LinearOpMode {
      * after init() and before start().
      */
     private void opModeInitLoop() {
-        // Add blackboard telemetry
-        blackboardHelper.addBlackboardTelemetry();
-
         if (currentAlliance == DecodeField.Alliance.UNKNOWN) {
-            telemetry.addData("ERROR", "Alliance not selected! Please select an alliance in [Vex] Game Setup.");
+            telemetry.addData("ERROR", "Alliance not selected! Please select an alliance in [Vex] GameSetup TeleOp.");
         } else {
             telemetry.addData("Alliance", currentAlliance.toString());
         }
-        telemetry.addData("Status", "Initialization Complete.");
+        // Add blackboard telemetry
+        blackboardHelper.addBlackboardTelemetry();
+
+        telemetry.addData("--- Status ---", "Initialization Complete.");
         telemetry.addData(">", "Searching for AprilTag... Press PLAY to start without one.");
 
         AprilTagDetection detection = vision.getMostAccurateTarget();
@@ -235,15 +240,13 @@ public class VexMainTeleop extends LinearOpMode {
      * Handles all driving and movement logic.
      */
     private void driveAndMove() {
-        double forwardInput = -gamepad1.left_stick_y;
-        double strafeInput  =  gamepad1.left_stick_x;
-        double turnInput;
+        double forwardInput = -gamepad1.left_stick_y * MAX_DRIVE_SPEED;
+        double strafeInput  =  gamepad1.left_stick_x * MAX_STRAFE_SPEED;
+        double turnInput = -gamepad1.right_stick_x * MAX_TURN_SPEED;
 
         // When the right stick is pressed, override manual turning to auto-align.
         if (gamepad1.right_stick_button) {
-            turnInput = calculateAutoAlignTurn();
-        } else {
-            turnInput = -gamepad1.right_stick_x;
+            turnInput = Range.clip(calculateAutoAlignTurn(), -MAX_TURN_SPEED, MAX_TURN_SPEED);
         }
 
         // If left stick is pressed, halve all driving power for finer control.
@@ -265,11 +268,10 @@ public class VexMainTeleop extends LinearOpMode {
      * @return A turn power value, from -1.0 to 1.0.
      */
     private double calculateAutoAlignTurn() {
-        double targetHeading;
         double currentHeading = driveTrain.getHeading();
 
         // Check if the shooter wheels are spinning
-        if (shootingState != ShootingState.IDLE) {
+        if (shootingState != ShootingState.IDLE || true) {
             // Align to the alliance corner
             telemetry.addData("Auto-Aligning to", currentAlliance.toString() + " Corner");
 
@@ -404,6 +406,7 @@ public class VexMainTeleop extends LinearOpMode {
                 currentPose.getPosition().y,
                 currentPose.getOrientation().getYaw(AngleUnit.DEGREES));
         telemetry.addData("Dist to Corner", "%.2f in", DecodeField.getDistanceToAllianceCorner(currentAlliance, currentPose));
+        telemetry.addData("Target Heading", "%.2f in", targetHeading);
 
         telemetry.addData("--- Actuators ---", "");
         telemetry.addData("Shooting State", shootingState.toString());

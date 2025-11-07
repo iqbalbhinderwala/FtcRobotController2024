@@ -62,7 +62,7 @@ import java.util.Locale;
  */
 
 @TeleOp(name = "[Utility] Webcam Frame Capture", group = "Utility")
-//@Disabled
+@Disabled
 public class UtilityWebcamFrameCapture extends LinearOpMode
 {
     /*

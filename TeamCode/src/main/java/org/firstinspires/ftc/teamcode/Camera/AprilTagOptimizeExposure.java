@@ -29,6 +29,7 @@
 
 package org.firstinspires.ftc.teamcode.Camera;
 
+import com.qualcomm.robotcore.eventloop.opmode.Disabled;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 import com.qualcomm.robotcore.util.Range;
@@ -66,7 +67,7 @@ import java.util.concurrent.TimeUnit;
 // Based on : ConceptAprilTagOptimizeExposure.java sample
 
 @TeleOp(name="[Utility] Optimize AprilTag Exposure", group = "Utility")
-//@Disabled
+@Disabled
 public class AprilTagOptimizeExposure extends LinearOpMode
 {
     private VisionPortal visionPortal = null;        // Used to manage the video source.

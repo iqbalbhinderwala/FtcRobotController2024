@@ -87,6 +87,8 @@ public class VexVision {
                 .setTagLibrary(AprilTagGameDatabase.getDecodeTagLibrary())
 //                .setTagLibrary(AprilTagGameDatabase.getCurrentGameTagLibrary())
                 .setOutputUnits(DistanceUnit.INCH, AngleUnit.DEGREES)
+                .setCameraPose(cameraPosition, cameraOrientation)
+
                 .build();
 
         // Adjust Image Decimation to trade-off detection-range for detection-rate.
@@ -297,7 +299,7 @@ public class VexVision {
 
     // Position and orientation of the camera on the robot
     private Position cameraPosition = new Position(DistanceUnit.INCH,
-            0, 0, 0, 0);
+            -(3+5.0/16), -17.5/2+14.25, 0, 0);
     private YawPitchRollAngles cameraOrientation = new YawPitchRollAngles(AngleUnit.DEGREES,
             0, -90, 0, 0);
 

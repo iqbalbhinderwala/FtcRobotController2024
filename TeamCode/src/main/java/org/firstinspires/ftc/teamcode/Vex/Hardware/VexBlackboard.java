@@ -115,9 +115,9 @@ public class VexBlackboard {
         }
 
         Position position = new Position(DistanceUnit.INCH,
-                (float) xValue, (float) yValue, 0, 0);
+                (double) xValue, (double) yValue, 0, 0);
         YawPitchRollAngles orientation = new YawPitchRollAngles(AngleUnit.DEGREES,
-                (float) headingValue, 0, 0, 0);
+                (double) headingValue, 0, 0, 0);
         return new Pose3D(position, orientation);
     }
 
@@ -135,7 +135,7 @@ public class VexBlackboard {
 
         if (xValue != null && yValue != null && headingValue != null) {
             opMode.telemetry.addData("Stored Pose", "X: %.2f, Y: %.2f, H: %.1f",
-                    (float) xValue, (float) yValue, (float) headingValue);
+                    (double) xValue, (double) yValue, (double) headingValue);
         } else {
             opMode.telemetry.addData("Stored Pose", "Not Set");
         }
