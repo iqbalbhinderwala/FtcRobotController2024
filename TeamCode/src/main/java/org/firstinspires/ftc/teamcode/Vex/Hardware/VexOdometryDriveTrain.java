@@ -12,6 +12,7 @@ import com.qualcomm.robotcore.util.Range;
 
 import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit;
 import org.firstinspires.ftc.robotcore.external.navigation.DistanceUnit;
+import org.firstinspires.ftc.robotcore.external.navigation.Pose2D;
 import org.firstinspires.ftc.robotcore.external.navigation.Pose3D;
 import org.firstinspires.ftc.robotcore.external.navigation.Position;
 import org.firstinspires.ftc.robotcore.external.navigation.YawPitchRollAngles;
@@ -158,6 +159,22 @@ public class VexOdometryDriveTrain {
     }
 
     /**
+     * Gets the current calculated 2D pose of the robot.
+     * This is useful for 2D path following and field navigation.
+     * @return A Pose2d object representing the robot's x, y, and heading.
+     */
+    public Pose2D getPose2D() {
+        // Update the odometry to ensure the pose is current
+        updateOdometry();
+
+        // Return the 2D pose using ftclib geometry classes
+        return new Pose2D(
+                DistanceUnit.INCH, odometry.x, odometry.y,
+                AngleUnit.DEGREES, headingProvider.getHeading()
+        );
+    }
+
+    /**
      * Gets the current calculated pose of the robot after an update.
      * @return A Pose3D object representing the robot's current state.
      */
@@ -228,9 +245,9 @@ public class VexOdometryDriveTrain {
 
     public boolean driveTo(double targetX, double targetY, double maxPower) {
         // Get the current pose to calculate the initial error
-        Pose3D currentPose = getPose();
-        double errorX = targetX - currentPose.getPosition().x;
-        double errorY = targetY - currentPose.getPosition().y;
+        Pose2D currentPose = getPose2D();
+        double errorX = targetX - currentPose.getX(DistanceUnit.INCH);
+        double errorY = targetY - currentPose.getY(DistanceUnit.INCH);
 
         ElapsedTime timer = new ElapsedTime();
         double prevErr = Double.MAX_VALUE;
@@ -239,12 +256,12 @@ public class VexOdometryDriveTrain {
         // Loop until the robot is within the move threshold for both axes and the opmode is active
         while (opMode.opModeIsActive() && (newErr > MOVE_THRESHOLD_INCH)) {
             // Update the robot's current position and heading
-            currentPose = getPose();
-            double currentHeading = currentPose.getOrientation().getYaw(AngleUnit.DEGREES);
+            currentPose = getPose2D();
+            double currentHeading = currentPose.getHeading(AngleUnit.DEGREES);
 
             // Recalculate the field-centric error
-            errorX = targetX - currentPose.getPosition().x;
-            errorY = targetY - currentPose.getPosition().y;
+            errorX = targetX - currentPose.getX(DistanceUnit.INCH);
+            errorY = targetY - currentPose.getY(DistanceUnit.INCH);
             newErr = Math.hypot(errorX, errorY);
             Log.d(TAG+"driveTo", "err "+errorX+","+errorY+","+newErr);
 
@@ -260,7 +277,7 @@ public class VexOdometryDriveTrain {
 
             // --- Transform field-centric error into robot-centric power commands ---
             // This rotates the (errorX, errorY) vector from field coordinates to robot coordinates.
-            double headingRad = Math.toRadians(currentHeading);
+            double headingRad = currentPose.getHeading(AngleUnit.RADIANS);
             double sinH = Math.sin(headingRad);
             double cosH = Math.cos(headingRad);
 
@@ -269,7 +286,7 @@ public class VexOdometryDriveTrain {
 
             // --- Apply Proportional Gain ---
             // Scale down the power as the robot gets closer.
-            // Adjust gain by the momentum. 
+            // Adjust gain by the momentum.
             forwardPower *= MOVE_GAIN / maxPower;
             strafePower  *= MOVE_GAIN / maxPower;
 
@@ -301,7 +318,7 @@ public class VexOdometryDriveTrain {
             // Optional: Add telemetry for debugging
             opMode.telemetry.addData("Target", "X: %.2f, Y: %.2f", targetX, targetY);
             opMode.telemetry.addData("Pose", "X: %.2f, Y: %.2f, H: %.1f",
-                    currentPose.getPosition().x, currentPose.getPosition().y, currentHeading);
+                    currentPose.getX(DistanceUnit.INCH), currentPose.getY(DistanceUnit.INCH), currentHeading);
             opMode.telemetry.addData("Error", "X: %.2f, Y: %.2f", errorX, errorY);
             opMode.telemetry.addData("Power", "Fwd: %.2f, Str: %.2f", forwardPower, strafePower);
             opMode.telemetry.update();
@@ -314,16 +331,15 @@ public class VexOdometryDriveTrain {
 
     /**
      * Moves the robot by a relative distance (dx, dy) from its current position.
-     * @param dx The distance to move along the field's X-axis (in inches).
-     * @param dy The distance to move along the field's Y-axis (in inches).
+     * @param dx The distance to move along the field's X-axis (in inches).     * @param dy The distance to move along the field's Y-axis (in inches).
      * @param power The maximum power to use for movement.
      * @return True if the movement completed successfully, false if it was obstructed.
      */
     public boolean driveRelative(double dx, double dy, double power) {
         // 1. Get the current pose to determine the starting point.
-        Pose3D currentPose = getPose();
-        double startX = currentPose.getPosition().x;
-        double startY = currentPose.getPosition().y;
+        Pose2D currentPose = getPose2D();
+        double startX = currentPose.getX(DistanceUnit.INCH);
+        double startY = currentPose.getY(DistanceUnit.INCH);
 
         // 2. Calculate the absolute target coordinates.
         double targetX = startX + dx;
@@ -332,6 +348,7 @@ public class VexOdometryDriveTrain {
         // 3. Use the existing driveTo method to move to the calculated target.
         return driveTo(targetX, targetY, power);
     }
+
 
     /**
      * Sends power to the drivetrain motors. The inputs are robot-centric.

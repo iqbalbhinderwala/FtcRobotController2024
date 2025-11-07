@@ -1,5 +1,6 @@
 package org.firstinspires.ftc.teamcode.Vex.Main;
 
+import android.util.Log;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 import com.qualcomm.robotcore.util.ElapsedTime;
@@ -36,6 +37,7 @@ import org.firstinspires.ftc.vision.apriltag.AprilTagDetection;
  */
 @TeleOp(name = "[Vex] Main TeleOp", group = "Vex")
 public class VexMainTeleop extends LinearOpMode {
+    private static final String TAG = "VEX::MainTele";
 
     // Hardware Classes
     private VexOdometryDriveTrain driveTrain;
@@ -98,15 +100,20 @@ public class VexMainTeleop extends LinearOpMode {
      * when the OpMode is selected on the Driver Station.
      */
     private void opModeInit() {
+        Log.d(TAG, "opModeInit: Initializing...");
         // Initialize hardware classes
-        driveTrain = new VexOdometryDriveTrain(this);
-        vision = new VexVision(this);
-        actuators = new VexActuators(this);
         blackboardHelper = new VexBlackboard(this);
+        driveTrain = new VexOdometryDriveTrain(this);
+        actuators = new VexActuators(this);
+        vision = new VexVision(this);
+
+        // Add blackboard telemetry
+        blackboardHelper.addBlackboardTelemetry();
 
         driveTrain.init();
-        vision.init();
         actuators.init(hardwareMap);
+        vision.init();
+
         actuators.closeGateA(); // Start with Gate A closed
         actuators.openGateB();  // and Gate B open (ready for intake)
 
@@ -118,11 +125,10 @@ public class VexMainTeleop extends LinearOpMode {
         gateCycleTimer = new ElapsedTime();
         spinUpTimer = new ElapsedTime();
 
-        if (currentAlliance == DecodeField.Alliance.BLUE) {
-            humanDirection = 180; // Driver faces -Y axis
-        } else {
-            humanDirection = 0; // Driver faces +Y axis
-        }
+        // Set humanDirection based on the alliance: 0 for RED, 180 for BLUE
+        humanDirection = (currentAlliance == DecodeField.Alliance.RED) ? 0 : 180;
+
+        Log.d(TAG, "opModeInit: Initialization complete.");
     }
 
     /**
@@ -158,6 +164,7 @@ public class VexMainTeleop extends LinearOpMode {
      * when the PLAY button is pressed.
      */
     private void opModeStart() {
+        Log.d(TAG, "opModeStart: Starting...");
         lastPress.reset(); // Reset timer on start
         gateCycleTimer.reset();
         spinUpTimer.reset();
@@ -166,6 +173,7 @@ public class VexMainTeleop extends LinearOpMode {
         Pose3D storedPose = blackboardHelper.getPose();
         if (storedPose != null) {
             driveTrain.resetPose(storedPose.getPosition().x, storedPose.getPosition().y, storedPose.getOrientation().getYaw(AngleUnit.DEGREES));
+            Log.d(TAG, "opModeStart: Pose initialized from blackboard: " + storedPose);
             telemetry.addLine("Pose initialized from final pose of last OpMode.");
         } else {
             // If not, try to use the starting position from the setup
@@ -173,6 +181,7 @@ public class VexMainTeleop extends LinearOpMode {
             if (startingLocation != DecodeField.KeyLocation.UNKNOWN) {
                 Pose2D startingPose = startingLocation.getPose();
                 driveTrain.resetPose(startingPose.getX(DistanceUnit.INCH), startingPose.getY(DistanceUnit.INCH), startingPose.getHeading(AngleUnit.DEGREES));
+                Log.d(TAG, "opModeStart: Pose initialized from starting location: " + startingLocation);
                 telemetry.addData("Pose initialized from", startingLocation.toString());
             } else {
                 // If no blackboard pose, try to set initial pose from AprilTag
@@ -180,9 +189,11 @@ public class VexMainTeleop extends LinearOpMode {
                 if (detection != null && detection.robotPose != null) {
                     Pose3D robotPose = detection.robotPose;
                     driveTrain.resetPose(robotPose.getPosition().x, robotPose.getPosition().y, robotPose.getOrientation().getYaw(AngleUnit.DEGREES));
+                    Log.d(TAG, "opModeStart: Pose initialized from AprilTag: " + robotPose);
                     telemetry.addLine("Pose initialized from AprilTag.");
                 } else {
                     driveTrain.resetPose(0, 0, 0);
+                    Log.d(TAG, "opModeStart: No pose source found, starting at (0,0,0).");
                     telemetry.addLine("No AprilTag, starting position, or stored pose found, starting at (0,0,0).");
                 }
             }
@@ -190,6 +201,7 @@ public class VexMainTeleop extends LinearOpMode {
 
         telemetry.addData(">", "TeleOp Started. Driver orientation is set to face the +Y-Axis (0 deg).");
         telemetry.update();
+        Log.d(TAG, "opModeStart: Start complete.");
     }
 
 
@@ -203,6 +215,7 @@ public class VexMainTeleop extends LinearOpMode {
         if (newDetection != null && newDetection.robotPose != null) {
             Pose3D robotPose = newDetection.robotPose;
             driveTrain.updatePosition(robotPose.getPosition().x, robotPose.getPosition().y);
+            Log.d(TAG, "opModeLoop: Pose updated from vision: " + robotPose);
             telemetry.addLine("!!! POSE UPDATED FROM VISION !!!");
         }
 
@@ -222,10 +235,12 @@ public class VexMainTeleop extends LinearOpMode {
      * when the OpMode is stopped.
      */
     private void opModeStop() {
+        Log.d(TAG, "opModeStop: Stopping...");
         // Save the robot's current pose to the blackboard for the next run
         Pose3D finalPose = driveTrain.getPose();
         if (finalPose != null) {
             blackboardHelper.setPose(finalPose);
+            Log.d(TAG, "opModeStop: Saved final pose to blackboard: " + finalPose);
         }
 
         driveTrain.stopMotors();
@@ -234,6 +249,7 @@ public class VexMainTeleop extends LinearOpMode {
         actuators.setIntakePower(0);
         telemetry.addData("Status", "OpMode Stopped.");
         telemetry.update();
+        Log.d(TAG, "opModeStop: Stop complete.");
     }
 
     /**
@@ -247,6 +263,7 @@ public class VexMainTeleop extends LinearOpMode {
         // When the right stick is pressed, override manual turning to auto-align.
         if (gamepad1.right_stick_button) {
             turnInput = Range.clip(calculateAutoAlignTurn(), -MAX_TURN_SPEED, MAX_TURN_SPEED);
+            Log.d(TAG, "driveAndMove: Auto-aligning with turn power: " + turnInput);
         }
 
         // If left stick is pressed, halve all driving power for finer control.
@@ -273,13 +290,13 @@ public class VexMainTeleop extends LinearOpMode {
         // Check if the shooter wheels are spinning
         if (shootingState != ShootingState.IDLE || true) {
             // Align to the alliance corner
-            telemetry.addData("Auto-Aligning to", currentAlliance.toString() + " Corner");
+            Log.d(TAG, "calculateAutoAlignTurn: Auto-Aligning to " + currentAlliance.toString() + " Corner");
 
-            targetHeading = DecodeField.getTurnAngleToAllianceCorner(currentAlliance, driveTrain.getPose());
+            targetHeading = DecodeField.getTurnAngleToAllianceCorner_v1(currentAlliance, driveTrain.getPose2D());
         } else {
             // Align to the closest 90-degree heading
             targetHeading = Math.round(currentHeading / 90.0) * 90.0;
-            telemetry.addData("Auto-Aligning to", String.format("%.0f Degrees", targetHeading));
+            Log.d(TAG, "calculateAutoAlignTurn: Auto-Aligning to " + String.format("%.0f Degrees", targetHeading));
         }
 
         // Use the helper function to calculate the turn power.
@@ -312,6 +329,8 @@ public class VexMainTeleop extends LinearOpMode {
         boolean rightTrigger = gamepad1.right_trigger > 0.5;
         boolean anyTrigger = leftTrigger || rightTrigger;
         boolean bothTriggers = leftTrigger && rightTrigger;
+
+        ShootingState lastState = shootingState;
 
         switch (shootingState) {
             case IDLE:
@@ -359,6 +378,10 @@ public class VexMainTeleop extends LinearOpMode {
                 }
                 break;
         }
+
+        if (lastState != shootingState) {
+            Log.d(TAG, "handleShooting: State changed from " + lastState + " to " + shootingState);
+        }
     }
 
     private void runShootingCycleIteration() {
@@ -368,6 +391,7 @@ public class VexMainTeleop extends LinearOpMode {
         }
 
         gateCycleTimer.reset(); // Reset timer for the next step in the cycle
+        GateCycleState lastState = gateCycleState;
 
         switch (gateCycleState) {
             case STEP_1_CLOSE_B:
@@ -390,6 +414,10 @@ public class VexMainTeleop extends LinearOpMode {
                 // Should not happen, but as a safe-guard, reset to ready
                 gateCycleState = GateCycleState.READY;
                 break;
+        }
+
+        if (lastState != gateCycleState) {
+            Log.d(TAG, "runShootingCycleIteration: State changed from " + lastState + " to " + gateCycleState);
         }
     }
 

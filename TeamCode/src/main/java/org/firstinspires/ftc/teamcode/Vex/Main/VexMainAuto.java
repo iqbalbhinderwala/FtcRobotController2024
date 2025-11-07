@@ -159,7 +159,7 @@ public class VexMainAuto extends LinearOpMode {
      * Turns the robot to face the correct alliance corner.
      */
     private void turnTowardsCorner() {
-        double targetAngle = DecodeField.getTurnAngleToAllianceCorner(currentAlliance, driveTrain.getPose());
+        double targetAngle = DecodeField.getTurnAngleToAllianceCorner_v1(currentAlliance, driveTrain.getPose2D());
         driveTrain.turnToHeading(TURN_POWER, targetAngle);
     }
 
