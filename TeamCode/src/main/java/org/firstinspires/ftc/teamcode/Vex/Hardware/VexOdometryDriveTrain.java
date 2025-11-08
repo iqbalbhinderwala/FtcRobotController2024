@@ -207,9 +207,18 @@ public class VexOdometryDriveTrain {
         // The Range.clip function limits the power to the range [-1, 1].
         double turnPower = Range.clip(headingError * TURN_GAIN, -1, 1);
 
+        // Log the intermediate values for debugging
+        Log.d(TAG, String.format("calculateTurnPower: Target: %.1f, Current: %.1f, Error: %.1f",
+                targetHeading, currentHeading, headingError));
+        Log.d(TAG, String.format("calculateTurnPower: Initial Power: %.2f", turnPower));
+
         // Apply a minimum power to overcome static friction and prevent stalling.
         // Math.copySign ensures the direction of the minimum power is correct.
-        return Math.copySign(Math.max(MIN_TURN_SPEED, Math.abs(turnPower)), turnPower);
+        double finalTurnPower = Math.copySign(Math.max(MIN_TURN_SPEED, Math.abs(turnPower)), turnPower);
+
+        Log.d(TAG, String.format("calculateTurnPower: Final Power: %.2f", finalTurnPower));
+
+        return finalTurnPower;
     }
 
 
@@ -373,6 +382,8 @@ public class VexOdometryDriveTrain {
         rightFrontDrive.setPower(rightFrontPower / max);
         leftBackDrive.setPower(leftBackPower / max);
         rightBackDrive.setPower(rightBackPower / max);
+
+        updateOdometry();
     }
 
     /**
@@ -436,7 +447,7 @@ public class VexOdometryDriveTrain {
 
     // --- Constants copied from VexIMUOmniDriveTrain ---
     static final double HEADING_THRESHOLD = 2.0 ;   // How close must the heading get to the target before moving to next step.
-    static final double MIN_TURN_SPEED = 0.1;
+    static final double MIN_TURN_SPEED = 0.05;
     static final double TURN_GAIN = 1.0 / 15.0 ;    // Turn Control "Gain". Start reducing power at 15 degrees.
 
     static final double MOVE_THRESHOLD_INCH = 0.5;
@@ -454,5 +465,5 @@ public class VexOdometryDriveTrain {
     static final double ODOMETER_TRACK_WIDTH_INCH = 8 + 3.0/8; // 8.375 in
     static final double ODOMETER_CENTER_WHEEL_OFFSET_INCH = -17.25/2 + (7+7.0/16); // -1.1875 in
 
-    private static final String TAG = "VEX::";
+    private static final String TAG = "VEX::DriveTrain";
 }

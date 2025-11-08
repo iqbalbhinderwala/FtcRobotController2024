@@ -20,6 +20,7 @@ import java.util.Locale;
 public class VexGameSetup extends LinearOpMode {
 
     private enum SetupState {
+        PRECHECK, // New state to check blackboard
         SELECT_ALLIANCE,
         SELECT_LOCATION,
         CONFIRMED
@@ -28,10 +29,16 @@ public class VexGameSetup extends LinearOpMode {
     @Override
     public void runOpMode() throws InterruptedException {
         VexBlackboard blackboardHelper = new VexBlackboard(this);
-        blackboardHelper.reset(); // Always start fresh
 
         // --- State Variables ---
-        SetupState currentState = SetupState.SELECT_ALLIANCE;
+        SetupState currentState;
+        // Check if the blackboard already has data
+        if (blackboardHelper.getStartingLocation() != null) {
+            currentState = SetupState.PRECHECK;
+        } else {
+            currentState = SetupState.SELECT_ALLIANCE;
+        }
+
         List<DecodeField.KeyLocation> filteredLocations = new ArrayList<>();
         int selectionIndex = 0;
         boolean lastDpadUp = false, lastDpadDown = false, lastA = false, lastY = false, lastB = false, lastX = false;
@@ -41,6 +48,23 @@ public class VexGameSetup extends LinearOpMode {
             telemetry.clear();
 
             switch (currentState) {
+                case PRECHECK:
+                    if (blackboardHelper.isEmpty()) {
+                        currentState = SetupState.SELECT_ALLIANCE;
+                    } else {
+                        telemetry.addLine("! WARNING: Blackboard is not empty.");
+                        telemetry.addLine();
+                        blackboardHelper.addBlackboardTelemetry();
+                        telemetry.addLine();
+                        telemetry.addLine("Press [Y] to clear and continue.");
+
+                        if (gamepad1.y && !lastY) {
+                            blackboardHelper.reset();
+                            currentState = SetupState.SELECT_ALLIANCE;
+                        }
+                    }
+                    break;
+
                 case SELECT_ALLIANCE:
                     telemetry.addLine("Select Alliance:");
                     telemetry.addLine("Press [B] for RED");

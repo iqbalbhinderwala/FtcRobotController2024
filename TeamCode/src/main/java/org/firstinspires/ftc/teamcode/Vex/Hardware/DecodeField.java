@@ -1,5 +1,6 @@
 package org.firstinspires.ftc.teamcode.Vex.Hardware;
 
+import android.util.Log;
 import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit;
 import org.firstinspires.ftc.robotcore.external.navigation.DistanceUnit;
 import org.firstinspires.ftc.robotcore.external.navigation.Pose2D;
@@ -99,52 +100,6 @@ public class DecodeField {
 
     /**
      * Calculates the angle the robot needs to turn to face the current alliance corner.
-     * It computes the signed angle between the robot's forward vector and the target vector
-     * using the atan2(cross_product, dot_product) identity.
-     *
-     * @param currentAlliance The current alliance (RED or BLUE).
-     * @param robotPose The robot's current 2D pose from VexOdometryDriveTrain.getPose2D().
-     * @return The required turn angle in degrees, in the range [-180, 180].
-     *         A positive value indicates a counter-clockwise (left) turn, and a negative value
-     *         indicates a clockwise (right) turn.
-     */
-    public static double getTurnAngleToAllianceCorner_v1(Alliance currentAlliance, Pose2D robotPose) {
-        // 1. Define the target coordinates for the alliance corner.
-        double targetX = (currentAlliance == Alliance.RED) ? RED_CORNER_X : BLUE_CORNER_X;
-        double targetY = (currentAlliance == Alliance.RED) ? RED_CORNER_Y : BLUE_CORNER_Y;
-
-        // 2. Get the robot's current position from the pose, specifying INCH units.
-        double currentX = robotPose.getX(DistanceUnit.INCH);
-        double currentY = robotPose.getY(DistanceUnit.INCH);
-
-        // 3. Compute the 2D robot-to-target vector (T).
-        double targetVecX = targetX - currentX;
-        double targetVecY = targetY - currentY;
-
-        // 4. Compute the 2D forward direction vector from the robot's current heading (F).
-        // Get heading in radians.
-        double currentHeadingRadians = robotPose.getHeading(AngleUnit.RADIANS);
-
-        // **CRITICAL CORRECTION**: Adjust for the heading convention where 0 is the positive Y-axis.
-        // To use standard math functions (where 0 is +X axis), we must convert our heading
-        // by subtracting 90 degrees (PI/2 radians).
-        double mathHeading = currentHeadingRadians - (Math.PI / 2.0);
-        double forwardVecX = Math.cos(mathHeading);
-        double forwardVecY = Math.sin(mathHeading);
-
-        // 5. Calculate the dot product (F · T) and the 2D cross product's Z-component.
-        double dotProduct = forwardVecX * targetVecX + forwardVecY * targetVecY;
-        double crossProductZ = forwardVecX * targetVecY - forwardVecY * targetVecX;
-
-        // 6. Use atan2(cross, dot) to find the signed angle directly from the forward vector to the target vector.
-        double turnAngleRadians = Math.atan2(crossProductZ, dotProduct);
-
-        // 7. Convert the result from radians to degrees for the return value.
-        return Math.toDegrees(turnAngleRadians);
-    }
-
-    /**
-     * Calculates the angle the robot needs to turn to face the current alliance corner.
      * Assumes a coordinate system where 0 heading is along the positive Y-axis.
      *
      * @param currentAlliance The current alliance (RED or BLUE).
@@ -153,7 +108,7 @@ public class DecodeField {
      *         A positive value indicates a counter-clockwise (left) turn, and a negative value
      *         indicates a clockwise (right) turn.
      */
-    public static double getTurnAngleToAllianceCorner_v2(Alliance currentAlliance, Pose2D robotPose) {
+    public static double getTurnAngleToAllianceCorner(Alliance currentAlliance, Pose2D robotPose) {
         // 1. Define the target coordinates for the alliance corner.
         double targetX = (currentAlliance == Alliance.RED) ? RED_CORNER_X : BLUE_CORNER_X;
         double targetY = (currentAlliance == Alliance.RED) ? RED_CORNER_Y : BLUE_CORNER_Y;
@@ -166,15 +121,27 @@ public class DecodeField {
         double dx = targetX - currentX;
         double dy = targetY - currentY;
 
+        // Log initial data
+        Log.d(TAG, "getTurnAngle_v1: Alliance=" + currentAlliance);
+        Log.d(TAG, String.format("getTurnAngle_v1: Robot Pose (X, Y, HeadingDeg): (%.2f, %.2f, %.2f)",
+                currentX, currentY, robotPose.getHeading(AngleUnit.DEGREES)));
+        Log.d(TAG, String.format("getTurnAngle_v1: Target Corner (X, Y): (%.2f, %.2f)", targetX, targetY));
+        Log.d(TAG, String.format("getTurnAngle_v1: Vector to Target (dx, dy): (%.2f, %.2f)", dx, dy));
+
+
         // 4. Calculate the absolute angle of the target vector relative to the positive Y-axis.
         //    Math.atan2(x, y) gives the angle from the positive Y-axis to the vector (x, y).
-        double absoluteAngleToTarget = Math.atan2(dx, dy);
+        double absoluteAngleToTarget = Math.atan2(-dx, dy);
 
         // 5. Get the robot's current heading (already relative to the positive Y-axis).
         double currentHeading = robotPose.getHeading(AngleUnit.RADIANS);
 
         // 6. The required turn is the difference between where we want to point and where we are pointing.
         double turnAngle = absoluteAngleToTarget - currentHeading;
+
+        Log.d(TAG, String.format("getTurnAngle_v1: Absolute Angle to Target (deg): %.2f", Math.toDegrees(absoluteAngleToTarget)));
+        Log.d(TAG, String.format("getTurnAngle_v1: Current Heading (deg): %.2f", Math.toDegrees(currentHeading)));
+        Log.d(TAG, String.format("getTurnAngle_v1: Initial Turn Angle (deg): %.2f", Math.toDegrees(turnAngle)));
 
         // 7. Normalize the angle to the range [-PI, PI] to ensure the shortest turn.
         while (turnAngle > Math.PI) {
@@ -184,8 +151,11 @@ public class DecodeField {
             turnAngle += 2 * Math.PI;
         }
 
+        double finalAngleDegrees = Math.toDegrees(turnAngle);
+        Log.d(TAG, String.format("getTurnAngle_v1: Normalized Turn Angle (deg): %.2f", finalAngleDegrees));
+
         // 8. Convert the result from radians to degrees for the return value.
-        return Math.toDegrees(turnAngle);
+        return finalAngleDegrees;
     }
 
     /**
@@ -197,4 +167,6 @@ public class DecodeField {
     public static boolean isInRangeForShooting(Alliance currentAlliance, Pose3D robotPose) {
         return getDistanceToAllianceCorner(currentAlliance, robotPose) >= MINIMUM_SHOOTING_DISTANCE;
     }
+
+    private static final String TAG = "VEX::DecodeField";
 }

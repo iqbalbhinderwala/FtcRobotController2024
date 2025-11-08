@@ -262,7 +262,8 @@ public class VexMainTeleop extends LinearOpMode {
 
         // When the right stick is pressed, override manual turning to auto-align.
         if (gamepad1.right_stick_button) {
-            turnInput = Range.clip(calculateAutoAlignTurn(), -MAX_TURN_SPEED, MAX_TURN_SPEED);
+            double turnPower = calculateAutoAlignTurnPower();
+            turnInput = Range.clip(turnPower, -MAX_TURN_SPEED, MAX_TURN_SPEED);
             Log.d(TAG, "driveAndMove: Auto-aligning with turn power: " + turnInput);
         }
 
@@ -284,20 +285,18 @@ public class VexMainTeleop extends LinearOpMode {
      * - If the shooter is idle, it aligns to a fixed heading of 90 degrees.
      * @return A turn power value, from -1.0 to 1.0.
      */
-    private double calculateAutoAlignTurn() {
+    private double calculateAutoAlignTurnPower() {
         double currentHeading = driveTrain.getHeading();
 
-        // Check if the shooter wheels are spinning
-        if (shootingState != ShootingState.IDLE || true) {
-            // Align to the alliance corner
-            Log.d(TAG, "calculateAutoAlignTurn: Auto-Aligning to " + currentAlliance.toString() + " Corner");
+        // Align to the alliance corner
+        Log.d(TAG, "calculateAutoAlignTurn: Auto-Aligning to " + currentAlliance.toString() + " Corner");
 
-            targetHeading = DecodeField.getTurnAngleToAllianceCorner_v1(currentAlliance, driveTrain.getPose2D());
-        } else {
-            // Align to the closest 90-degree heading
-            targetHeading = Math.round(currentHeading / 90.0) * 90.0;
-            Log.d(TAG, "calculateAutoAlignTurn: Auto-Aligning to " + String.format("%.0f Degrees", targetHeading));
+        double headingError = DecodeField.getTurnAngleToAllianceCorner(currentAlliance, driveTrain.getPose2D());
+        if (Math.abs(headingError) < 5) {
+            return 0.0;
         }
+
+        targetHeading = driveTrain.getHeading() + headingError;
 
         // Use the helper function to calculate the turn power.
         return driveTrain.calculateTurnPower(targetHeading, currentHeading);

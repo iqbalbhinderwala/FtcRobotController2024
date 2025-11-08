@@ -31,6 +31,18 @@ public class VexBlackboard {
     }
 
     /**
+     * Checks if the Vex-specific blackboard data is empty.
+     * @return true if no Vex-specific data is found, false otherwise.
+     */
+    public boolean isEmpty() {
+        return opMode.blackboard.get(ALLIANCE_KEY) == null &&
+                opMode.blackboard.get(STARTING_LOCATION_KEY) == null &&
+                opMode.blackboard.get(POSE_X_KEY) == null &&
+                opMode.blackboard.get(POSE_Y_KEY) == null &&
+                opMode.blackboard.get(POSE_HEADING_KEY) == null;
+    }
+
+    /**
      * Resets the blackboard values to their defaults.
      */
     public void reset() {
