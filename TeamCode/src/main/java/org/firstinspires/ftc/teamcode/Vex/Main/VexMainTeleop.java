@@ -309,19 +309,19 @@ public class VexMainTeleop extends LinearOpMode {
         // Manual controls are disabled during auto-shoot sequence
         if (shootingState == ShootingState.IDLE) {
             actuators.setShooterPower(0);
+        }
 
-            // Intake Control
-            if (gamepad1.right_bumper) {
-                actuators.setIntakePower(intakePower);
-                if (shootingState != ShootingState.SHOOTING_CYCLE) {
-                    actuators.closeGateA();
-                    actuators.openGateB();
-                }
-            } else if (gamepad1.b) {
-                actuators.setIntakePower(-intakePower);
-            } else {
-                actuators.setIntakePower(0);
+        // Intake Control
+        if (gamepad1.right_bumper) {
+            actuators.setIntakePower(intakePower);
+            if (shootingState != ShootingState.SHOOTING_CYCLE) {
+                actuators.closeGateA();
+                actuators.openGateB();
             }
+        } else if (gamepad1.b) {
+            actuators.setIntakePower(-intakePower);
+        } else {
+            actuators.setIntakePower(0);
         }
     }
 
