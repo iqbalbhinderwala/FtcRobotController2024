@@ -341,7 +341,8 @@ public class VexMainTeleop extends LinearOpMode {
                     spinUpTimer.reset(); // Start the spin-up timer
 
                     // Automatically determine shooter power based on distance
-                    shooterPower = actuators.calculateDistanceBasedShooterPower(DecodeField.getDistanceToAllianceCorner(currentAlliance, driveTrain.getPose2D()));
+                    double distanceToCorner = DecodeField.getDistanceToAllianceCorner(currentAlliance, driveTrain.getPose2D());
+                    shooterPower = actuators.calculateDistanceBasedShooterPower(distanceToCorner);
                     actuators.setShooterPower(shooterPower);
 
                     actuators.closeGateA(); // Set gates to ready-to-shoot state

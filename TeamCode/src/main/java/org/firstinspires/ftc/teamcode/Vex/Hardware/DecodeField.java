@@ -4,7 +4,6 @@ import android.util.Log;
 import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit;
 import org.firstinspires.ftc.robotcore.external.navigation.DistanceUnit;
 import org.firstinspires.ftc.robotcore.external.navigation.Pose2D;
-import org.firstinspires.ftc.robotcore.external.navigation.Pose3D;
 
 /**
  * A utility class for decoding field positions and orientations for the VEX Robotics Competition.
@@ -22,6 +21,7 @@ public class DecodeField {
     private static final double ROBOT_WIDTH = 16.0; // inches
     private static final double ROBOT_HALF_LENGTH = ROBOT_LENGTH / 2.0; // inches
     private static final double ROBOT_HALF_WIDTH = ROBOT_WIDTH / 2.0; // inches
+    private static final double SHOOTER_OFFSET_INCHES = 4.0; // inches to the right
 
     // Alliance corner coordinates (in inches).
     // It's assumed that the odometry system uses inches as its unit.
@@ -41,28 +41,28 @@ public class DecodeField {
         UNKNOWN(new Pose2D(DistanceUnit.INCH, 0, 0, AngleUnit.DEGREES, 90)),
         // Red Alliance Locations
 
-        // Red Alliance, Audience Wall, 1 tile off center line, facing North
+        // Red Alliance, Audience Wall, 0.5 tile off center line, facing North
         RED__AUDIENCE_WALL__HEADING_NORTH(new Pose2D(DistanceUnit.INCH,
                 3 * TILE - ROBOT_HALF_LENGTH,
-                1 * TILE,  // Right side
+                0.5 * TILE,  // Right side
                 AngleUnit.DEGREES, 90)), // North facing
 
-        // Blue Alliance, Audience Wall, 1 tile off center line, facing North
+        // Blue Alliance, Audience Wall, 0.5 tile off center line, facing North
         BLUE__AUDIENCE_WALL__HEADING_NORTH(new Pose2D(DistanceUnit.INCH,
                 3 * TILE - ROBOT_HALF_LENGTH,
-                -1 * TILE,  // Left side
+                -0.5 * TILE,  // Left side
                 AngleUnit.DEGREES, 90)), // North facing
 
-        // Red Alliance, Obelisk Wall, 1 tile off center line, facing North
+        // Red Alliance, Obelisk Wall, 0.5 tile off center line, facing North
         RED__OBELISK_WALL__HEADING_NORTH(new Pose2D(DistanceUnit.INCH,
                 -3 * TILE + ROBOT_HALF_LENGTH,
-                1 * TILE,  // Right side
+                0.5 * TILE,  // Right side
                 AngleUnit.DEGREES, 90)), // North facing
 
-        // Blue Alliance, Obelisk Wall, 1 tile off center line, facing North
+        // Blue Alliance, Obelisk Wall, 0.5 tile off center line, facing North
         BLUE__OBELISK_WALL__HEADING_NORTH(new Pose2D(DistanceUnit.INCH,
                 -3 * TILE + ROBOT_HALF_LENGTH,
-                -1 * TILE,  // Left side
+                -0.5 * TILE,  // Left side
                 AngleUnit.DEGREES, 90)), // North facing
 
         // Added a semicolon here to terminate the list of enum constants.
@@ -77,6 +77,19 @@ public class DecodeField {
         public Pose2D getPose() { return pose; }
     }
 
+    private static Pose2D getShooterPose(Pose2D robotPose) {
+        double currentX = robotPose.getX(DistanceUnit.INCH);
+        double currentY = robotPose.getY(DistanceUnit.INCH);
+        double currentHeading = robotPose.getHeading(AngleUnit.RADIANS);
+
+        // Calculate the shooter's position, accounting for the offset to the right.
+        // Positive heading is CCW from the positive Y axis. The "right" vector is (cos(h), sin(h)).
+        double shooterX = currentX + SHOOTER_OFFSET_INCHES * Math.cos(currentHeading);
+        double shooterY = currentY + SHOOTER_OFFSET_INCHES * Math.sin(currentHeading);
+
+        return new Pose2D(DistanceUnit.INCH, shooterX, shooterY, AngleUnit.RADIANS, currentHeading);
+    }
+
     /**
      * Calculates the distance from the robot to the current alliance corner.
      * @param currentAlliance The current alliance.
@@ -88,13 +101,14 @@ public class DecodeField {
         double targetX = (currentAlliance == Alliance.RED) ? RED_CORNER_X : BLUE_CORNER_X;
         double targetY = (currentAlliance == Alliance.RED) ? RED_CORNER_Y : BLUE_CORNER_Y;
 
-        // 2. Get the robot's current position from the pose.
-        double currentX = robotPose.getX(DistanceUnit.INCH);
-        double currentY = robotPose.getY(DistanceUnit.INCH);
+        // 2. Get the shooter's position from the new method
+        Pose2D shooterPose = getShooterPose(robotPose);
+        double shooterX = shooterPose.getX(DistanceUnit.INCH);
+        double shooterY = shooterPose.getY(DistanceUnit.INCH);
 
-        // 3. Calculate the distance using the distance formula.
-        double dx = targetX - currentX;
-        double dy = targetY - currentY;
+        // 3. Calculate the distance using the distance formula from the shooter.
+        double dx = targetX - shooterX;
+        double dy = targetY - shooterY;
         return Math.sqrt(dx*dx + dy*dy);
     }
 
@@ -113,28 +127,35 @@ public class DecodeField {
         double targetX = (currentAlliance == Alliance.RED) ? RED_CORNER_X : BLUE_CORNER_X;
         double targetY = (currentAlliance == Alliance.RED) ? RED_CORNER_Y : BLUE_CORNER_Y;
 
-        // 2. Get the robot's current position from the pose.
+        // 2. Get the robot's current position and heading from the pose.
         double currentX = robotPose.getX(DistanceUnit.INCH);
         double currentY = robotPose.getY(DistanceUnit.INCH);
+        double currentHeading = robotPose.getHeading(AngleUnit.RADIANS);
 
-        // 3. Calculate the vector from the robot to the corner.
-        double dx = targetX - currentX;
-        double dy = targetY - currentY;
+        // 2a. Get the shooter's position from the new method.
+        Pose2D shooterPose = getShooterPose(robotPose);
+        double shooterX = shooterPose.getX(DistanceUnit.INCH);
+        double shooterY = shooterPose.getY(DistanceUnit.INCH);
+
+        // 3. Calculate the vector from the shooter to the corner.
+        double dx = targetX - shooterX;
+        double dy = targetY - shooterY;
 
         // Log initial data
         Log.d(TAG, "getTurnAngle_v1: Alliance=" + currentAlliance);
         Log.d(TAG, String.format("getTurnAngle_v1: Robot Pose (X, Y, HeadingDeg): (%.2f, %.2f, %.2f)",
                 currentX, currentY, robotPose.getHeading(AngleUnit.DEGREES)));
+        Log.d(TAG, String.format("getTurnAngle_v1: Shooter Pose (X, Y): (%.2f, %.2f)", shooterX, shooterY));
         Log.d(TAG, String.format("getTurnAngle_v1: Target Corner (X, Y): (%.2f, %.2f)", targetX, targetY));
         Log.d(TAG, String.format("getTurnAngle_v1: Vector to Target (dx, dy): (%.2f, %.2f)", dx, dy));
 
 
         // 4. Calculate the absolute angle of the target vector relative to the positive Y-axis.
-        //    Math.atan2(x, y) gives the angle from the positive Y-axis to the vector (x, y).
+        //    Math.atan2(-x, y) gives the angle from the positive Y-axis to the vector (x, y).
         double absoluteAngleToTarget = Math.atan2(-dx, dy);
 
         // 5. Get the robot's current heading (already relative to the positive Y-axis).
-        double currentHeading = robotPose.getHeading(AngleUnit.RADIANS);
+        //double currentHeading = robotPose.getHeading(AngleUnit.RADIANS);
 
         // 6. The required turn is the difference between where we want to point and where we are pointing.
         double turnAngle = absoluteAngleToTarget - currentHeading;

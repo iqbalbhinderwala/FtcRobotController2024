@@ -1,5 +1,6 @@
 package org.firstinspires.ftc.teamcode.Vex.Test;
 
+import com.qualcomm.robotcore.eventloop.opmode.Disabled;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 
@@ -17,6 +18,7 @@ import org.firstinspires.ftc.teamcode.Vex.Hardware.VexOdometryDriveTrain;
  * - Right Stick: Controls the robot's rotation (turning).
  */
 @TeleOp(name = "TeleOp - Field Centric", group = "Vex")
+@Disabled
 public class FieldCentricTeleOp extends LinearOpMode {
 
     // Declare our drivetrain from the VexOdometryDriveTrain class
