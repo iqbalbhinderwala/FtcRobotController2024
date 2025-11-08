@@ -28,12 +28,14 @@ import org.firstinspires.ftc.vision.apriltag.AprilTagDetection;
  * - Left Stick:  Controls strafing and forward/backward movement from the driver's perspective.
  * - Left Stick Button: Press to halve the driving power for finer control.
  * - Right Stick: Controls the robot's rotation (turning).
- * - Right Stick Button: Press to automatically align. Aligns to corner if shooting wheel spins, else aligns to the closest 90 degrees.
+ * - Right Stick Button: Press to automatically align to the alliance corner for shooting.
  * - Gamepad 1 Right Bumper: Runs the intake.
  * - Gamepad 1 'B': Reverses the intake.
  * - Triggers: Controls the shooting mechanism.
  *   - One trigger pulled: Spins up the shooter wheels, gates in ready state (A closed, B open).
  *   - Both triggers pulled: Activates the gate cycle to shoot (after a 1-second spin-up).
+ * - D-Pad Up/Down: Increases/decreases the shooter power by a small increment to adjust for battery level.
+ * - D-Pad Left/Right: Resets the shooter power adjustment to zero.
  */
 @TeleOp(name = "[Vex] Main TeleOp", group = "Vex")
 public class VexMainTeleop extends LinearOpMode {
@@ -52,9 +54,10 @@ public class VexMainTeleop extends LinearOpMode {
     double MAX_TURN_SPEED   = 0.5;
     private double intakePower = 1.0;
     private double shooterPower = 0.6;
+    private double shooterPowerAdjustment = 0.0; // Adjustment for shooter power
     private double humanDirection;
     private final double BUTTON_DELAY = 0.25;
-    private final double POWER_INCREMENT = 0.05;
+    private final double POWER_INCREMENT = 0.025;
 
     // Alliance information
     private DecodeField.Alliance currentAlliance;
@@ -306,6 +309,22 @@ public class VexMainTeleop extends LinearOpMode {
      * Handles all actuator logic (intake, shooter, gates).
      */
     private void handleActuators() {
+        // --- Shooter Power Adjustment ---
+        // Use the D-Pad to fine-tune the shooter power. Reset with D-Pad Left/Right.
+        if (gamepad1.dpad_up && lastPress.seconds() > BUTTON_DELAY) {
+            lastPress.reset();
+            shooterPowerAdjustment += POWER_INCREMENT;
+            Log.d(TAG, "handleActuators: Increased shooter offset to " + shooterPowerAdjustment);
+        } else if (gamepad1.dpad_down && lastPress.seconds() > BUTTON_DELAY) {
+            lastPress.reset();
+            shooterPowerAdjustment -= POWER_INCREMENT;
+            Log.d(TAG, "handleActuators: Decreased shooter offset to " + shooterPowerAdjustment);
+        } else if ((gamepad1.dpad_left || gamepad1.dpad_right) && lastPress.seconds() > BUTTON_DELAY) {
+            lastPress.reset();
+            shooterPowerAdjustment = 0.0; // Reset the offset
+            Log.d(TAG, "handleActuators: Reset shooter offset to 0.0");
+        }
+
         // Manual controls are disabled during auto-shoot sequence
         if (shootingState == ShootingState.IDLE) {
             actuators.setShooterPower(0);
@@ -342,7 +361,10 @@ public class VexMainTeleop extends LinearOpMode {
 
                     // Automatically determine shooter power based on distance
                     double distanceToCorner = DecodeField.getDistanceToAllianceCorner(currentAlliance, driveTrain.getPose2D());
-                    shooterPower = actuators.calculateDistanceBasedShooterPower(distanceToCorner);
+                    double baseShooterPower = actuators.calculateDistanceBasedShooterPower(distanceToCorner);
+
+                    // Apply the offset and clip the value to a safe range [0, 1]
+                    shooterPower = Range.clip(baseShooterPower + shooterPowerAdjustment, 0, 1.0);
                     actuators.setShooterPower(shooterPower);
 
                     actuators.closeGateA(); // Set gates to ready-to-shoot state
@@ -398,15 +420,15 @@ public class VexMainTeleop extends LinearOpMode {
         switch (gateCycleState) {
             case STEP_1_CLOSE_B:
                 actuators.closeGateB();
-                gateCycleState = GateCycleState.STEP_2_OPEN_A;
+                    gateCycleState = GateCycleState.STEP_2_OPEN_A;
                 break;
             case STEP_2_OPEN_A:
                 actuators.openGateA();
-                gateCycleState = GateCycleState.STEP_3_CLOSE_A;
+                    gateCycleState = GateCycleState.STEP_3_CLOSE_A;
                 break;
             case STEP_3_CLOSE_A:
                 actuators.closeGateA();
-                gateCycleState = GateCycleState.STEP_4_OPEN_B;
+                    gateCycleState = GateCycleState.STEP_4_OPEN_B;
                 break;
             case STEP_4_OPEN_B:
                 actuators.openGateB();
@@ -443,6 +465,7 @@ public class VexMainTeleop extends LinearOpMode {
         telemetry.addData("Gate Cycle", gateCycleState.toString());
         telemetry.addData("Intake Power", "%.2f", intakePower);
         telemetry.addData("Shooter Power", "%.2f", shooterPower);
+        telemetry.addData("** Shooter Adjustment **", "%.3f", shooterPowerAdjustment); // Display the adjustment
         telemetry.addData("Gate A Pos", "%.2f", actuators.getGateAPosition());
         telemetry.addData("Gate B Pos", "%.2f", actuators.getGateBPosition());
 
