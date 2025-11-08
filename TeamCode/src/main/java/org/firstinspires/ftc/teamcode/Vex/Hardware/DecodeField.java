@@ -57,13 +57,13 @@ public class DecodeField {
         // Red Alliance, Obelisk Wall, 0.5 tile off center line, facing North
         RED__OBELISK_WALL__HEADING_NORTH(new Pose2D(DistanceUnit.INCH,
                 -3 * TILE + ROBOT_HALF_LENGTH,
-                0.5 * TILE,  // Right side
+                2 * TILE - ROBOT_HALF_LENGTH,  // Right side
                 AngleUnit.DEGREES, 90)), // North facing
 
         // Blue Alliance, Obelisk Wall, 0.5 tile off center line, facing North
         BLUE__OBELISK_WALL__HEADING_NORTH(new Pose2D(DistanceUnit.INCH,
                 -3 * TILE + ROBOT_HALF_LENGTH,
-                -0.5 * TILE,  // Left side
+                -2 * TILE + ROBOT_HALF_LENGTH,  // Left side
                 AngleUnit.DEGREES, 90)), // North facing
 
         // Added a semicolon here to terminate the list of enum constants.

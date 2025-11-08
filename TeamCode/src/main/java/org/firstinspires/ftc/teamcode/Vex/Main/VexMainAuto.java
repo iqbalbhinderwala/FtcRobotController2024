@@ -126,13 +126,19 @@ public class VexMainAuto extends LinearOpMode {
 
         // 1. Move forward a little to clear the wall for rotation (e.g., 6 inches)
         // Since the robot starts facing North (positive Y direction), dy is positive.
-        driveTrain.driveRelative(0, 6.0, DRIVE_POWER);
+        driveTrain.driveRelative(-6, 0, DRIVE_POWER);
 
         // 2. Turn to face the alliance corner
         turnTowardsCorner();
 
         // 3. Shoot 3 balls
         shootCycle(SHOT_COUNT);
+
+        // 4. Turn back to 90 degrees
+        driveTrain.turnToHeading(90, TURN_POWER);
+
+        // 5. Drive off the launch line
+        driveTrain.driveRelative(-TILE, 0, DRIVE_POWER);
     }
 
     /**
@@ -143,16 +149,21 @@ public class VexMainAuto extends LinearOpMode {
         telemetry.addLine("Running Obelisk Wall Path...");
         telemetry.update();
 
-        // Obelisk is ~3 tiles from corner, too close to shoot.
-        // Move back 1.5 tiles (36 inches) to get into a good shooting range.
-        // Since the robot starts facing North (positive Y), moving backward means a negative dy.
-        driveTrain.driveRelative(0, -36.0, DRIVE_POWER);
+        double targetX = -1 * TILE;
+        double targetY = 0.5 * TILE * ((currentAlliance == DecodeField.Alliance.RED) ? 1 : -1);
+        driveTrain.driveTo(targetX, targetY, DRIVE_POWER);
 
         // 2. Turn to face the alliance corner
         turnTowardsCorner();
 
         // 3. Shoot 3 balls
         shootCycle(SHOT_COUNT);
+
+        // 4. Turn back to 90 degrees
+        driveTrain.turnToHeading(90, TURN_POWER);
+
+        // 5. Drive off the launch line
+        driveTrain.driveRelative(-TILE, 0, DRIVE_POWER);
     }
 
     /**
@@ -239,5 +250,7 @@ public class VexMainAuto extends LinearOpMode {
             telemetry.update();
         }
     }
+
+    private static final double TILE = 24.0; // inches
 }
 
