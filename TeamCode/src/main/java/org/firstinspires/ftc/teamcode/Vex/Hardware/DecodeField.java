@@ -83,14 +83,14 @@ public class DecodeField {
      * @param robotPose The robot's current pose.
      * @return The distance in inches.
      */
-    public static double getDistanceToAllianceCorner(Alliance currentAlliance, Pose3D robotPose) {
+    public static double getDistanceToAllianceCorner(Alliance currentAlliance, Pose2D robotPose) {
         // 1. Get the target coordinates based on the current alliance.
         double targetX = (currentAlliance == Alliance.RED) ? RED_CORNER_X : BLUE_CORNER_X;
         double targetY = (currentAlliance == Alliance.RED) ? RED_CORNER_Y : BLUE_CORNER_Y;
 
         // 2. Get the robot's current position from the pose.
-        double currentX = robotPose.getPosition().x;
-        double currentY = robotPose.getPosition().y;
+        double currentX = robotPose.getX(DistanceUnit.INCH);
+        double currentY = robotPose.getY(DistanceUnit.INCH);
 
         // 3. Calculate the distance using the distance formula.
         double dx = targetX - currentX;
@@ -164,7 +164,7 @@ public class DecodeField {
      * @param robotPose The robot's current pose.
      * @return True if the robot is far enough to shoot, false otherwise.
      */
-    public static boolean isInRangeForShooting(Alliance currentAlliance, Pose3D robotPose) {
+    public static boolean isInRangeForShooting(Alliance currentAlliance, Pose2D robotPose) {
         return getDistanceToAllianceCorner(currentAlliance, robotPose) >= MINIMUM_SHOOTING_DISTANCE;
     }
 

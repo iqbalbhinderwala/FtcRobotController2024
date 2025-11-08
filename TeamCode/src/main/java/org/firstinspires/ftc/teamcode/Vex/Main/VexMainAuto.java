@@ -173,7 +173,7 @@ public class VexMainAuto extends LinearOpMode {
 
         // 1. Spin up the shooter wheels
         double shooterPower = actuators.calculateDistanceBasedShooterPower(
-                DecodeField.getDistanceToAllianceCorner(currentAlliance, driveTrain.getPose())
+                DecodeField.getDistanceToAllianceCorner(currentAlliance, driveTrain.getPose2D())
         );
         actuators.setShooterPower(shooterPower);
         spinUpTimer.reset();

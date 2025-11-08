@@ -313,8 +313,10 @@ public class VexMainTeleop extends LinearOpMode {
             // Intake Control
             if (gamepad1.right_bumper) {
                 actuators.setIntakePower(intakePower);
-                actuators.closeGateA();
-                actuators.openGateB();
+                if (shootingState != ShootingState.SHOOTING_CYCLE) {
+                    actuators.closeGateA();
+                    actuators.openGateB();
+                }
             } else if (gamepad1.b) {
                 actuators.setIntakePower(-intakePower);
             } else {
@@ -339,7 +341,7 @@ public class VexMainTeleop extends LinearOpMode {
                     spinUpTimer.reset(); // Start the spin-up timer
 
                     // Automatically determine shooter power based on distance
-                    shooterPower = actuators.calculateDistanceBasedShooterPower(DecodeField.getDistanceToAllianceCorner(currentAlliance, driveTrain.getPose()));
+                    shooterPower = actuators.calculateDistanceBasedShooterPower(DecodeField.getDistanceToAllianceCorner(currentAlliance, driveTrain.getPose2D()));
                     actuators.setShooterPower(shooterPower);
 
                     actuators.closeGateA(); // Set gates to ready-to-shoot state
@@ -354,7 +356,7 @@ public class VexMainTeleop extends LinearOpMode {
                     actuators.closeGateA(); // Set gates to ready-for-intake
                     actuators.openGateB();
                 } else if (bothTriggers && spinUpTimer.seconds() >= SPIN_UP_TIME_S) {
-                    if (!DecodeField.isInRangeForShooting(currentAlliance, driveTrain.getPose())) {
+                    if (!DecodeField.isInRangeForShooting(currentAlliance, driveTrain.getPose2D())) {
                         gamepad1.rumble(100);
                     } else {
                         // Spin-up complete, transition to SHOOTING_CYCLE
@@ -425,13 +427,13 @@ public class VexMainTeleop extends LinearOpMode {
      */
     private void updateTelemetry() {
         driveTrain.update(); // Update odometry
-        Pose3D currentPose = driveTrain.getPose();
+        Pose2D currentPose = driveTrain.getPose2D();
 
         telemetry.addData("--- Robot ---", "");
         telemetry.addData("Pose", "X: %.2f, Y: %.2f (in), H: %.1f (deg)",
-                currentPose.getPosition().x,
-                currentPose.getPosition().y,
-                currentPose.getOrientation().getYaw(AngleUnit.DEGREES));
+                currentPose.getX(DistanceUnit.INCH),
+                currentPose.getY(DistanceUnit.INCH),
+                currentPose.getHeading(AngleUnit.DEGREES));
         telemetry.addData("Dist to Corner", "%.2f in", DecodeField.getDistanceToAllianceCorner(currentAlliance, currentPose));
         telemetry.addData("Target Heading", "%.2f in", targetHeading);
 
