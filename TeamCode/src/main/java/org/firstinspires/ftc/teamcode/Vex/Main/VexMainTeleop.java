@@ -192,9 +192,9 @@ public class VexMainTeleop extends LinearOpMode {
                     Log.d(TAG, "opModeStart: Pose initialized from AprilTag: " + robotPose);
                     telemetry.addLine("Pose initialized from AprilTag.");
                 } else {
-                    driveTrain.resetPose(0, 0, 0);
-                    Log.d(TAG, "opModeStart: No pose source found, starting at (0,0,0).");
-                    telemetry.addLine("No AprilTag, starting position, or stored pose found, starting at (0,0,0).");
+                    driveTrain.resetPose(0, 0, 90);
+                    Log.d(TAG, "opModeStart: No pose source found, starting at (0,0,90).");
+                    telemetry.addLine("No AprilTag, starting position, or stored pose found, starting at (0,0,NORTH).");
                 }
             }
         }
@@ -358,7 +358,7 @@ public class VexMainTeleop extends LinearOpMode {
                     actuators.openGateB();
                 } else if (bothTriggers && spinUpTimer.seconds() >= SPIN_UP_TIME_S) {
                     if (!DecodeField.isInRangeForShooting(currentAlliance, driveTrain.getPose2D())) {
-                        gamepad1.rumble(100);
+                        gamepad1.rumble(500);
                     } else {
                         // Spin-up complete, transition to SHOOTING_CYCLE
                         shootingState = ShootingState.SHOOTING_CYCLE;
