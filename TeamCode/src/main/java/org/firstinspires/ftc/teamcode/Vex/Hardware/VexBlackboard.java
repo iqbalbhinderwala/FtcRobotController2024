@@ -54,6 +54,15 @@ public class VexBlackboard {
     }
 
     /**
+     * Resets the blackboard pose.
+     */
+    public void resetPose() {
+        opMode.blackboard.remove(POSE_X_KEY);
+        opMode.blackboard.remove(POSE_Y_KEY);
+        opMode.blackboard.remove(POSE_HEADING_KEY);
+    }
+
+    /**
      * Retrieves the currently selected alliance from the blackboard.
      *
      * @return The selected Alliance enum. Defaults to UNKNOWN if no selection is found.

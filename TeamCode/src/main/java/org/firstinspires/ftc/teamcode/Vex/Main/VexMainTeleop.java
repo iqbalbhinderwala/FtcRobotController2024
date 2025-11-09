@@ -239,12 +239,7 @@ public class VexMainTeleop extends LinearOpMode {
      */
     private void opModeStop() {
         Log.d(TAG, "opModeStop: Stopping...");
-        // Save the robot's current pose to the blackboard for the next run
-        Pose3D finalPose = driveTrain.getPose();
-        if (finalPose != null) {
-            blackboardHelper.setPose(finalPose);
-            Log.d(TAG, "opModeStop: Saved final pose to blackboard: " + finalPose);
-        }
+        blackboardHelper.resetPose();
 
         driveTrain.stopMotors();
         vision.stop();

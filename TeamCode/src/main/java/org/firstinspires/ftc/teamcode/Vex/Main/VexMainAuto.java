@@ -187,6 +187,8 @@ public class VexMainAuto extends LinearOpMode {
 
         // 4. Turn back to 90 degrees
         driveTrain.turnToHeading(90, TURN_POWER);
+
+        driveTrain.driveRelative(1.5*TILE, 0, DRIVE_POWER);
     }
 
     /**
