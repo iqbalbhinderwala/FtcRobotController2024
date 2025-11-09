@@ -49,8 +49,8 @@ public class VexMainTeleop extends LinearOpMode {
 
     // OpMode Members
     private ElapsedTime lastPress;
-    double MAX_DRIVE_SPEED  = 0.7;
-    double MAX_STRAFE_SPEED = 0.7;
+    double MAX_DRIVE_SPEED  = 0.8;
+    double MAX_STRAFE_SPEED = 0.8;
     double MAX_TURN_SPEED   = 0.5;
     private double intakePower = 1.0;
     private double shooterPower = 0.6;

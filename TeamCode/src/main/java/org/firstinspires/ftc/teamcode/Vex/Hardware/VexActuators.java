@@ -76,7 +76,7 @@ public class VexActuators {
      * @return The calculated shooter power, a value between 0.0 and 1.0.
      */
     public double calculateDistanceBasedShooterPower(double distanceInInches) {
-        double power = (4.48 / 24.0 * distanceInInches + 55.055) / 100.0;
+        double power = (4.48 / 24.0 * distanceInInches + 55.055 - 2.5) / 100.0;
         // Clamp the power to be between 0.0 and 1.0, which is what the motor can take.
         return Math.max(0.0, Math.min(1.0, power));
     }

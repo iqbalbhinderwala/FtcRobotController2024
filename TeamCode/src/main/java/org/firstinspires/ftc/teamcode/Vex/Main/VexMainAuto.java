@@ -32,7 +32,7 @@ public class VexMainAuto extends LinearOpMode {
     private ElapsedTime gateCycleTimer = new ElapsedTime();
 
     // Constants
-    private static final double DRIVE_POWER = 0.7;
+    private static final double DRIVE_POWER = 0.8;
     private static final double TURN_POWER = 0.5;
     private static final double SPIN_UP_TIME_S = 1.25;
     private static final long GATE_DELAY_MS = 350;
@@ -88,8 +88,8 @@ public class VexMainAuto extends LinearOpMode {
             telemetry.addData("Status", "Initialized at " + startingLocation.name());
         } else {
             telemetry.addData("ERROR", "Starting location not selected in [Vex] Game Setup!");
-            telemetry.addLine("Defaulting to (0,0,0). Path may be incorrect.");
-            driveTrain.resetPose(0, 0, 0);
+            telemetry.addLine("Defaulting to (0,0,90). Path may be incorrect.");
+            driveTrain.resetPose(0, 0, 90);
         }
         telemetry.update();
     }
@@ -138,7 +138,7 @@ public class VexMainAuto extends LinearOpMode {
         driveTrain.turnToHeading(90, TURN_POWER);
 
         // 5. Drive off the launch line
-        driveTrain.driveRelative(-TILE, 0, DRIVE_POWER);
+        driveTrain.driveRelative(-0.5*TILE, 0, DRIVE_POWER);
     }
 
     /**
@@ -163,7 +163,30 @@ public class VexMainAuto extends LinearOpMode {
         driveTrain.turnToHeading(90, TURN_POWER);
 
         // 5. Drive off the launch line
-        driveTrain.driveRelative(-TILE, 0, DRIVE_POWER);
+//        driveTrain.driveRelative(-TILE, 0, DRIVE_POWER);
+
+        // 6. Drive to PPG
+        targetX = -0.5 * TILE;
+        targetY =  0.5 * TILE * ((currentAlliance == DecodeField.Alliance.RED) ? 1 : -1);
+        double YSign = ((currentAlliance == DecodeField.Alliance.RED) ? 1 : -1);
+        driveTrain.driveTo(targetX-2, targetY, DRIVE_POWER);
+        driveTrain.turnToHeading((currentAlliance == DecodeField.Alliance.RED) ? 180 : 0, TURN_POWER);
+        actuators.setIntakePower(1);
+        driveTrain.driveTo(targetX, targetY + 2*TILE*YSign, 0.3);
+        actuators.setIntakePower(1);
+
+        targetX = -1 * TILE;
+        targetY = 0.5 * TILE * ((currentAlliance == DecodeField.Alliance.RED) ? 1 : -1);
+        driveTrain.driveTo(targetX, targetY, DRIVE_POWER);
+
+        // 2. Turn to face the alliance corner
+        turnTowardsCorner();
+
+        // 3. Shoot 3 balls
+        shootCycle(SHOT_COUNT);
+
+        // 4. Turn back to 90 degrees
+        driveTrain.turnToHeading(90, TURN_POWER);
     }
 
     /**
