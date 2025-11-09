@@ -187,9 +187,11 @@ public class DecodeField {
      * @return True if the robot is far enough and oriented correctly for shooting, false otherwise.
      */
     public static boolean isInRangeForShooting(Alliance currentAlliance, Pose2D robotPose) {
-        double distance = getDistanceToAllianceCorner(currentAlliance, robotPose);
-        double turnAngle = getTurnAngleToAllianceCorner(currentAlliance, robotPose);
-        return distance >= MINIMUM_SHOOTING_DISTANCE && Math.abs(turnAngle) <= MAXIMUM_SHOOTING_ANGLE_ERROR_DEGREES;
+        return true;
+
+//        double distance = getDistanceToAllianceCorner(currentAlliance, robotPose);
+//        double turnAngle = getTurnAngleToAllianceCorner(currentAlliance, robotPose);
+//        return distance >= MINIMUM_SHOOTING_DISTANCE && Math.abs(turnAngle) <= MAXIMUM_SHOOTING_ANGLE_ERROR_DEGREES;
     }
 
     private static final String TAG = "VEX::DecodeField";

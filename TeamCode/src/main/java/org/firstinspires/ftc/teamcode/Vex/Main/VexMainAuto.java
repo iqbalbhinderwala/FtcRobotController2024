@@ -32,11 +32,11 @@ public class VexMainAuto extends LinearOpMode {
     private ElapsedTime gateCycleTimer = new ElapsedTime();
 
     // Constants
-    private static final double DRIVE_POWER = 0.5;
-    private static final double TURN_POWER = 0.4;
-    private static final double SPIN_UP_TIME_S = 1.0;
-    private static final long GATE_DELAY_MS = 250;
-    private static final int SHOT_COUNT = 3;
+    private static final double DRIVE_POWER = 0.7;
+    private static final double TURN_POWER = 0.5;
+    private static final double SPIN_UP_TIME_S = 1.25;
+    private static final long GATE_DELAY_MS = 350;
+    private static final int SHOT_COUNT = 4;
 
     @Override
     public void runOpMode() throws InterruptedException {
@@ -170,8 +170,9 @@ public class VexMainAuto extends LinearOpMode {
      * Turns the robot to face the correct alliance corner.
      */
     private void turnTowardsCorner() {
-        double targetAngle = DecodeField.getTurnAngleToAllianceCorner(currentAlliance, driveTrain.getPose2D());
-        driveTrain.turnToHeading(TURN_POWER, targetAngle);
+        double deltaAngle = DecodeField.getTurnAngleToAllianceCorner(currentAlliance, driveTrain.getPose2D());
+        double targetAngle = driveTrain.getHeading() + deltaAngle;
+        driveTrain.turnToHeading(targetAngle, TURN_POWER);
     }
 
     /**
@@ -187,6 +188,7 @@ public class VexMainAuto extends LinearOpMode {
                 DecodeField.getDistanceToAllianceCorner(currentAlliance, driveTrain.getPose2D())
         );
         actuators.setShooterPower(shooterPower);
+        actuators.setIntakePower(1.0);
         spinUpTimer.reset();
         while (opModeIsActive() && spinUpTimer.seconds() < SPIN_UP_TIME_S) {
             driveTrain.update(); // Keep odometry updated

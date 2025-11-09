@@ -69,8 +69,8 @@ public class VexMainTeleop extends LinearOpMode {
     private GateCycleState gateCycleState = GateCycleState.READY;
     private ElapsedTime gateCycleTimer; // For timing gate movements
     private ElapsedTime spinUpTimer;    // For timing wheel spin-up
-    private final long GATE_DELAY_MS = 250;
-    private final double SPIN_UP_TIME_S = 1.0;
+    private final long GATE_DELAY_MS = 350;
+    private final double SPIN_UP_TIME_S = 1.25;
 
     private double targetHeading;
 
