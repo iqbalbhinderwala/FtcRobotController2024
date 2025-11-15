@@ -173,9 +173,9 @@ public class VexMainTeleop extends LinearOpMode {
         spinUpTimer.reset();
 
         // Try to initialize pose from the blackboard first
-        Pose3D storedPose = blackboardHelper.getPose();
+        Pose2D storedPose = blackboardHelper.getPose();
         if (storedPose != null) {
-            driveTrain.resetPose(storedPose.getPosition().x, storedPose.getPosition().y, storedPose.getOrientation().getYaw(AngleUnit.DEGREES));
+            driveTrain.resetPose(storedPose.getX(DistanceUnit.INCH), storedPose.getY(DistanceUnit.INCH), storedPose.getHeading(AngleUnit.DEGREES));
             Log.d(TAG, "opModeStart: Pose initialized from blackboard: " + storedPose);
             telemetry.addLine("Pose initialized from final pose of last OpMode.");
         } else {

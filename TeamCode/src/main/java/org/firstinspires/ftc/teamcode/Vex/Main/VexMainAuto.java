@@ -6,6 +6,7 @@ import com.qualcomm.robotcore.util.ElapsedTime;
 
 import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit;
 import org.firstinspires.ftc.robotcore.external.navigation.DistanceUnit;
+import org.firstinspires.ftc.robotcore.external.navigation.Pose2D;
 import org.firstinspires.ftc.robotcore.external.navigation.Pose3D;
 import org.firstinspires.ftc.teamcode.Vex.Hardware.VexBlackboard;
 import org.firstinspires.ftc.teamcode.Vex.Hardware.DecodeField;
@@ -29,14 +30,6 @@ public class VexMainAuto extends LinearOpMode {
     private DecodeField.Alliance currentAlliance;
     private DecodeField.KeyLocation startingLocation;
     private ElapsedTime spinUpTimer = new ElapsedTime();
-    private ElapsedTime gateCycleTimer = new ElapsedTime();
-
-    // Constants
-    private static final double DRIVE_POWER = 0.8;
-    private static final double TURN_POWER = 0.5;
-    private static final double SPIN_UP_TIME_S = 1.25;
-    private static final long GATE_DELAY_MS = 350;
-    private static final int SHOT_COUNT = 4;
 
     @Override
     public void runOpMode() throws InterruptedException {
@@ -125,7 +118,6 @@ public class VexMainAuto extends LinearOpMode {
         telemetry.update();
 
         // 1. Move forward a little to clear the wall for rotation (e.g., 6 inches)
-        // Since the robot starts facing North (positive Y direction), dy is positive.
         driveTrain.driveRelative(-6, 0, DRIVE_POWER);
 
         // 2. Turn to face the alliance corner
@@ -269,7 +261,7 @@ public class VexMainAuto extends LinearOpMode {
     private void saveFinalPose() {
         driveTrain.stopMotors();
         driveTrain.update(); // Final odometry update
-        Pose3D finalPose = driveTrain.getPose();
+        Pose2D finalPose = driveTrain.getPose2D();
 
         if (finalPose != null) {
             blackboardHelper.setPose(finalPose);
@@ -277,6 +269,13 @@ public class VexMainAuto extends LinearOpMode {
             telemetry.update();
         }
     }
+
+    // Constants
+    private static final double DRIVE_POWER = 0.8;
+    private static final double TURN_POWER = 0.5;
+    private static final double SPIN_UP_TIME_S = 1.25;
+    private static final long GATE_DELAY_MS = 350;
+    private static final int SHOT_COUNT = 4;
 
     private static final double TILE = 24.0; // inches
 }

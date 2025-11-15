@@ -4,9 +4,7 @@ import com.qualcomm.robotcore.eventloop.opmode.OpMode;
 
 import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit;
 import org.firstinspires.ftc.robotcore.external.navigation.DistanceUnit;
-import org.firstinspires.ftc.robotcore.external.navigation.Pose3D;
-import org.firstinspires.ftc.robotcore.external.navigation.Position;
-import org.firstinspires.ftc.robotcore.external.navigation.YawPitchRollAngles;
+import org.firstinspires.ftc.robotcore.external.navigation.Pose2D;
 
 /**
  * A helper class for managing data stored on the FTC SDK blackboard.
@@ -116,17 +114,17 @@ public class VexBlackboard {
      * Stores the robot's last known pose on the blackboard.
      * @param pose The robot's pose.
      */
-    public void setPose(Pose3D pose) {
-        opMode.blackboard.put(POSE_X_KEY, pose.getPosition().x);
-        opMode.blackboard.put(POSE_Y_KEY, pose.getPosition().y);
-        opMode.blackboard.put(POSE_HEADING_KEY, pose.getOrientation().getYaw(AngleUnit.DEGREES));
+    public void setPose(Pose2D pose) {
+        opMode.blackboard.put(POSE_X_KEY, pose.getX(DistanceUnit.INCH));
+        opMode.blackboard.put(POSE_Y_KEY, pose.getY(DistanceUnit.INCH));
+        opMode.blackboard.put(POSE_HEADING_KEY, pose.getHeading(AngleUnit.DEGREES));
     }
 
     /**
      * Retrieves the robot's last known pose from the blackboard.
      * @return The robot's pose as a Pose3D object, or null if not found.
      */
-    public Pose3D getPose() {
+    public Pose2D getPose() {
         Object xValue = opMode.blackboard.get(POSE_X_KEY);
         Object yValue = opMode.blackboard.get(POSE_Y_KEY);
         Object headingValue = opMode.blackboard.get(POSE_HEADING_KEY);
@@ -135,11 +133,10 @@ public class VexBlackboard {
             return null;
         }
 
-        Position position = new Position(DistanceUnit.INCH,
-                (double) xValue, (double) yValue, 0, 0);
-        YawPitchRollAngles orientation = new YawPitchRollAngles(AngleUnit.DEGREES,
-                (double) headingValue, 0, 0, 0);
-        return new Pose3D(position, orientation);
+        return new Pose2D(
+                DistanceUnit.INCH, (double)xValue, (double)yValue,
+                AngleUnit.DEGREES, (double)headingValue
+        );
     }
 
     /**
