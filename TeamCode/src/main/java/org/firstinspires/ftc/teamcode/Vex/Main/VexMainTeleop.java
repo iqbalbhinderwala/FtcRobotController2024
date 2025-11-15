@@ -347,6 +347,9 @@ public class VexMainTeleop extends LinearOpMode {
 
         ShootingState lastState = shootingState;
 
+        // Keep shooter power based on distance always updated for telemetry
+        updateShooterPowerFromTargetDistance();
+
         switch (shootingState) {
             case IDLE:
                 if (anyTrigger) {
@@ -354,12 +357,6 @@ public class VexMainTeleop extends LinearOpMode {
                     shootingState = ShootingState.SPIN_UP;
                     spinUpTimer.reset(); // Start the spin-up timer
 
-                    // Automatically determine shooter power based on distance
-                    double distanceToCorner = DecodeField.getDistanceToAllianceCorner(currentAlliance, driveTrain.getPose2D());
-                    double baseShooterPower = actuators.calculateDistanceBasedShooterPower(distanceToCorner);
-
-                    // Apply the offset and clip the value to a safe range [0, 1]
-                    shooterPower = Range.clip(baseShooterPower + shooterPowerAdjustment, 0, 1.0);
                     actuators.setShooterPower(shooterPower);
 
                     actuators.closeGateA(); // Set gates to ready-to-shoot state
@@ -401,6 +398,15 @@ public class VexMainTeleop extends LinearOpMode {
         if (lastState != shootingState) {
             Log.d(TAG, "handleShooting: State changed from " + lastState + " to " + shootingState);
         }
+    }
+
+    private void updateShooterPowerFromTargetDistance() {
+        // Automatically determine shooter power based on distance
+        double distanceToCorner = DecodeField.getDistanceToAllianceCorner(currentAlliance, driveTrain.getPose2D());
+        double baseShooterPower = actuators.calculateDistanceBasedShooterPower(distanceToCorner);
+
+        // Apply the offset and clip the value to a safe range [0, 1]
+        shooterPower = Range.clip(baseShooterPower + shooterPowerAdjustment, 0, 1.0);
     }
 
     private void runShootingCycleIteration() {
