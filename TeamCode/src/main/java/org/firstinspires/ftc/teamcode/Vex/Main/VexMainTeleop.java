@@ -29,7 +29,7 @@ import org.firstinspires.ftc.vision.apriltag.AprilTagDetection;
  * - Left Stick Button: Press to halve the driving power for finer control.
  * - Right Stick: Controls the robot's rotation (turning).
  * - Right Stick Button: Press to automatically align to the alliance corner for shooting.
- * - Gamepad 1 Right Bumper: Runs the intake.
+ * - Gamepad 1 Left or Right Bumper: Runs the intake.
  * - Gamepad 1 'B': Reverses the intake.
  * - Triggers: Controls the shooting mechanism.
  *   - One trigger pulled: Spins up the shooter wheels, gates in ready state (A closed, B open).
@@ -49,9 +49,9 @@ public class VexMainTeleop extends LinearOpMode {
 
     // OpMode Members
     private ElapsedTime lastPress;
-    double MAX_DRIVE_SPEED  = 0.8;
-    double MAX_STRAFE_SPEED = 0.8;
-    double MAX_TURN_SPEED   = 0.5;
+    double MAX_DRIVE_SPEED  = 0.9;
+    double MAX_STRAFE_SPEED = 0.9;
+    double MAX_TURN_SPEED   = 0.6;
     private double intakePower = 1.0;
     private double shooterPower = 0.6;
     private double shooterPowerAdjustment = 0.0; // Adjustment for shooter power
@@ -71,8 +71,10 @@ public class VexMainTeleop extends LinearOpMode {
     private ElapsedTime spinUpTimer;    // For timing wheel spin-up
     private final long GATE_DELAY_MS = 350;
     private final double SPIN_UP_TIME_S = 1.25;
+    private static final double VISION_POSE_UPDATE_INTERVAL_SECONDS = 1.0; // Seconds
 
     private double targetHeading;
+    private ElapsedTime visionUpdateTimer;
 
     @Override
     public void runOpMode() throws InterruptedException {
@@ -127,6 +129,7 @@ public class VexMainTeleop extends LinearOpMode {
         lastPress = new ElapsedTime();
         gateCycleTimer = new ElapsedTime();
         spinUpTimer = new ElapsedTime();
+        visionUpdateTimer = new ElapsedTime();
 
         // Set humanDirection based on the alliance: 0 for RED, 180 for BLUE
         humanDirection = (currentAlliance == DecodeField.Alliance.RED) ? 0 : 180;
@@ -171,6 +174,7 @@ public class VexMainTeleop extends LinearOpMode {
         lastPress.reset(); // Reset timer on start
         gateCycleTimer.reset();
         spinUpTimer.reset();
+        visionUpdateTimer.reset();
 
         // Try to initialize pose from the blackboard first
         Pose2D storedPose = blackboardHelper.getPose();
@@ -217,9 +221,19 @@ public class VexMainTeleop extends LinearOpMode {
         AprilTagDetection newDetection = vision.getMostAccurateTarget();
         if (newDetection != null && newDetection.robotPose != null) {
             Pose3D robotPose = newDetection.robotPose;
-            driveTrain.updatePosition(robotPose.getPosition().x, robotPose.getPosition().y);
-            Log.d(TAG, "opModeLoop: Pose updated from vision: " + robotPose);
-            telemetry.addLine("!!! POSE UPDATED FROM VISION !!!");
+
+            // - UPDATE HEADING ONCE PER SECOND: Only update the robot's orientation if 1 second has passed.
+            if (visionUpdateTimer.seconds() > VISION_POSE_UPDATE_INTERVAL_SECONDS) {
+                visionUpdateTimer.reset(); // Reset the timer after the update
+                driveTrain.updatePose(robotPose.getPosition().x, robotPose.getPosition().y, robotPose.getOrientation().getYaw(AngleUnit.DEGREES));
+                Log.d(TAG, "opModeLoop: Pose updated from vision: " + robotPose);
+                telemetry.addLine("!!! HEADING UPDATED FROM VISION !!!");
+            } else {
+                // - UPDATE POSITION ALWAYS: Continuously update the robot's X and Y coordinates.
+                driveTrain.updatePosition(robotPose.getPosition().x, robotPose.getPosition().y);
+                Log.d(TAG, "opModeLoop: Position updated from vision: " + robotPose);
+                telemetry.addLine("!!! POSITION UPDATED FROM VISION !!!");
+            }
         }
 
         // --- DRIVING CONTROLS ---
@@ -326,7 +340,7 @@ public class VexMainTeleop extends LinearOpMode {
         }
 
         // Intake Control
-        if (gamepad1.right_bumper) {
+        if (gamepad1.right_bumper || gamepad1.left_bumper) {
             actuators.setIntakePower(intakePower);
             if (shootingState != ShootingState.SHOOTING_CYCLE) {
                 actuators.closeGateA();

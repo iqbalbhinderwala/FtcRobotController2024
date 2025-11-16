@@ -56,4 +56,20 @@ public class IMUHeadingProvider {
         // 3. Set the reference heading to the new desired heading, adjusted for the offset.
         this.referenceHeading = newHeading - offset;
     }
+
+    /**
+     * Sets the robot's current heading to a new value without resetting the IMU.
+     * For example, calling setHeading(90) makes the robot's current direction read as 90 degrees.
+     *
+     * @param newHeading The desired heading (in degrees) for the robot's current orientation.
+     */
+    public void setHeading(double newHeading) {
+        // 1. Get the raw yaw from the IMU. This is the angle relative to the last hardware reset.
+        double rawYaw = imu.getRobotYawPitchRollAngles().getYaw(AngleUnit.DEGREES);
+
+        // 2. Calculate the new reference heading.
+        // This makes the current rawYaw correspond to the newHeading.
+        this.referenceHeading = newHeading - rawYaw;
+    }
+
 }

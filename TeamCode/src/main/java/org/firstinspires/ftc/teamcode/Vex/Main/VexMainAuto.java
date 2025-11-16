@@ -7,7 +7,6 @@ import com.qualcomm.robotcore.util.ElapsedTime;
 import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit;
 import org.firstinspires.ftc.robotcore.external.navigation.DistanceUnit;
 import org.firstinspires.ftc.robotcore.external.navigation.Pose2D;
-import org.firstinspires.ftc.robotcore.external.navigation.Pose3D;
 import org.firstinspires.ftc.teamcode.Vex.Hardware.VexBlackboard;
 import org.firstinspires.ftc.teamcode.Vex.Hardware.DecodeField;
 import org.firstinspires.ftc.teamcode.Vex.Hardware.VexActuators;
@@ -117,14 +116,23 @@ public class VexMainAuto extends LinearOpMode {
         telemetry.addLine("Running Audience Wall Path...");
         telemetry.update();
 
+        boolean isRed = (currentAlliance == DecodeField.Alliance.RED);
+
         // 1. Move forward a little to clear the wall for rotation (e.g., 6 inches)
-        driveTrain.driveRelative(-6, 0, DRIVE_POWER);
+        driveToFarTargetAndShoot();
 
-        // 2. Turn to face the alliance corner
-        turnTowardsCorner();
+        // 6. Drive to GPP
+        double targetX = +1.5 * TILE;
+        double targetY = +0.5 * TILE * (isRed?1:-1);
 
-        // 3. Shoot 3 balls
-        shootCycle(SHOT_COUNT);
+        driveTrain.driveTo(targetX+2, targetY, DRIVE_POWER);    // underdrive by 2 inch
+        driveTrain.turnToHeading((currentAlliance == DecodeField.Alliance.RED) ? 180 : 0, TURN_POWER);
+        actuators.setIntakePower(1);
+        driveTrain.driveTo(targetX, targetY + 2*TILE * (isRed?1:-1), 0.3);
+        actuators.setIntakePower(1);
+
+        // --- Shooting Sequence ---
+        driveToFarTargetAndShoot();
 
         // 4. Turn back to 90 degrees
         driveTrain.turnToHeading(90, TURN_POWER);
@@ -141,54 +149,75 @@ public class VexMainAuto extends LinearOpMode {
         telemetry.addLine("Running Obelisk Wall Path...");
         telemetry.update();
 
-        double targetX = -1 * TILE;
-        double targetY = 0.5 * TILE * ((currentAlliance == DecodeField.Alliance.RED) ? 1 : -1);
-        driveTrain.driveTo(targetX, targetY, DRIVE_POWER);
+        boolean isRed = (currentAlliance == DecodeField.Alliance.RED);
 
-        // 2. Turn to face the alliance corner
-        turnTowardsCorner();
-
-        // 3. Shoot 3 balls
-        shootCycle(SHOT_COUNT);
-
-        // 4. Turn back to 90 degrees
-        driveTrain.turnToHeading(90, TURN_POWER);
-
-        // 5. Drive off the launch line
-//        driveTrain.driveRelative(-TILE, 0, DRIVE_POWER);
+        // --- Shooting Sequence ---
+        driveToNearTargetAndShoot();
 
         // 6. Drive to PPG
-        targetX = -0.5 * TILE;
-        targetY =  0.5 * TILE * ((currentAlliance == DecodeField.Alliance.RED) ? 1 : -1);
-        double YSign = ((currentAlliance == DecodeField.Alliance.RED) ? 1 : -1);
-        driveTrain.driveTo(targetX-2, targetY, DRIVE_POWER);
+        double targetX = -0.5 * TILE;
+        double targetY = +0.5 * TILE * (isRed?1:-1);
+
+        driveTrain.driveTo(targetX-2, targetY, DRIVE_POWER); // underdrive by 2 inch
         driveTrain.turnToHeading((currentAlliance == DecodeField.Alliance.RED) ? 180 : 0, TURN_POWER);
         actuators.setIntakePower(1);
-        driveTrain.driveTo(targetX, targetY + 2*TILE*YSign, 0.3);
+        driveTrain.driveTo(targetX, targetY + 2*TILE * (isRed?1:-1), 0.3);
         actuators.setIntakePower(1);
 
-        targetX = -1 * TILE;
-        targetY = 0.5 * TILE * ((currentAlliance == DecodeField.Alliance.RED) ? 1 : -1);
-        driveTrain.driveTo(targetX, targetY, DRIVE_POWER);
-
-        // 2. Turn to face the alliance corner
-        turnTowardsCorner();
-
-        // 3. Shoot 3 balls
-        shootCycle(SHOT_COUNT);
+        // --- Shooting Sequence ---
+        driveToNearTargetAndShoot();
 
         // 4. Turn back to 90 degrees
         driveTrain.turnToHeading(90, TURN_POWER);
 
-        driveTrain.driveRelative(1.5*TILE, 0, DRIVE_POWER);
+        // Move off launch line
+        driveTrain.driveRelative(1*TILE, 0, DRIVE_POWER);
+    }
+
+    /**
+     * Drives the robot to a predefined shooting position, turns toward the corner,
+     * and executes a shooting cycle. The target coordinates are hardcoded.
+     */
+    private void driveToNearTargetAndShoot() {
+        // 1. Drive to the shooting position
+        boolean isRed = (currentAlliance == DecodeField.Alliance.RED);
+        double targetX = -1.0 * TILE;
+        double targetY = +0.5 * TILE * (isRed ? 1 : -1);
+        driveTrain.driveTo(targetX, targetY, DRIVE_POWER);
+
+        // 2. Turn to face the alliance corner
+        turnTowardsCorner(0);
+
+        // 3. Shoot a predefined number of balls
+        shootCycle(SHOT_COUNT);
+    }
+
+    /**
+     * Drives the robot to a predefined shooting position, turns toward the corner,
+     * and executes a shooting cycle. The target coordinates are hardcoded.
+     */
+    private void driveToFarTargetAndShoot() {
+        // 1. Drive to the shooting position
+        boolean isRed = (currentAlliance == DecodeField.Alliance.RED);
+        double targetX = +3.0 * TILE - 9 - 6; // 6 inches from start position to clear wall
+        double targetY = +0.5 * TILE * (isRed ? 1 : -1);
+        driveTrain.driveTo(targetX, targetY, DRIVE_POWER);
+
+        // 2. Turn to face the alliance corner
+        turnTowardsCorner(0);
+
+        // 3. Shoot a predefined number of balls
+        shootCycle(SHOT_COUNT);
     }
 
     /**
      * Turns the robot to face the correct alliance corner.
+     * @param earlyStopByDegrees The number of degrees to reduce the turn by to account for momentum.
      */
-    private void turnTowardsCorner() {
+    private void turnTowardsCorner(double earlyStopByDegrees) {
         double deltaAngle = DecodeField.getTurnAngleToAllianceCorner(currentAlliance, driveTrain.getPose2D());
-        double targetAngle = driveTrain.getHeading() + deltaAngle;
+        double adjustment = Math.copySign(earlyStopByDegrees, deltaAngle);
+        double targetAngle = driveTrain.getHeading() + deltaAngle - adjustment;
         driveTrain.turnToHeading(targetAngle, TURN_POWER);
     }
 
