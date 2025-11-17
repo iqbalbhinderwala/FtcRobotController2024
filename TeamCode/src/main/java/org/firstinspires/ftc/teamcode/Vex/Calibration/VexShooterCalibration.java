@@ -86,8 +86,12 @@ public class VexShooterCalibration extends LinearOpMode {
                 shooterTargetRPM = Range.clip(shooterTargetRPM - SHOOTER_INCREMENT, 0, VexActuators.SHOOTER_RPM_MAX);
             }
 
-            // --- Manual Shooter (X Button) ---
+            // --- Activate Shooter (X/Y Button) ---
             if (gamepad1.x) {
+                actuators.setShooterRPM(shooterTargetRPM);
+            } else if (gamepad1.y) {
+                double dist_INCH = DecodeField.getDistanceToAllianceCorner(DecodeField.Alliance.RED, driveTrain.getPose2D());
+                shooterTargetRPM = actuators.predictShooterRPMFromDistance(dist_INCH);
                 actuators.setShooterRPM(shooterTargetRPM);
             } else {
                 actuators.setShooterRPM(0);
@@ -98,7 +102,8 @@ public class VexShooterCalibration extends LinearOpMode {
             Pose2D pose = driveTrain.getPose2D();
 
             telemetry.addData("--- Actuators ---", "");
-            telemetry.addData(">", "X: Manual-Shoot");
+            telemetry.addData(">", "X: Manual-RPM (DPAD up/down)");
+            telemetry.addData(">", "Y: Auto-RPM (VISION)");
             telemetry.addData("Voltage", "%.2f", actuators.getVoltage());
             telemetry.addData("Shooter Target RPM", "%.2f", shooterTargetRPM);
             telemetry.addData("Shooter Actual RPM", "%.2f", actuators.getShooterRPM());

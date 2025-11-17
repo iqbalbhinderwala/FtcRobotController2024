@@ -200,6 +200,31 @@ public class VexActuators {
     }
 
     /**
+     * Predicts the target shooter RPM based on the distance from the target.
+     * The formula provided is y = -11.636x^3 + 180.9x^2 - 814x + 2556.9,
+     * where 'x' is in tile units (1 tile = 24 inches) and 'y' is RPM.
+     *
+     * @param distanceInInches The distance from the target in inches.
+     * @return The calculated target RPM for the shooter.
+     */
+    public double predictShooterRPMFromDistance(double distanceInInches) {
+        // Convert the distance from inches to tile units, as required by the formula.
+        double x = distanceInInches / 24.0;
+
+        // Because of the cubic fit, do not extrapolate outside the valid range.
+        x = Range.clip(x, 2.9, 7); // tiles
+
+        // Apply the polynomial formula to calculate the target RPM.
+        double rpm = -11.636 * Math.pow(x, 3)
+                + 180.9 * Math.pow(x, 2)
+                - 814 * x
+                + 2556.9;
+
+        // It's good practice to ensure the returned value is within a sensible range.
+        return Range.clip(rpm, 0, SHOOTER_RPM_MAX);
+    }
+
+    /**
      * Calculates the shooter power based on the distance to the alliance corner.
      * The formula is power(x in) = (4.48 / 24 * x + 55.055) / 100.
      * @return The calculated shooter power, a value between 0.0 and 1.0.
