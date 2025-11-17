@@ -1,7 +1,5 @@
 package org.firstinspires.ftc.teamcode.Vex.Calibration;
 
-import android.util.Log;
-
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 import com.qualcomm.robotcore.util.ElapsedTime;
@@ -104,10 +102,12 @@ public class VexShooterCalibration extends LinearOpMode {
             telemetry.addData("Voltage", "%.2f", actuators.getVoltage());
             telemetry.addData("Shooter Target RPM", "%.2f", shooterTargetRPM);
             telemetry.addData("Shooter Actual RPM", "%.2f", actuators.getShooterRPM());
-            telemetry.addData("Shooter Target Power", "%.2f", actuators.getShooterTargetPower());
+            telemetry.addData("Shooter Power", "%.2f", actuators.getShooterPower());
             telemetry.addData("Shooter Ready", actuators.isShooterAtTargetRPM());
+            telemetry.addData("Coordinates", "(%.2f, %.2f) inch", pose.getX(DistanceUnit.INCH), pose.getY(DistanceUnit.INCH));
             telemetry.addData("Tile Coordinates", "(%.2f, %.2f) TILES", pose.getX(DistanceUnit.INCH)/TILE, pose.getY(DistanceUnit.INCH)/TILE);
-            telemetry.addData("Distance to Corner", "%.2f TILES", DecodeField.getDistanceToAllianceCorner(DecodeField.Alliance.RED, pose) * TILE);
+            telemetry.addData("Distance to Corner", "%.2f inch", DecodeField.getDistanceToAllianceCorner(DecodeField.Alliance.RED, pose));
+            telemetry.addData("Distance to Corner", "%.2f TILES", DecodeField.getDistanceToAllianceCorner(DecodeField.Alliance.RED, pose)/TILE);
             telemetry.update();
         }
 

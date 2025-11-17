@@ -1,5 +1,7 @@
 package org.firstinspires.ftc.teamcode.Vex.Hardware;
 
+import android.util.Log;
+
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.hardware.DcMotor;
 import com.qualcomm.robotcore.hardware.DcMotorEx;
@@ -21,9 +23,8 @@ public class VexActuators {
     private VoltageSensor voltageSensor = null;
 
     private double shooterTargetRPM = 0.0;
-    private double shooterTargetPower = 0.0;
-    private ElapsedTime shooterTimer = new ElapsedTime();
-
+    private double shooterPower = 0.0;
+    private ElapsedTime shooterSpinupTimer = new ElapsedTime();
 
 
     public VexActuators(LinearOpMode opMode) {
@@ -49,7 +50,7 @@ public class VexActuators {
 
         voltageSensor = hardwareMap.voltageSensor.iterator().next();
 
-        shooterTimer = new ElapsedTime();
+        shooterSpinupTimer = new ElapsedTime();
     }
 
     public void setIntakePower(double power) {
@@ -57,9 +58,18 @@ public class VexActuators {
     }
 
     public void setShooterPower(double power) {
-        shooterTargetPower = power;
+        // Reset shooter timer on shooter starting up
+        if (shooterPower == 0 && power != 0) {
+            shooterSpinupTimer.reset();
+        }
+        power = Range.clip(power, -1, 1);
+        shooterPower = power;
         topShooterMotor.setPower(power);
         bottomShooterMotor.setPower(power);
+    }
+
+    public double getShooterPower() {
+        return shooterPower;
     }
 
     public double getShooterTicksPerSecond() {
@@ -68,10 +78,6 @@ public class VexActuators {
 
     public double getShooterRPM() {
         return getShooterTicksPerSecond() / SHOOTER_TICKS_PER_REVOLUTION * 60.0;
-    }
-
-    public double getShooterTargetPower() {
-        return shooterTargetPower;
     }
 
     public double getVoltage() {
@@ -103,22 +109,49 @@ public class VexActuators {
     }
 
     public void setShooterRPM(double targetRPM) {
-        // Reset shooter timer on shooter starting up
-        if (shooterTargetRPM == 0 && targetRPM > 0) {
-            shooterTimer.reset();
+        targetRPM = Range.clip(targetRPM, 0, SHOOTER_RPM_MAX);
+        shooterTargetRPM = targetRPM;
+        double adjustedPower = calculateAdjustedShooterPowerForTargetRPM(targetRPM);
+        setShooterPower(adjustedPower);
+    }
+
+    private double calculateAdjustedShooterPowerForTargetRPM(double targetRPM) {
+        // Power off the motors if the target is zero.
+        if (targetRPM == 0) {
+            Log.d(TAG, "calculateAdjustedShooterPowerForTargetRPM: Target RPM is 0, returning power 0.");
+            return 0;
         }
 
-        shooterTargetRPM = Range.clip(targetRPM, 0, SHOOTER_RPM_MAX);
+        // Get the current average RPM of the shooter motors.
+        double currentRPM = getShooterRPM();
+        // Calculate the difference between the current RPM and the desired target RPM.
+        double error = currentRPM - targetRPM;
 
-        if (shooterTargetRPM == 0) {
-            setShooterPower(0); // stop the motors
-            return;
+        Log.d(TAG, String.format("calculateAdjustedShooterPowerForTargetRPM: Target=%.1f, Current=%.1f, Error=%.1f", targetRPM, currentRPM, error));
+
+        // Check if the absolute error is within an acceptable tolerance.
+        if (Math.abs(error) < SHOOTER_RPM_TOLERANCE) {
+            // If the RPM is close enough to the target, no change is needed.
+            Log.d(TAG, String.format("calculateAdjustedShooterPowerForTargetRPM: RPM is within tolerance. Maintaining current power: %.2f", shooterPower));
+            return shooterPower;
+        } else {
+            // If the error is too large, a correction is needed.
+            // Only apply a power correction periodically to avoid unstable oscillations.
+            if (shooterPower > 0 && shooterSpinupTimer.seconds() > 0.4) {
+                Log.d(TAG, "calculateAdjustedShooterPowerForTargetRPM: RPM outside tolerance. Calculating correction.");
+                // Apply a proportional correction to the current power.
+                // If the shooter is too slow (error is negative), this increases the power.
+                // If the shooter is too fast (error is positive), this decreases the power.
+                double adjustedPower = shooterPower * (1.0 - error / targetRPM);
+                Log.d(TAG, String.format("calculateAdjustedShooterPowerForTargetRPM: Applying correction. Old Power=%.2f, New Power=%.2f", shooterPower, adjustedPower));
+                return adjustedPower;
+            }
+            // If the timer hasn't elapsed, predict the initial power.
+            // This branch is often hit when the motors are first spinning up.
+            double predictedPower = predictShooterPowerForTargetRPM(targetRPM);
+            Log.d(TAG, String.format("calculateAdjustedShooterPowerForTargetRPM: Spin-up phase. Returning predicted power: %.2f", predictedPower));
+            return predictedPower;
         }
-
-        double predictedPower = calculateShooterPowerForTargetRPM(shooterTargetRPM);
-        setShooterPower(predictedPower);
-
-        updateShooterPowerForTargetRPM();
     }
 
     /**
@@ -128,34 +161,7 @@ public class VexActuators {
      */
     public boolean isShooterAtTargetRPM() {
         double error = getShooterRPM() - shooterTargetRPM;
-        return Math.abs(error) < 20; // Use a constant for tolerance, e.g., SHOOTER_RPM_TOLERANCE
-    }
-
-    private boolean updateShooterPowerForTargetRPM() {
-        // Get the current average RPM of the shooter motors.
-        double currentRPM = getShooterRPM();
-        // Calculate the difference between the current RPM and the desired target RPM.
-        double error = currentRPM - shooterTargetRPM;
-
-        // Check if the absolute error is within an acceptable tolerance (e.g., 20 RPM).
-        if (Math.abs(error) < 20) {
-            // If the RPM is close enough to the target, return true.
-            return true;
-        } else {
-            // If the error is too large, a correction is needed.
-            // Only apply a power correction every 0.1 seconds to avoid rapid, unstable oscillations.
-            if (shooterTimer.seconds() > 0.1) {
-                // Calculate the feed-forward power based on the target RPM and current voltage.
-                // Apply a proportional correction to the predicted power.
-                // If the shooter is too slow (error is negative), this increases the power.
-                // If the shooter is too fast (error is positive), this decreases the power.
-                double adjustedPower = shooterTargetPower * (1.0 - error / shooterTargetRPM);
-                // Apply the newly calculated power to the motors.
-                setShooterPower(adjustedPower);
-            }
-            // Return false because the shooter is not yet at the target speed.
-            return false;
-        }
+        return Math.abs(error) < SHOOTER_RPM_TOLERANCE;
     }
 
     /**
@@ -166,7 +172,7 @@ public class VexActuators {
      * @param targetRPM The desired rotations per minute for the shooter wheels.
      * @return The calculated motor power, a value between 0.0 and 1.0.
      */
-    private double calculateShooterPowerForTargetRPM(double targetRPM) {
+    private double predictShooterPowerForTargetRPM(double targetRPM) {
         if (targetRPM <= 0) {
             return 0.0;
         }
@@ -182,7 +188,7 @@ public class VexActuators {
 
         // This formula converts the desired RPM into a motor power value.
         // It's based on a linear model (y = mx + b) where:
-        // y = shooterTargetPower
+        // y = shooterPower
         // m = 1 / SHOOTER_12V_RPM_TO_POWER_GAIN
         // x = targetShooterRPM * scaleRPMTo12V
         // b = -SHOOTER_12V_RPM_TO_POWER_OFFSET / SHOOTER_12V_RPM_TO_POWER_GAIN
@@ -250,4 +256,7 @@ public class VexActuators {
     static private final double SHOOTER_12V_RPM_TO_POWER_OFFSET = -85.0;
     static private final double SHOOTER_12V_RPM_TO_POWER_GAIN = 2100.0;
     static public final double SHOOTER_RPM_MAX = 2000;
+    static public final double SHOOTER_RPM_TOLERANCE = 40;
+
+    private static final String TAG = "VEX::Actuators";
 }

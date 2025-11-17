@@ -458,7 +458,7 @@ public class VexOdometryDriveTrain {
     }
 
     // --- Constants copied from VexIMUOmniDriveTrain ---
-    static final double HEADING_THRESHOLD = 2.0 ;   // How close must the heading get to the target before moving to next step.
+    static final double HEADING_THRESHOLD = 3.0 ;   // How close must the heading get to the target before moving to next step.
     static final double MIN_TURN_SPEED = 0.15;
     static final double TURN_GAIN = 1.0 / 50.0 ;    // Turn Control "Gain". Start reducing power at 15 degrees.
 
