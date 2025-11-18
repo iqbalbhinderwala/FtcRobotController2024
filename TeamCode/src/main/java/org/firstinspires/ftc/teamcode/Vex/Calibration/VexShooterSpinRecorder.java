@@ -73,7 +73,7 @@ public class VexShooterSpinRecorder extends LinearOpMode {
         double initialVoltage = actuators.getVoltage();
 
         // Iterate through power levels from 0.0 to 1.0
-        for (double power = 0.0; power <= 1.0; power += 0.05) {
+        for (double power = 0.3; power <= 1.0; power += 0.05) {
             if (!opModeIsActive()) break; // Exit loop if OpMode is stopped
 
             // Set the shooter power
@@ -84,7 +84,7 @@ public class VexShooterSpinRecorder extends LinearOpMode {
             telemetry.update();
 
             // Wait for the motors to stabilize at the new power level
-            sleep(1300);
+            sleep(3000);
 
             // Record the measurements
             double currentVoltage = actuators.getVoltage();

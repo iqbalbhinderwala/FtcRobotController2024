@@ -142,7 +142,7 @@ public class VexActuators {
                 // Apply a proportional correction to the current power.
                 // If the shooter is too slow (error is negative), this increases the power.
                 // If the shooter is too fast (error is positive), this decreases the power.
-                double adjustedPower = shooterPower * (1.0 - error / targetRPM);
+                double adjustedPower = shooterPower * (1.0 - error / targetRPM * 0.25);
                 Log.d(TAG, String.format("calculateAdjustedShooterPowerForTargetRPM: Applying correction. Old Power=%.2f, New Power=%.2f", shooterPower, adjustedPower));
                 return adjustedPower;
             }
@@ -165,39 +165,110 @@ public class VexActuators {
     }
 
     /**
-     * Calculates the shooter power based on the target RPM with voltage compensation.
-     * This method is an alternative to using DcMotorEx.setVelocity() when you want to manage the power calculation manually.
-     * It uses a linear model derived from experimental data to map RPM to power.
+     * Predicts the motor power needed to achieve a target RPM, with voltage compensation.
+     * This function is based on the quadratic model:
+     *   y = 0.1877x^2 + 3.9794x + 1.6133
+     * where:
+     *   y = Power * Voltage
+     *   x = RPM / 1000
      *
-     * @param targetRPM The desired rotations per minute for the shooter wheels.
-     * @return The calculated motor power, a value between 0.0 and 1.0.
+     * @param targetRPM The desired rotations per minute for the shooter.
+     * @return The calculated motor power (from 0.0 to 1.0) required to reach the target RPM.
      */
-    private double predictShooterPowerForTargetRPM(double targetRPM) {
+    public double predictShooterPowerForTargetRPM(double targetRPM) {
+        // If the target RPM is zero or less, the power should be zero.
         if (targetRPM <= 0) {
             return 0.0;
         }
 
-        // Get the current battery voltage.
-        double voltage = getVoltage();
+        // Get the current battery voltage to compensate for power level changes.
+        double currentVoltage = getVoltage();
 
-        // This scale factor is used to compensate for battery voltage drops.
-        // It increases the target power when the voltage is below 12V
-        // and decreases it when the voltage is above 12V.
-        double scaleRPMFor12V = 1 + (12.0 - voltage) / 12.0; // same as: 2 - V/12
-//        double scaleRPMFor12V = 12.0 / voltage; // simpler, slightly more aggressive
+        // If voltage is very low, return 0 to prevent division by zero or invalid values.
+        if (currentVoltage < 5.0) { // A reasonable minimum voltage threshold.
+            return 0.0;
+        }
 
-        // This formula converts the desired RPM into a motor power value.
-        // It's based on a linear model (y = mx + b) where:
-        // y = shooterPower
-        // m = 1 / SHOOTER_12V_RPM_TO_POWER_GAIN
-        // x = targetShooterRPM * scaleRPMTo12V
-        // b = -SHOOTER_12V_RPM_TO_POWER_OFFSET / SHOOTER_12V_RPM_TO_POWER_GAIN
-        // The result is a power value that should achieve the target RPM at the current voltage.
-        double calculatedPower = (scaleRPMFor12V * targetRPM - SHOOTER_12V_RPM_TO_POWER_OFFSET) / SHOOTER_12V_RPM_TO_POWER_GAIN;
+        // Calculate 'x' as defined by the formula (RPM / 1000).
+        double x = targetRPM / 1000.0;
 
-        // Clamp the power to the valid range [0.0, 1.0] for the motor.
+        // Calculate 'y' (the Power * Voltage product) using the provided quadratic model.
+        double powerVoltageProduct = (0.1877 * x * x) + (3.9794 * x) + 1.6133;
+
+        // Solve for the final power by dividing the result by the current voltage.
+        double calculatedPower = powerVoltageProduct / currentVoltage;
+
+        // Clamp the result to the valid motor power range [0.0, 1.0].
         return Range.clip(calculatedPower, 0.0, 1.0);
     }
+
+
+//    /**
+//     * Predicts the motor power needed to achieve a target RPM, with voltage compensation.
+//     * This function is based on the linear model:
+//     *   RPM = 223.64 * (voltage * power) - 302.06
+//     *
+//     * By rearranging for power, we get:
+//     *   power = (RPM + 302.06) / (223.64 * voltage)
+//     *
+//     * @param targetRPM The desired rotations per minute for the shooter.
+//     * @return The calculated motor power (from 0.0 to 1.0) required to reach the target RPM.
+//     */
+//    public double predictShooterPowerForTargetRPM(double targetRPM) {
+//        // If the target RPM is zero or less, the power should be zero.
+//        if (targetRPM <= 0) {
+//            return 0.0;
+//        }
+//
+//        // Get the current battery voltage to compensate for power level changes.
+//        double currentVoltage = getVoltage();
+//
+//        // If for some reason voltage is very low, prevent division by zero or invalid values.
+//        if (currentVoltage < 5.0) { // A reasonable minimum voltage threshold.
+//            return 0.0;
+//        }
+//
+//        // Calculate the required power using the rearranged formula.
+//        double calculatedPower = (targetRPM + 302.06) / (223.64 * currentVoltage);
+//
+//        // Clamp the result to the valid motor power range [0.0, 1.0].
+//        return Range.clip(calculatedPower, 0.0, 1.0);
+//    }
+
+//    /**
+//     * Calculates the shooter power based on the target RPM with voltage compensation.
+//     * This method is an alternative to using DcMotorEx.setVelocity() when you want to manage the power calculation manually.
+//     * It uses a linear model derived from experimental data to map RPM to power.
+//     *
+//     * @param targetRPM The desired rotations per minute for the shooter wheels.
+//     * @return The calculated motor power, a value between 0.0 and 1.0.
+//     */
+//    private double predictShooterPowerForTargetRPM(double targetRPM) {
+//        if (targetRPM <= 0) {
+//            return 0.0;
+//        }
+//
+//        // Get the current battery voltage.
+//        double voltage = getVoltage();
+//
+//        // This scale factor is used to compensate for battery voltage drops.
+//        // It increases the target power when the voltage is below 12V
+//        // and decreases it when the voltage is above 12V.
+//        double scaleRPMFor12V = 1 + (12.0 - voltage) / 12.0; // same as: 2 - V/12
+////        double scaleRPMFor12V = 12.0 / voltage; // simpler, slightly more aggressive
+//
+//        // This formula converts the desired RPM into a motor power value.
+//        // It's based on a linear model (y = mx + b) where:
+//        // y = shooterPower
+//        // m = 1 / SHOOTER_12V_RPM_TO_POWER_GAIN
+//        // x = targetShooterRPM * scaleRPMTo12V
+//        // b = -SHOOTER_12V_RPM_TO_POWER_OFFSET / SHOOTER_12V_RPM_TO_POWER_GAIN
+//        // The result is a power value that should achieve the target RPM at the current voltage.
+//        double calculatedPower = (scaleRPMFor12V * targetRPM - SHOOTER_12V_RPM_TO_POWER_OFFSET) / SHOOTER_12V_RPM_TO_POWER_GAIN;
+//
+//        // Clamp the power to the valid range [0.0, 1.0] for the motor.
+//        return Range.clip(calculatedPower, 0.0, 1.0);
+//    }
 
     /**
      * Predicts the target shooter RPM based on the distance from the target.
