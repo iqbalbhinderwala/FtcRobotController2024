@@ -108,7 +108,7 @@ public class VexShooterCalibration extends LinearOpMode {
             telemetry.addData("Shooter Target RPM", "%.2f", shooterTargetRPM);
             telemetry.addData("Shooter Actual RPM", "%.2f", actuators.getShooterRPM());
             telemetry.addData("Shooter Power", "%.2f", actuators.getShooterPower());
-            telemetry.addData("Shooter Ready", actuators.isShooterAtTargetRPM());
+            telemetry.addData("Shooter Ready", actuators.isShooterAtTargetRPM(shooterTargetRPM));
             telemetry.addData("Coordinates", "(%.2f, %.2f) inch", pose.getX(DistanceUnit.INCH), pose.getY(DistanceUnit.INCH));
             telemetry.addData("Tile Coordinates", "(%.2f, %.2f) TILES", pose.getX(DistanceUnit.INCH)/TILE, pose.getY(DistanceUnit.INCH)/TILE);
             telemetry.addData("Distance to Corner", "%.2f inch", DecodeField.getDistanceToAllianceCorner(DecodeField.Alliance.RED, pose));

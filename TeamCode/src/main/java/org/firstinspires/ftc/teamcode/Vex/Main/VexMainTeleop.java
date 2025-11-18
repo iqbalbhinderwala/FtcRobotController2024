@@ -49,15 +49,9 @@ public class VexMainTeleop extends LinearOpMode {
 
     // OpMode Members
     private ElapsedTime lastPress;
-    double MAX_DRIVE_SPEED  = 0.9;
-    double MAX_STRAFE_SPEED = 0.9;
-    double MAX_TURN_SPEED   = 0.6;
-    private double intakePower = 1.0;
-    private double shooterPower = 0.6;
-    private double shooterPowerAdjustment = 0.0; // Adjustment for shooter power
+    private double shooterRPM = VexActuators.SHOOTER_RPM_LOW;
+    private double shooterRPMAdjustment = 0.0; // Adjustment for shooter RPM
     private double humanDirection;
-    private final double BUTTON_DELAY = 0.25;
-    private final double POWER_INCREMENT = 0.025;
 
     // Alliance information
     private DecodeField.Alliance currentAlliance;
@@ -69,9 +63,6 @@ public class VexMainTeleop extends LinearOpMode {
     private GateCycleState gateCycleState = GateCycleState.READY;
     private ElapsedTime gateCycleTimer; // For timing gate movements
     private ElapsedTime spinUpTimer;    // For timing wheel spin-up
-    private final long GATE_DELAY_MS = 350;
-    private final double SPIN_UP_TIME_S = 1.25;
-    private static final double VISION_POSE_UPDATE_INTERVAL_SECONDS = 1.0; // Seconds
 
     private double targetHeading;
     private ElapsedTime visionUpdateTimer;
@@ -304,7 +295,7 @@ public class VexMainTeleop extends LinearOpMode {
         Log.d(TAG, "calculateAutoAlignTurn: Auto-Aligning to " + currentAlliance.toString() + " Corner");
 
         double headingError = DecodeField.getTurnAngleToAllianceCorner(currentAlliance, driveTrain.getPose2D());
-        if (Math.abs(headingError) < 5) {
+        if (Math.abs(headingError) < TURN_TOLERANCE_DEGREES) {
             return 0.0;
         }
 
@@ -322,16 +313,13 @@ public class VexMainTeleop extends LinearOpMode {
         // Use the D-Pad to fine-tune the shooter power. Reset with D-Pad Left/Right.
         if (gamepad1.dpad_up && lastPress.seconds() > BUTTON_DELAY) {
             lastPress.reset();
-            shooterPowerAdjustment += POWER_INCREMENT;
-            Log.d(TAG, "handleActuators: Increased shooter offset to " + shooterPowerAdjustment);
+            shooterRPMAdjustment += RPM_INCREMENT;
         } else if (gamepad1.dpad_down && lastPress.seconds() > BUTTON_DELAY) {
             lastPress.reset();
-            shooterPowerAdjustment -= POWER_INCREMENT;
-            Log.d(TAG, "handleActuators: Decreased shooter offset to " + shooterPowerAdjustment);
+            shooterRPMAdjustment -= RPM_INCREMENT;
         } else if ((gamepad1.dpad_left || gamepad1.dpad_right) && lastPress.seconds() > BUTTON_DELAY) {
             lastPress.reset();
-            shooterPowerAdjustment = 0.0; // Reset the offset
-            Log.d(TAG, "handleActuators: Reset shooter offset to 0.0");
+            shooterRPMAdjustment = 0.0; // Reset the offset
         }
 
         // Manual controls are disabled during auto-shoot sequence
@@ -341,13 +329,13 @@ public class VexMainTeleop extends LinearOpMode {
 
         // Intake Control
         if (gamepad1.right_bumper || gamepad1.left_bumper) {
-            actuators.setIntakePower(intakePower);
+            actuators.setIntakePower(MAX_INTAKE_POWER);
             if (shootingState != ShootingState.SHOOTING_CYCLE) {
                 actuators.closeGateA();
                 actuators.openGateB();
             }
         } else if (gamepad1.b) {
-            actuators.setIntakePower(-intakePower);
+            actuators.setIntakePower(-MAX_INTAKE_POWER);
         } else {
             actuators.setIntakePower(0);
         }
@@ -361,8 +349,8 @@ public class VexMainTeleop extends LinearOpMode {
 
         ShootingState lastState = shootingState;
 
-        // Keep shooter power based on distance always updated for telemetry
-        updateShooterPowerFromTargetDistance();
+        // Keep shooter RPM target value always updated for telemetry
+        updateShooterTargetRPMFromDistance();
 
         switch (shootingState) {
             case IDLE:
@@ -371,7 +359,7 @@ public class VexMainTeleop extends LinearOpMode {
                     shootingState = ShootingState.SPIN_UP;
                     spinUpTimer.reset(); // Start the spin-up timer
 
-                    actuators.setShooterPower(shooterPower);
+                    actuators.setShooterRPM(shooterRPM);
 
                     actuators.closeGateA(); // Set gates to ready-to-shoot state
                     actuators.openGateB();
@@ -414,13 +402,13 @@ public class VexMainTeleop extends LinearOpMode {
         }
     }
 
-    private void updateShooterPowerFromTargetDistance() {
-        // Automatically determine shooter power based on distance
+    private void updateShooterTargetRPMFromDistance() {
+        // Automatically determine shooter RPM based on distance
         double distanceToCorner = DecodeField.getDistanceToAllianceCorner(currentAlliance, driveTrain.getPose2D());
-        double baseShooterPower = actuators.calculateDistanceBasedShooterPower(distanceToCorner);
+        double predictedShooterRPM = actuators.predictShooterRPMFromDistance(distanceToCorner);
 
-        // Apply the offset and clip the value to a safe range [0, 1]
-        shooterPower = Range.clip(baseShooterPower + shooterPowerAdjustment, 0, 1.0);
+        // Apply the offset and clip the value to a safe range [0, 2000]
+        shooterRPM = Range.clip(predictedShooterRPM + shooterRPMAdjustment, 0, VexActuators.SHOOTER_RPM_MAX);
     }
 
     private void runShootingCycleIteration() {
@@ -476,16 +464,30 @@ public class VexMainTeleop extends LinearOpMode {
         telemetry.addData("Target Heading", "%.2f in", targetHeading);
 
         telemetry.addData("--- Actuators ---", "");
-        telemetry.addData("Shooting State", shootingState.toString());
-        telemetry.addData("Gate Cycle", gateCycleState.toString());
-        telemetry.addData("Intake Power", "%.2f", intakePower);
-        telemetry.addData("Shooter Power", "%.2f", shooterPower);
-        telemetry.addData("** Shooter Adjustment **", "%.3f", shooterPowerAdjustment); // Display the adjustment
-        telemetry.addData("Gate A Pos", "%.2f", actuators.getGateAPosition());
-        telemetry.addData("Gate B Pos", "%.2f", actuators.getGateBPosition());
+//        telemetry.addData("Shooting State", shootingState.toString());
+//        telemetry.addData("Gate Cycle", gateCycleState.toString());
+//        telemetry.addData("Intake Power", "%.2f", MAX_INTAKE_POWER);
+        telemetry.addData("Shooter Target RPM", "%.1f", shooterRPM);
+        telemetry.addData("** Shooter RPM Adjustment **", "%.1f", shooterRPMAdjustment); // Display the adjustment
+//        telemetry.addData("Gate A Pos", "%.2f", actuators.getGateAPosition());
+//        telemetry.addData("Gate B Pos", "%.2f", actuators.getGateBPosition());
 
         vision.addTelemetry();
 
         telemetry.update();
     }
+
+    private final double BUTTON_DELAY = 0.25;
+
+    final double MAX_DRIVE_SPEED  = 1.0;
+    final double MAX_STRAFE_SPEED = 1.0;
+    final double MAX_TURN_SPEED   = 0.6;
+    final double TURN_TOLERANCE_DEGREES = 5.0;
+
+    final double MAX_INTAKE_POWER = 1.0;
+    private final double RPM_INCREMENT = VexActuators.SHOOTER_RPM_INCREMENT; // 40
+    private final double SPIN_UP_TIME_S = 1.25;
+    private final long GATE_DELAY_MS = 350;
+
+    private static final double VISION_POSE_UPDATE_INTERVAL_SECONDS = 1.0; // Seconds
 }

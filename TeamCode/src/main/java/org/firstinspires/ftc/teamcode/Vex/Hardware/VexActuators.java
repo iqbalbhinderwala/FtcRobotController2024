@@ -22,7 +22,6 @@ public class VexActuators {
     private Servo secondGateServo = null;
     private VoltageSensor voltageSensor = null;
 
-    private double shooterTargetRPM = 0.0;
     private double shooterPower = 0.0;
     private ElapsedTime shooterSpinupTimer = new ElapsedTime();
 
@@ -110,7 +109,6 @@ public class VexActuators {
 
     public void setShooterRPM(double targetRPM) {
         targetRPM = Range.clip(targetRPM, 0, SHOOTER_RPM_MAX);
-        shooterTargetRPM = targetRPM;
         double adjustedPower = calculateAdjustedShooterPowerForTargetRPM(targetRPM);
         setShooterPower(adjustedPower);
     }
@@ -159,8 +157,8 @@ public class VexActuators {
      * This method has NO side effects; it only returns a boolean state.
      * @return true if the shooter is at its target speed, false otherwise.
      */
-    public boolean isShooterAtTargetRPM() {
-        double error = getShooterRPM() - shooterTargetRPM;
+    public boolean isShooterAtTargetRPM(double targetRPM) {
+        double error = getShooterRPM() - targetRPM;
         return Math.abs(error) < SHOOTER_RPM_TOLERANCE;
     }
 
@@ -341,18 +339,20 @@ public class VexActuators {
         }
     }
 
-    // Constants
+    // Gate Constants
     static public final double GATE_A_OPEN = 0.0;
     static public final double GATE_A_CLOSED = 0.20;
     static public final double GATE_B_OPEN = 0.35;
     static public final double GATE_B_CLOSED = 0.65;
 
-    // Shooter
+    // Shooter Constants
     static private final double SHOOTER_TICKS_PER_REVOLUTION = 28;
-    static private final double SHOOTER_12V_RPM_TO_POWER_OFFSET = -85.0;
-    static private final double SHOOTER_12V_RPM_TO_POWER_GAIN = 2100.0;
+    // static private final double SHOOTER_12V_RPM_TO_POWER_OFFSET = -85.0;
+    // static private final double SHOOTER_12V_RPM_TO_POWER_GAIN = 2100.0;
+    static public final double SHOOTER_RPM_LOW = 1200;
     static public final double SHOOTER_RPM_MAX = 2000;
     static public final double SHOOTER_RPM_TOLERANCE = 40;
+    static public final double SHOOTER_RPM_INCREMENT = 40;
 
     private static final String TAG = "VEX::Actuators";
 }
