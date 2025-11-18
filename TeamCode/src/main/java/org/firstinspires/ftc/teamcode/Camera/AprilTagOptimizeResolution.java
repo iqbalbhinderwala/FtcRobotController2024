@@ -31,6 +31,7 @@ package org.firstinspires.ftc.teamcode.Camera;
 
 import android.util.Size;
 
+import com.qualcomm.robotcore.eventloop.opmode.Disabled;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 
@@ -48,6 +49,7 @@ import java.util.List;
  */
 
 @TeleOp(name = "[Utility] Optimize AprilTag Resolution", group = "Utility")
+@Disabled
 public class AprilTagOptimizeResolution extends LinearOpMode {
 
     private static final boolean USE_WEBCAM = true;  // true for webcam, false for phone camera

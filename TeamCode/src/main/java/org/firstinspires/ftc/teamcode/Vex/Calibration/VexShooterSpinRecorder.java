@@ -1,5 +1,6 @@
 package org.firstinspires.ftc.teamcode.Vex.Calibration;
 
+import com.qualcomm.robotcore.eventloop.opmode.Disabled;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 import com.qualcomm.robotcore.util.ElapsedTime;
@@ -16,7 +17,8 @@ import java.util.Date;
 import java.util.List;
 import java.util.Locale;
 
-@TeleOp(name = "[VEX] Shooter Spin Recorder", group = "VEX")
+@TeleOp(name = "[Vex] Shooter Spin Recorder", group = "VexTest")
+@Disabled
 public class VexShooterSpinRecorder extends LinearOpMode {
 
     // Using a simple data class to hold our measurements
