@@ -230,10 +230,11 @@ public class VexMainAuto extends LinearOpMode {
         telemetry.update();
 
         // 1. Spin up the shooter wheels
-        double shooterPower = actuators.calculateDistanceBasedShooterPower(
-                DecodeField.getDistanceToAllianceCorner(currentAlliance, driveTrain.getPose2D())
-        );
-        actuators.setShooterPower(shooterPower);
+        actuators.setShooterRPM(
+                actuators.predictShooterRPMFromDistance(
+                        DecodeField.getDistanceToAllianceCorner(
+                                currentAlliance, driveTrain.getPose2D())));
+
         actuators.setIntakePower(1.0);
         spinUpTimer.reset();
         while (opModeIsActive() && spinUpTimer.seconds() < SPIN_UP_TIME_S) {
@@ -305,7 +306,6 @@ public class VexMainAuto extends LinearOpMode {
     private static final double SPIN_UP_TIME_S = 1.25;
     private static final long GATE_DELAY_MS = 350;
     private static final int SHOT_COUNT = 4;
-
     private static final double TILE = 24.0; // inches
 }
 
