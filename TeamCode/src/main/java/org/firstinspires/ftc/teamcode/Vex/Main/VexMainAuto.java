@@ -128,7 +128,7 @@ public class VexMainAuto extends LinearOpMode {
         driveTrain.driveTo(targetX+2, targetY, DRIVE_POWER);    // underdrive by 2 inch
         driveTrain.turnToHeading((currentAlliance == DecodeField.Alliance.RED) ? 180 : 0, TURN_POWER);
         actuators.setIntakePower(1);
-        driveTrain.driveTo(targetX, targetY + 2*TILE * (isRed?1:-1), 0.3);
+        driveTrain.driveTo(targetX, targetY + 2.5*TILE * (isRed?1:-1), 0.4);
         actuators.setIntakePower(1);
 
         // --- Shooting Sequence ---
@@ -138,7 +138,7 @@ public class VexMainAuto extends LinearOpMode {
         driveTrain.turnToHeading(90, TURN_POWER);
 
         // 5. Drive off the launch line
-        driveTrain.driveRelative(-0.5*TILE, 0, DRIVE_POWER);
+        driveTrain.driveRelative(-1.25*TILE, 0, 0.4);
     }
 
     /**
@@ -171,7 +171,7 @@ public class VexMainAuto extends LinearOpMode {
         driveTrain.turnToHeading(90, TURN_POWER);
 
         // Move off launch line
-        driveTrain.driveRelative(1*TILE, 0, DRIVE_POWER);
+        driveTrain.driveRelative(1.5*TILE, 0, 0.4);
     }
 
     /**
