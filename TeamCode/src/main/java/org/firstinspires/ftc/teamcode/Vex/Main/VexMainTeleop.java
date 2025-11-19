@@ -135,6 +135,7 @@ public class VexMainTeleop extends LinearOpMode {
     private void opModeInitLoop() {
         if (currentAlliance == DecodeField.Alliance.UNKNOWN) {
             telemetry.addData("ERROR", "Alliance not selected! Please select an alliance in [Vex] GameSetup TeleOp.");
+            return;
         } else {
             telemetry.addData("Alliance", currentAlliance.toString());
         }
@@ -147,7 +148,7 @@ public class VexMainTeleop extends LinearOpMode {
         AprilTagDetection detection = vision.getMostAccurateTarget();
         if (detection != null && detection.robotPose != null) {
             telemetry.addLine("AprilTag found! Pose will be updated from this tag.");
-            vision.addTelemetry();
+//            vision.addTelemetry();
         } else {
             telemetry.addLine("Searching for AprilTag...");
         }
@@ -453,26 +454,37 @@ public class VexMainTeleop extends LinearOpMode {
      */
     private void updateTelemetry() {
         driveTrain.update(); // Update odometry
-        Pose2D currentPose = driveTrain.getPose2D();
+        Pose2D pose = driveTrain.getPose2D();
 
         telemetry.addData("--- Robot ---", "");
         telemetry.addData("Pose", "X: %.2f, Y: %.2f (in), H: %.1f (deg)",
-                currentPose.getX(DistanceUnit.INCH),
-                currentPose.getY(DistanceUnit.INCH),
-                currentPose.getHeading(AngleUnit.DEGREES));
-        telemetry.addData("Dist to Corner", "%.2f in", DecodeField.getDistanceToAllianceCorner(currentAlliance, currentPose));
+                pose.getX(DistanceUnit.INCH),
+                pose.getY(DistanceUnit.INCH),
+                pose.getHeading(AngleUnit.DEGREES));
+        // telemetry.addData("Dist to Corner", "%.2f in", DecodeField.getDistanceToAllianceCorner(currentAlliance, pose));
         telemetry.addData("Target Heading", "%.2f in", targetHeading);
+//        telemetry.addData("Coordinates", "(%.2f, %.2f) inch", pose.getX(DistanceUnit.INCH), pose.getY(DistanceUnit.INCH));
+        // telemetry.addData("Tile Coordinates", "(%.2f, %.2f) TILES", pose.getX(DistanceUnit.INCH)/TILE, pose.getY(DistanceUnit.INCH)/TILE);
+//        telemetry.addData("Distance to Corner", "%.2f inch", DecodeField.getDistanceToAllianceCorner(DecodeField.Alliance.RED, pose));
+        telemetry.addData("Distance to Corner", "%.2f TILES", DecodeField.getDistanceToAllianceCorner(DecodeField.Alliance.RED, pose)/TILE);
 
         telemetry.addData("--- Actuators ---", "");
 //        telemetry.addData("Shooting State", shootingState.toString());
 //        telemetry.addData("Gate Cycle", gateCycleState.toString());
 //        telemetry.addData("Intake Power", "%.2f", MAX_INTAKE_POWER);
-        telemetry.addData("Shooter Target RPM", "%.1f", shooterRPM);
-        telemetry.addData("** Shooter RPM Adjustment **", "%.1f", shooterRPMAdjustment); // Display the adjustment
+//        telemetry.addData("Shooter Target RPM", "%.1f", shooterRPM);
+        telemetry.addData("** Shooter RPM Adjustment **", "%.1f (%.0fx)", shooterRPMAdjustment, shooterRPMAdjustment/RPM_INCREMENT); // Display the adjustment
 //        telemetry.addData("Gate A Pos", "%.2f", actuators.getGateAPosition());
 //        telemetry.addData("Gate B Pos", "%.2f", actuators.getGateBPosition());
 
-        vision.addTelemetry();
+        telemetry.addData("Voltage", "%.2f", actuators.getVoltage());
+        telemetry.addData("Shooter Target RPM", "%.1f", shooterRPM);
+        telemetry.addData("Shooter Actual RPM", "%.2f", actuators.getShooterRPM());
+        telemetry.addData("Shooter Power", "%.2f", actuators.getShooterPower());
+        telemetry.addData("Shooter Ready", actuators.isShooterAtTargetRPM(shooterRPM));
+
+//        vision.addTelemetry();
+
 
         telemetry.update();
     }
@@ -490,4 +502,6 @@ public class VexMainTeleop extends LinearOpMode {
     private final long GATE_DELAY_MS = 350;
 
     private static final double VISION_POSE_UPDATE_INTERVAL_SECONDS = 1.0; // Seconds
+
+    final double TILE = 24; // inches
 }
