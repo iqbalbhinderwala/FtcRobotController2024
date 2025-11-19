@@ -209,14 +209,10 @@ public class VexOdometryDriveTrain {
      * @return The turn power, from -1.0 to 1.0.
      */
     public double calculateTurnPower(double targetHeading, double currentHeading) {
-        double headingError = targetHeading - currentHeading;
-
-        // Normalize the error to be within +/- 180 degrees for the shortest turn.
-        while (headingError > 180)  headingError -= 360;
-        while (headingError <= -180) headingError += 360;
+        // Use helper to get the shortest path error
+        double headingError = getHeadingError(targetHeading, currentHeading);
 
         // Calculate the turning power using a proportional gain.
-        // The Range.clip function limits the power to the range [-1, 1].
         double turnPower = Range.clip(headingError * TURN_GAIN, -1, 1);
 
         // Log the intermediate values for debugging
@@ -233,15 +229,14 @@ public class VexOdometryDriveTrain {
         return finalTurnPower;
     }
 
-
     /**
      * Turns the robot in place to a target heading.
      * @param targetHeading The desired heading in degrees.
      * @param maxPower The maximum power to use for the turn, from 0.0 to 1.0.
      */
     public void turnToHeading(double targetHeading, double maxPower) {
-        // Calculate the initial heading error.
-        double headingError = targetHeading - headingProvider.getHeading();
+        // Calculate the initial error
+        double headingError = getHeadingError(targetHeading, headingProvider.getHeading());
 
         // Loop until the robot is within the heading threshold and the opmode is active.
         while (opMode.opModeIsActive() && Math.abs(headingError) > HEADING_THRESHOLD) {
@@ -256,12 +251,29 @@ public class VexOdometryDriveTrain {
             // Update odometry to keep track of the robot's position.
             updateOdometry();
 
-            // Recalculate the heading error for the next loop iteration.
-            headingError = targetHeading - headingProvider.getHeading();
+            // Recalculate error for the next loop check
+            headingError = getHeadingError(targetHeading, headingProvider.getHeading());
         }
 
         // Stop all motion once the robot has reached the target heading.
         stopMotors();
+    }
+
+    /**
+     * Calculates the normalized error between a target and current heading.
+     * Returns the shortest path error in degrees (+/- 180).
+     */
+    private double getHeadingError(double targetHeading, double currentHeading) {
+        return normalizeAngle(targetHeading - currentHeading);
+    }
+
+    /**
+     * Normalizes an angle to be within the range (-180, 180].
+     */
+    private double normalizeAngle(double angle) {
+        while (angle > 180) angle -= 360;
+        while (angle <= -180) angle += 360;
+        return angle;
     }
 
     public boolean driveTo(double targetX, double targetY, double maxPower) {
