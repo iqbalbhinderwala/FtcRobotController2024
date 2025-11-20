@@ -66,6 +66,7 @@ public class VexMainTeleop extends LinearOpMode {
 
     private double targetHeading;
     private ElapsedTime visionUpdateTimer;
+    private boolean acceptVisionHeadingOverIMU = false;
 
     @Override
     public void runOpMode() throws InterruptedException {
@@ -143,18 +144,18 @@ public class VexMainTeleop extends LinearOpMode {
         blackboardHelper.addBlackboardTelemetry();
 
         telemetry.addData("--- Status ---", "Initialization Complete.");
-        telemetry.addData(">", "Searching for AprilTag... Press PLAY to start without one.");
+//         telemetry.addData(">", "Searching for AprilTag... Press PLAY to start without one.");
 
-        AprilTagDetection detection = vision.getMostAccurateTarget();
-        if (detection != null && detection.robotPose != null) {
-            telemetry.addLine("AprilTag found! Pose will be updated from this tag.");
-//            vision.addTelemetry();
-        } else {
-            telemetry.addLine("Searching for AprilTag...");
-        }
+//         AprilTagDetection detection = vision.getMostAccurateTarget();
+//         if (detection != null && detection.robotPose != null) {
+//             telemetry.addLine("AprilTag found! Pose will be updated from this tag.");
+// //            vision.addTelemetry();
+//         } else {
+//             telemetry.addLine("Searching for AprilTag...");
+//         }
 
-        telemetry.update();
-        sleep(50); // Small sleep to prevent busy-looping
+//         telemetry.update();
+//         sleep(50); // Small sleep to prevent busy-looping
     }
 
     /**
@@ -167,6 +168,8 @@ public class VexMainTeleop extends LinearOpMode {
         gateCycleTimer.reset();
         spinUpTimer.reset();
         visionUpdateTimer.reset();
+
+        acceptVisionHeadingOverIMU = false;
 
         // Try to initialize pose from the blackboard first
         Pose2D storedPose = blackboardHelper.getPose();
@@ -187,6 +190,7 @@ public class VexMainTeleop extends LinearOpMode {
                 AprilTagDetection detection = vision.getMostAccurateTarget();
                 if (detection != null && detection.robotPose != null) {
                     Pose3D robotPose = detection.robotPose;
+                    acceptVisionHeadingOverIMU = true; // Allow taking heading updates from vision
                     driveTrain.resetPose(robotPose.getPosition().x, robotPose.getPosition().y, robotPose.getOrientation().getYaw(AngleUnit.DEGREES));
                     Log.d(TAG, "opModeStart: Pose initialized from AprilTag: " + robotPose);
                     telemetry.addLine("Pose initialized from AprilTag.");
@@ -211,11 +215,24 @@ public class VexMainTeleop extends LinearOpMode {
     private void opModeLoop() {
         // --- VISION POSE CORRECTION ---
         AprilTagDetection newDetection = vision.getMostAccurateTarget();
+        
         if (newDetection != null && newDetection.robotPose != null) {
             Pose3D robotPose = newDetection.robotPose;
 
+            // 1. GET HEADINGS
+            double visionHeading = robotPose.getOrientation().getYaw(AngleUnit.DEGREES);
+            double currentHeading = driveTrain.getHeading();
+
+            // 2. CALCULATE NORMALIZED ERROR (Smallest angle between the two)
+            double headingError = driveTrain.normalizeAngle(visionHeading - currentHeading);
+
+            // 3. DETERMINE IF IMU JUMPED (Hard Threshold)            
+            if (Math.abs(headingError) > IMU_ANOMALY_THRESHOLD_DEG && newDetection.decisionMargin > 70) {
+                acceptVisionHeadingOverIMU = true; // If error > 12.5 deg, assume IMU jumped
+            }
+
             // - UPDATE HEADING ONCE PER SECOND: Only update the robot's orientation if 1 second has passed.
-            if (visionUpdateTimer.seconds() > VISION_POSE_UPDATE_INTERVAL_SECONDS) {
+            if (acceptVisionHeadingOverIMU && visionUpdateTimer.seconds() > VISION_POSE_UPDATE_INTERVAL_SECONDS) {
                 visionUpdateTimer.reset(); // Reset the timer after the update
                 driveTrain.updatePose(robotPose.getPosition().x, robotPose.getPosition().y, robotPose.getOrientation().getYaw(AngleUnit.DEGREES));
                 Log.d(TAG, "opModeLoop: Pose updated from vision: " + robotPose);
@@ -238,6 +255,68 @@ public class VexMainTeleop extends LinearOpMode {
         // --- TELEMETRY ---
         updateTelemetry();
     }
+
+    
+//    private void opModeLoop() {
+//        // --- VISION POSE CORRECTION ---
+//        AprilTagDetection newDetection = vision.getMostAccurateTarget();
+//
+//        if (newDetection != null && newDetection.robotPose != null) {
+//            Pose3D robotPose = newDetection.robotPose;
+//
+//            // 1. GET HEADINGS
+//            double visionHeading = robotPose.getOrientation().getYaw(AngleUnit.DEGREES);
+//            double currentHeading = driveTrain.getHeading();
+//
+//            // 2. CALCULATE NORMALIZED ERROR (Smallest angle between the two)
+//            double headingError = visionHeading - currentHeading;
+//            while (headingError > 180)  headingError -= 360;
+//            while (headingError <= -180) headingError += 360;
+//
+//            // 3. DETERMINE CORRECTION STRENGTH (Adaptive Filter)
+//            // If the error is huge (IMU jumped/glitched), snap instantly (Alpha 1.0).
+//            // If the error is small (normal drift), smooth it out (Alpha 0.1).
+//            double effectiveAlpha = (Math.abs(headingError) > IMU_ANOMALY_THRESHOLD_DEG)
+//                    ? 1.0
+//                    : VISION_HEADING_FILTER_ALPHA;
+//
+//            // 4. CALCULATE NEW HEADING
+//            double fusedHeading = currentHeading + (headingError * effectiveAlpha);
+//
+//            // 5. APPLY UPDATES
+//            // We update heading EVERY LOOP to catch IMU jumps immediately.
+//            // We only update X/Y Position once per second to prevent teleporting/jittering the drive vector.
+//            if (visionUpdateTimer.seconds() > VISION_POSE_UPDATE_INTERVAL_SECONDS) {
+//                visionUpdateTimer.reset();
+//                // Update Position AND Heading
+//                driveTrain.updatePose(robotPose.getPosition().x, robotPose.getPosition().y, fusedHeading);
+//                telemetry.addLine("!!! POSE SYNCED (XYZ) !!!");
+//            } else {
+//                // Update Heading ONLY (Keep X/Y from odometry/IMU for smoothness)
+//                // Note: You need to ensure your driveTrain.updatePose can handle this,
+//                // or use a method that just updates the gyro offset if available.
+//                // Assuming updatePose handles overrides:
+//                Pose2D currentPose = driveTrain.getPose2D(); // Get current X/Y estimate
+//                driveTrain.updatePose(currentPose.getX(DistanceUnit.INCH), currentPose.getY(DistanceUnit.INCH), fusedHeading);
+//            }
+//
+//            // Debugging logs
+//            if (effectiveAlpha == 1.0) {
+//                Log.d(TAG, "opModeLoop: LARGE HEADING ERROR DETECTED. Snapped to Vision.");
+//            }
+//        }
+//
+//        // --- DRIVING CONTROLS ---
+//        driveAndMove();
+//
+//        // --- ACTUATOR CONTROLS ---
+//        handleShooting();
+//        handleActuators();
+//
+//        // --- TELEMETRY ---
+//        updateTelemetry();
+//    }
+//
 
     /**
      * Replicates the stop() method of an Iterative OpMode. This code is run once
@@ -483,7 +562,7 @@ public class VexMainTeleop extends LinearOpMode {
         telemetry.addData("Shooter Power", "%.2f", actuators.getShooterPower());
         telemetry.addData("Shooter Ready", actuators.isShooterAtTargetRPM(shooterRPM));
 
-//        vision.addTelemetry();
+       vision.addTelemetry();
 
 
         telemetry.update();
@@ -502,6 +581,8 @@ public class VexMainTeleop extends LinearOpMode {
     private final long GATE_DELAY_MS = 350;
 
     private static final double VISION_POSE_UPDATE_INTERVAL_SECONDS = 1.0; // Seconds
+    //    final double VISION_HEADING_FILTER_ALPHA = 0.1; // 10% correction per loop for small errors
+    final double IMU_ANOMALY_THRESHOLD_DEG = 12.5; // If error > 12.5 deg, assume IMU jumped and snap
 
     final double TILE = 24; // inches
 }
