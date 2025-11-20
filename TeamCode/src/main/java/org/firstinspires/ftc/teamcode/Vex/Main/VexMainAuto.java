@@ -189,7 +189,7 @@ public class VexMainAuto extends LinearOpMode {
         turnTowardsCorner(0);
 
         // 3. Shoot a predefined number of balls
-        shootCycle(SHOT_COUNT);
+        shootCycle_Burst_3();
     }
 
     /**
@@ -207,7 +207,7 @@ public class VexMainAuto extends LinearOpMode {
         turnTowardsCorner(0);
 
         // 3. Shoot a predefined number of balls
-        shootCycle(SHOT_COUNT);
+        shootCycle_Burst_3();
     }
 
     /**
@@ -221,11 +221,128 @@ public class VexMainAuto extends LinearOpMode {
         driveTrain.turnToHeading(targetAngle, TURN_POWER);
     }
 
+    private void shootCycle_Burst_3() {
+        telemetry.addLine("Starting continuous burst cycle...");
+        telemetry.update();
+
+        // Calculate distance to determine logic
+        double dist = DecodeField.getDistanceToAllianceCorner(currentAlliance, driveTrain.getPose2D());
+        boolean isFar = (dist > 5 * TILE);
+
+        // Set Power Adjustment Factor and enable power adjustment
+        actuators.powerAdjustementFactor = (isFar ? 0.30 : 0.15);
+        actuators.enablePowerAdjustment = true;
+
+        // Set RPM based on distance
+        double targetRPM = actuators.predictShooterRPMFromDistance(dist);
+        actuators.setShooterRPM(targetRPM);
+
+        // Turn on intake to pressurize the stack
+        actuators.setIntakePower(1.0);
+
+        // 6. Wait for shooter RPM to be reached
+        spinUpTimer.reset();
+        while (opModeIsActive() && spinUpTimer.seconds() < SPIN_UP_TIME_S)
+        {
+            if (actuators.isShooterAtTargetRPM(targetRPM)) {
+                break;
+            }
+            driveTrain.update(); // IMPORTANT: Keep odometry alive
+            idle();
+        }
+
+        // Open Gate A to release the stream of balls
+        actuators.openGateA();
+
+        // Wait for all 3 balls to shoot
+        sleepWithOdometryUpdate(1500);
+
+        // Turn off
+        actuators.setShooterPower(0);
+        actuators.setIntakePower(0);
+
+        // Reset gates and logic for next run
+        actuators.closeGateA();
+        actuators.enablePowerAdjustment = false;
+    }
+
+    private void shootCycle_Burst_1_plus_2() {
+        telemetry.addLine("Starting shooting cycle...");
+        telemetry.update();
+
+        ElapsedTime timerGateA = new ElapsedTime();
+        ElapsedTime timerGateB = new ElapsedTime();
+
+        // Calculate distance to determine logic
+        double dist = DecodeField.getDistanceToAllianceCorner(currentAlliance, driveTrain.getPose2D());
+        boolean isFar = (dist > 5 * TILE);
+
+        // Close Gate B (isolate the first ball)
+        actuators.closeGateB();
+        timerGateB.reset();
+
+        // Disable power adjustments initially
+        actuators.enablePowerAdjustment = false;
+
+        // Set RPM based on distance
+        double targetRPM = actuators.predictShooterRPMFromDistance(dist);
+        actuators.setShooterRPM(targetRPM);
+
+        // Turn on intake
+        actuators.setIntakePower(1.0);
+
+        // Wait for shooter RPM to be reached
+        spinUpTimer.reset();
+        while (opModeIsActive() && spinUpTimer.seconds() < SPIN_UP_TIME_S)
+        {
+            if (actuators.isShooterAtTargetRPM(targetRPM) && timerGateB.milliseconds() > GATE_DELAY_MS) {
+                break;
+            }
+            driveTrain.update(); // IMPORTANT: Keep odometry alive
+            idle();
+        }
+
+        // Set power adjustment factor and enable power adjustment
+        actuators.powerAdjustementFactor = (isFar ? 0.4 : 0.3);
+        actuators.enablePowerAdjustment = true;
+
+        // Open Gate A for one ball to go
+        actuators.openGateA();
+        timerGateA.reset();
+
+        // WAIT until at target RPM regained or some timeout
+        ElapsedTime recoveryTimer = new ElapsedTime();
+        while (opModeIsActive() && recoveryTimer.milliseconds() < 500) {
+            if (actuators.isShooterAtTargetRPM(targetRPM) && timerGateA.milliseconds() > GATE_DELAY_MS) {
+                break;
+            }
+            driveTrain.update(); // IMPORTANT: Keep odometry alive
+            idle();
+        }
+
+        // Open GATE B
+        actuators.openGateB();
+        timerGateB.reset();
+
+        // Wait some time for 2 more balls to go through
+        sleepWithOdometryUpdate(2000);
+
+        // Turn off
+        actuators.setShooterPower(0);
+        actuators.setIntakePower(0);
+
+        // Reset gates and logic for next run
+        actuators.closeGateA();
+        actuators.openGateB();
+        actuators.enablePowerAdjustment = false;
+    }
+
     /**
      * Executes the shooting sequence: spins up the shooter and cycles the gates.
-     * @param shots The number of balls to shoot.
      */
-    private void shootCycle(int shots) {
+    private void shootCycle() {
+        long shots = SHOT_COUNT;
+
         telemetry.addLine("Starting shooting cycle...");
         telemetry.update();
 
@@ -305,7 +422,7 @@ public class VexMainAuto extends LinearOpMode {
     private static final double TURN_POWER = 0.5;
     private static final double SPIN_UP_TIME_S = 1.25;
     private static final long GATE_DELAY_MS = 350;
-    private static final int SHOT_COUNT = 4;
+    private static final long SHOT_COUNT = 4;
     private static final double TILE = 24.0; // inches
 }
 

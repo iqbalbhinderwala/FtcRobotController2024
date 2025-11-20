@@ -25,6 +25,9 @@ public class VexActuators {
     private double shooterPower = 0.0;
     private ElapsedTime shooterSpinupTimer = new ElapsedTime();
 
+    public boolean enablePowerAdjustment = false;
+    public double powerAdjustementFactor = 0.25;
+
 
     public VexActuators(LinearOpMode opMode) {
         this.opMode = opMode;
@@ -135,12 +138,12 @@ public class VexActuators {
         } else {
             // If the error is too large, a correction is needed.
             // Only apply a power correction periodically to avoid unstable oscillations.
-            if (shooterPower > 0 && shooterSpinupTimer.seconds() > 0.4) {
+            if (shooterPower > 0 && shooterSpinupTimer.seconds() > 1 && enablePowerAdjustment) {
                 Log.d(TAG, "calculateAdjustedShooterPowerForTargetRPM: RPM outside tolerance. Calculating correction.");
                 // Apply a proportional correction to the current power.
                 // If the shooter is too slow (error is negative), this increases the power.
                 // If the shooter is too fast (error is positive), this decreases the power.
-                double adjustedPower = shooterPower * (1.0 - error / targetRPM * 0.25);
+                double adjustedPower = shooterPower * (1.0 - error / targetRPM * powerAdjustementFactor);
                 Log.d(TAG, String.format("calculateAdjustedShooterPowerForTargetRPM: Applying correction. Old Power=%.2f, New Power=%.2f", shooterPower, adjustedPower));
                 return adjustedPower;
             }

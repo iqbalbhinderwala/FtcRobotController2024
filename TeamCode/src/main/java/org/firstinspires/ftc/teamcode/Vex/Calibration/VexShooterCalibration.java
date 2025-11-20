@@ -33,6 +33,7 @@ public class VexShooterCalibration extends LinearOpMode {
 
         actuators.openGateA();
         actuators.openGateB();
+        boolean gateB_is_open = true;
 
         telemetry.addData("Status", "Initialized");
         telemetry.addData(">", "Driver orientation is set to face the +Y-Axis (0 deg).");
@@ -97,6 +98,31 @@ public class VexShooterCalibration extends LinearOpMode {
                 actuators.setShooterRPM(0);
             }
 
+            if (gamepad1.b && lastPress.seconds() > BUTTON_DELAY) {
+                lastPress.reset();
+                if (gateB_is_open) {
+                    actuators.closeGateB();
+                    gateB_is_open = false;
+                } else {
+                    actuators.openGateB();
+                    gateB_is_open = true;
+                }
+            }
+
+            if (gamepad1.a && lastPress.seconds() > BUTTON_DELAY) {
+                lastPress.reset();
+                actuators.enablePowerAdjustment = !actuators.enablePowerAdjustment;
+            }
+
+            if (gamepad1.left_bumper && lastPress.seconds() > BUTTON_DELAY) {
+                lastPress.reset();
+                actuators.powerAdjustementFactor = actuators.powerAdjustementFactor - 0.05;
+            }
+            if (gamepad1.right_bumper && lastPress.seconds() > BUTTON_DELAY) {
+                lastPress.reset();
+                actuators.powerAdjustementFactor = actuators.powerAdjustementFactor + 0.05;
+            }
+
             driveTrain.update();
 
             Pose2D pose = driveTrain.getPose2D();
@@ -104,6 +130,16 @@ public class VexShooterCalibration extends LinearOpMode {
             telemetry.addData("--- Actuators ---", "");
             telemetry.addData(">", "X: Manual-RPM (DPAD up/down)");
             telemetry.addData(">", "Y: Auto-RPM (VISION)");
+            telemetry.addData(">", "B: Toggle GateB");
+            telemetry.addData(">", "A: Toggle Power Adjustment");
+            telemetry.addData(">", "Left/Right Bumper: Adjust Power Adjustment Factor");
+
+            telemetry.addData("--- Control ---", "");
+            telemetry.addData("Power Adjustment State", actuators.enablePowerAdjustment);
+            telemetry.addData("Power Adjustment factor", "%.3f", actuators.powerAdjustementFactor);
+            telemetry.addData("Gate B State", gateB_is_open);
+
+            telemetry.addData("--- Shooter ---", "");
             telemetry.addData("Voltage", "%.2f", actuators.getVoltage());
             telemetry.addData("Shooter Target RPM", "%.2f", shooterTargetRPM);
             telemetry.addData("Shooter Actual RPM", "%.2f", actuators.getShooterRPM());

@@ -270,7 +270,7 @@ public class VexOdometryDriveTrain {
     /**
      * Normalizes an angle to be within the range (-180, 180].
      */
-    private double normalizeAngle(double angle) {
+    public static double normalizeAngle(double angle) {
         while (angle > 180) angle -= 360;
         while (angle <= -180) angle += 360;
         return angle;
