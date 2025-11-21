@@ -119,7 +119,7 @@ public class VexActuators {
     private double calculateAdjustedShooterPowerForTargetRPM(double targetRPM) {
         // Power off the motors if the target is zero.
         if (targetRPM == 0) {
-            Log.d(TAG, "calculateAdjustedShooterPowerForTargetRPM: Target RPM is 0, returning power 0.");
+//            Log.d(TAG, "calculateAdjustedShooterPowerForTargetRPM: Target RPM is 0, returning power 0.");
             return 0;
         }
 
