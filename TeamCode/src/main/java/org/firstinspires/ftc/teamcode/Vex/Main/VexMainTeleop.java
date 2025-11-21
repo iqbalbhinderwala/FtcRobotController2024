@@ -532,6 +532,8 @@ public class VexMainTeleop extends LinearOpMode {
      * Updates and displays all telemetry data on the Driver Station.
      */
     private void updateTelemetry() {
+        telemetry.addData("Heading Updates: ", acceptVisionHeadingOverIMU?"IMU":"VISION");
+
         driveTrain.update(); // Update odometry
         Pose2D pose = driveTrain.getPose2D();
 
