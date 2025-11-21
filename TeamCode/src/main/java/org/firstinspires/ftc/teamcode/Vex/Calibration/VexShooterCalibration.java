@@ -33,6 +33,7 @@ public class VexShooterCalibration extends LinearOpMode {
 
         actuators.openGateA();
         actuators.openGateB();
+        boolean gateA_is_open = true;
         boolean gateB_is_open = true;
 
         telemetry.addData("Status", "Initialized");
@@ -98,6 +99,16 @@ public class VexShooterCalibration extends LinearOpMode {
                 actuators.setShooterRPM(0);
             }
 
+            if (gamepad1.a && lastPress.seconds() > BUTTON_DELAY) {
+                lastPress.reset();
+                if (gateA_is_open) {
+                    actuators.closeGateA();
+                    gateA_is_open = false;
+                } else {
+                    actuators.openGateA();
+                    gateA_is_open = true;
+                }
+            }
             if (gamepad1.b && lastPress.seconds() > BUTTON_DELAY) {
                 lastPress.reset();
                 if (gateB_is_open) {
@@ -109,7 +120,7 @@ public class VexShooterCalibration extends LinearOpMode {
                 }
             }
 
-            if (gamepad1.a && lastPress.seconds() > BUTTON_DELAY) {
+            if (gamepad1.left_stick_button && lastPress.seconds() > BUTTON_DELAY) {
                 lastPress.reset();
                 actuators.enablePowerAdjustment = !actuators.enablePowerAdjustment;
             }
@@ -130,8 +141,8 @@ public class VexShooterCalibration extends LinearOpMode {
             telemetry.addData("--- Actuators ---", "");
             telemetry.addData(">", "X: Manual-RPM (DPAD up/down)");
             telemetry.addData(">", "Y: Auto-RPM (VISION)");
-            telemetry.addData(">", "B: Toggle GateB");
-            telemetry.addData(">", "A: Toggle Power Adjustment");
+            telemetry.addData(">", "A/B: Toggle Gates A/B");
+            telemetry.addData(">", "Left Stick Button: Toggle Power Adjustment");
             telemetry.addData(">", "Left/Right Bumper: Adjust Power Adjustment Factor");
 
             telemetry.addData("--- Control ---", "");
