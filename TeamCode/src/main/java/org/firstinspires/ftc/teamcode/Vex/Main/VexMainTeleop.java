@@ -57,7 +57,7 @@ public class VexMainTeleop extends LinearOpMode {
     private DecodeField.Alliance currentAlliance;
 
     // Shooting state machine
-    private enum ShootingState { IDLE, SPIN_UP, SHOOTING_CYCLE }
+    private enum ShootingState { IDLE, SPIN_UP, SHOOTING_CYCLE, BURST_FIRE }
     private ShootingState shootingState = ShootingState.IDLE;
     private enum GateCycleState { READY, STEP_1_CLOSE_B, STEP_2_OPEN_A, STEP_3_CLOSE_A, STEP_4_OPEN_B }
     private GateCycleState gateCycleState = GateCycleState.READY;
@@ -410,10 +410,6 @@ public class VexMainTeleop extends LinearOpMode {
         // Intake Control
         if (gamepad1.right_bumper || gamepad1.left_bumper) {
             actuators.setIntakePower(MAX_INTAKE_POWER);
-            if (shootingState != ShootingState.SHOOTING_CYCLE) {
-                actuators.closeGateA();
-                actuators.openGateB();
-            }
         } else if (gamepad1.b) {
             actuators.setIntakePower(-MAX_INTAKE_POWER);
         } else {
@@ -432,38 +428,92 @@ public class VexMainTeleop extends LinearOpMode {
         // Keep shooter RPM target value always updated for telemetry
         updateShooterTargetRPMFromDistance();
 
+        // Keep power adjustment factor updated while moving around
+        double dist = DecodeField.getDistanceToAllianceCorner(currentAlliance, driveTrain.getPose2D());
+        boolean isFar = (dist > 5 * TILE);
+
+        actuators.powerAdjustementFactor = (isFar ? POWER_ADJUST_FACTOR_NEAR : POWER_ADJUST_FACTOR_FAR);
+
+        // Alert if not in range
+        if (!DecodeField.isInRangeForShooting(currentAlliance, driveTrain.getPose2D())) {
+            // USE RED LED
+        }
+
         switch (shootingState) {
             case IDLE:
+                actuators.enablePowerAdjustment = false; // Ensure this is off when not shooting
+                actuators.setShooterPower(0);
+                actuators.closeGateA();
+                actuators.openGateB();
+
                 if (anyTrigger) {
                     // Transition to SPIN_UP
                     shootingState = ShootingState.SPIN_UP;
                     spinUpTimer.reset(); // Start the spin-up timer
-
-                    actuators.setShooterRPM(shooterRPM);
-
-                    actuators.closeGateA(); // Set gates to ready-to-shoot state
-                    actuators.openGateB();
                 }
                 break;
+
             case SPIN_UP:
+                // Keep RPM updated
+                actuators.enablePowerAdjustment = false;
+                actuators.setShooterRPM(shooterRPM);
+                actuators.closeGateA();
+                actuators.openGateB();
+
                 if (!anyTrigger) {
                     // Transition back to IDLE
                     shootingState = ShootingState.IDLE;
-                    actuators.setShooterPower(0);
-                    actuators.closeGateA(); // Set gates to ready-for-intake
-                    actuators.openGateB();
-                } else if (bothTriggers && spinUpTimer.seconds() >= SPIN_UP_TIME_S) {
-                    if (!DecodeField.isInRangeForShooting(currentAlliance, driveTrain.getPose2D())) {
-                        gamepad1.rumble(500);
-                    } else {
-                        // Spin-up complete, transition to SHOOTING_CYCLE
-                        shootingState = ShootingState.SHOOTING_CYCLE;
-                        gateCycleState = GateCycleState.STEP_1_CLOSE_B; // Start the cycle
-                        gateCycleTimer.reset(); // Reset timer for the first gate delay
+                } else if (bothTriggers) {
+                    // Check conditions to start firing
+                    boolean rpmReached = actuators.isShooterAtTargetRPM(shooterRPM);
+                    boolean timeOutReached = spinUpTimer.seconds() >= SPIN_UP_TIME_S;
+
+                    // Transition to SHOOTING if RPM ready or Timeout reached
+                    if (rpmReached || timeOutReached) {
+                        boolean USE_BURST_FIRE_INSTEAD_OF_GATES_SHOOTING_CYCLE = true;
+
+                        if (USE_BURST_FIRE_INSTEAD_OF_GATES_SHOOTING_CYCLE) {
+                            // Spin-up complete, transition to BURST_FIRE
+                            shootingState = ShootingState.BURST_FIRE;
+                            actuators.setShooterRPM(shooterRPM);
+                            actuators.openGateA(); // Release the stream!
+                            Log.d(TAG, "handleShooting: Starting BURST_FIRE");
+                        } else {
+                            // Spin-up complete, transition to SHOOTING_CYCLE
+                            shootingState = ShootingState.SHOOTING_CYCLE;
+                            gateCycleState = GateCycleState.STEP_1_CLOSE_B; // Start the cycle
+                            gateCycleTimer.reset(); // Reset timer for the first gate delay
+                            Log.d(TAG, "handleShooting: Starting SHOOTING_CYCLE");
+                        }
                     }
                 }
                 break;
+
+            case BURST_FIRE:
+                // Maintain RPM and Intake pressure
+                actuators.enablePowerAdjustment = true;
+                actuators.setShooterRPM(shooterRPM);
+                actuators.setIntakePower(MAX_INTAKE_POWER);
+
+                // Exit conditions
+                if (!bothTriggers) {
+                    shootingState = ShootingState.SPIN_UP;
+
+                    // Shutdown sequence
+                    actuators.setShooterPower(0);
+                    actuators.setIntakePower(0);
+                    actuators.closeGateA();
+                    actuators.enablePowerAdjustment = false;
+
+                    Log.d(TAG, "handleShooting: BURST_FIRE stopped. Returning to SPIN_UP.");
+                }
+                break;
+
             case SHOOTING_CYCLE:
+                // Maintain RPM and Intake pressure
+                actuators.setShooterRPM(shooterRPM);
+                actuators.setIntakePower(MAX_INTAKE_POWER);
+
                 if (!bothTriggers) {
                     // Released one or both triggers, go back to spinning up.
                     // The spinUpTimer is NOT reset, as the wheels are still spinning.
@@ -579,8 +629,11 @@ public class VexMainTeleop extends LinearOpMode {
 
     final double MAX_INTAKE_POWER = 1.0;
     private final double RPM_INCREMENT = VexActuators.SHOOTER_RPM_INCREMENT; // 40
-    private final double SPIN_UP_TIME_S = 1.25;
+    private final double SPIN_UP_TIME_S = 2;
     private final long GATE_DELAY_MS = 350;
+
+    private final double POWER_ADJUST_FACTOR_NEAR = 0.05;
+    private final double POWER_ADJUST_FACTOR_FAR = 0.05;
 
     private static final double VISION_POSE_UPDATE_INTERVAL_SECONDS = 1.0; // Seconds
     //    final double VISION_HEADING_FILTER_ALPHA = 0.1; // 10% correction per loop for small errors
