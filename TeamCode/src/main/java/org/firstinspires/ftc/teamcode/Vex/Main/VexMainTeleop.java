@@ -226,6 +226,8 @@ public class VexMainTeleop extends LinearOpMode {
             // 2. CALCULATE NORMALIZED ERROR (Smallest angle between the two)
             double headingError = driveTrain.normalizeAngle(visionHeading - currentHeading);
 
+            Log.d(TAG, "opModeLoop: IMU TO VISION HEADING ERROR: " + headingError);
+
             // 3. DETERMINE IF IMU JUMPED (Hard Threshold)            
             if (Math.abs(headingError) > IMU_ANOMALY_THRESHOLD_DEG && newDetection.decisionMargin > 70) {
                 acceptVisionHeadingOverIMU = true; // If error > 12.5 deg, assume IMU jumped
@@ -412,7 +414,7 @@ public class VexMainTeleop extends LinearOpMode {
             actuators.setIntakePower(MAX_INTAKE_POWER);
         } else if (gamepad1.b) {
             actuators.setIntakePower(-MAX_INTAKE_POWER);
-        } else {
+        } else if (shootingState == ShootingState.IDLE) {
             actuators.setIntakePower(0);
         }
     }
@@ -582,7 +584,7 @@ public class VexMainTeleop extends LinearOpMode {
      * Updates and displays all telemetry data on the Driver Station.
      */
     private void updateTelemetry() {
-        telemetry.addData("Heading Updates: ", acceptVisionHeadingOverIMU?"IMU":"VISION");
+        telemetry.addData("Heading Updates: ", acceptVisionHeadingOverIMU?"VISION":"IMU");
 
         driveTrain.update(); // Update odometry
         Pose2D pose = driveTrain.getPose2D();
