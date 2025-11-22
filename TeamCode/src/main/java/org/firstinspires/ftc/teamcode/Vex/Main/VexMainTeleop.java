@@ -427,14 +427,23 @@ public class VexMainTeleop extends LinearOpMode {
 
         ShootingState lastState = shootingState;
 
-        // Keep shooter RPM target value always updated for telemetry
-        updateShooterTargetRPMFromDistance();
-
         // Keep power adjustment factor updated while moving around
         double dist = DecodeField.getDistanceToAllianceCorner(currentAlliance, driveTrain.getPose2D());
         boolean isFar = (dist > 5 * TILE);
 
         actuators.powerAdjustementFactor = (isFar ? POWER_ADJUST_FACTOR_NEAR : POWER_ADJUST_FACTOR_FAR);
+
+        // Keep shooter RPM target value always updated for telemetry
+        // Automatically determine shooter RPM based on distance
+        double distanceToCorner = DecodeField.getDistanceToAllianceCorner(currentAlliance, driveTrain.getPose2D());
+        double predictedShooterRPM = actuators.predictShooterRPMFromDistance(distanceToCorner);
+
+        if (USE_BURST_FIRE_INSTEAD_OF_GATES_SHOOTING_CYCLE) {
+            predictedShooterRPM += (isFar ? 100 : 60);
+        }
+
+        // Apply the offset and clip the value to a safe range [0, 2000]
+        shooterRPM = Range.clip(predictedShooterRPM + shooterRPMAdjustment, 0, VexActuators.SHOOTER_RPM_MAX);
 
         // Alert if not in range
         if (!DecodeField.isInRangeForShooting(currentAlliance, driveTrain.getPose2D())) {
@@ -461,6 +470,7 @@ public class VexMainTeleop extends LinearOpMode {
                 actuators.setShooterRPM(shooterRPM);
                 actuators.closeGateA();
                 actuators.openGateB();
+                actuators.setIntakePower(MAX_INTAKE_POWER);
 
                 if (!anyTrigger) {
                     // Transition back to IDLE
@@ -472,8 +482,6 @@ public class VexMainTeleop extends LinearOpMode {
 
                     // Transition to SHOOTING if RPM ready or Timeout reached
                     if (rpmReached || timeOutReached) {
-                        boolean USE_BURST_FIRE_INSTEAD_OF_GATES_SHOOTING_CYCLE = true;
-
                         if (USE_BURST_FIRE_INSTEAD_OF_GATES_SHOOTING_CYCLE) {
                             // Spin-up complete, transition to BURST_FIRE
                             shootingState = ShootingState.BURST_FIRE;
@@ -532,15 +540,6 @@ public class VexMainTeleop extends LinearOpMode {
         if (lastState != shootingState) {
             Log.d(TAG, "handleShooting: State changed from " + lastState + " to " + shootingState);
         }
-    }
-
-    private void updateShooterTargetRPMFromDistance() {
-        // Automatically determine shooter RPM based on distance
-        double distanceToCorner = DecodeField.getDistanceToAllianceCorner(currentAlliance, driveTrain.getPose2D());
-        double predictedShooterRPM = actuators.predictShooterRPMFromDistance(distanceToCorner);
-
-        // Apply the offset and clip the value to a safe range [0, 2000]
-        shooterRPM = Range.clip(predictedShooterRPM + shooterRPMAdjustment, 0, VexActuators.SHOOTER_RPM_MAX);
     }
 
     private void runShootingCycleIteration() {
@@ -636,6 +635,8 @@ public class VexMainTeleop extends LinearOpMode {
 
     private final double POWER_ADJUST_FACTOR_NEAR = 0.05;
     private final double POWER_ADJUST_FACTOR_FAR = 0.05;
+    boolean USE_BURST_FIRE_INSTEAD_OF_GATES_SHOOTING_CYCLE = true;
+
 
     private static final double VISION_POSE_UPDATE_INTERVAL_SECONDS = 1.0; // Seconds
     //    final double VISION_HEADING_FILTER_ALPHA = 0.1; // 10% correction per loop for small errors

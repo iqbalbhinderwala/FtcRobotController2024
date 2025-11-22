@@ -233,10 +233,10 @@ public class VexMainAuto extends LinearOpMode {
 
         // Set Power Adjustment Factor and enable power adjustment
         actuators.powerAdjustementFactor = (isFar ? 0.05 : 0.05);
-        actuators.enablePowerAdjustment = true;
+        actuators.enablePowerAdjustment = false;
 
         // Set RPM based on distance
-        double targetRPM = actuators.predictShooterRPMFromDistance(dist);
+        double targetRPM = actuators.predictShooterRPMFromDistance(dist) + (isFar ? 60 : 20);
         actuators.setShooterRPM(targetRPM);
 
         // Turn on intake to pressurize the stack
@@ -258,10 +258,11 @@ public class VexMainAuto extends LinearOpMode {
 
         // Open Gate A to release the stream of balls
         actuators.openGateA();
+        actuators.enablePowerAdjustment = true;
 
         // Wait for all 3 balls to shoot
         ElapsedTime timer = new ElapsedTime();
-        while (opModeIsActive() && timer.milliseconds() < 5500) {
+        while (opModeIsActive() && timer.milliseconds() < 5000) {
             driveTrain.update();
             actuators.setShooterRPM(targetRPM); // IMPORTANT: Keep RPM updated to do power adjustments
             idle();
