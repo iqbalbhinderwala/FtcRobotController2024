@@ -158,7 +158,7 @@ public class VexMainAuto extends LinearOpMode {
 
         // Drive to PPG
         //   Intake is not in the middle of the robot (shift by 2 inches)
-        double targetX = -0.5 * TILE + (isRed ? -2 : +2);
+        double targetX = -0.5 * TILE + (isRed ? -2 : 0);
         double targetY = +0.5 * TILE * (isRed?1:-1);
 
         driveTrain.driveTo(targetX-2, targetY, DRIVE_POWER); // underdrive by 2 inch to prevent overshoot towards +X
