@@ -188,7 +188,7 @@ public class VexMainAuto extends LinearOpMode {
         driveTrain.driveTo(targetX, targetY, DRIVE_POWER);
 
         // 2. Turn to face the alliance corner
-        turnTowardsCorner();
+        turnTowardsCorner(false);
 
         // 3. Shoot a predefined number of balls
         shootCycle_Burst_3();
@@ -206,7 +206,7 @@ public class VexMainAuto extends LinearOpMode {
         driveTrain.driveTo(targetX, targetY, DRIVE_POWER);
 
         // 2. Turn to face the alliance corner
-        turnTowardsCorner();
+        turnTowardsCorner(true);
 
         // 3. Shoot a predefined number of balls
         shootCycle_Burst_3();
@@ -215,11 +215,27 @@ public class VexMainAuto extends LinearOpMode {
     /**
      * Turns the robot to face the correct alliance corner.
      */
-    private void turnTowardsCorner() {
+    private void turnTowardsCorner(boolean isFar) {
+        boolean isRed = (currentAlliance == DecodeField.Alliance.RED);
+
         double deltaAngle = DecodeField.getTurnAngleToAllianceCorner(currentAlliance, driveTrain.getPose2D());
+
         double earlyStopByDegrees = (Math.abs(deltaAngle) < 90) ? 0 : 3; // Early stop for large turns
         double adjustment = Math.copySign(earlyStopByDegrees, deltaAngle);
         double targetAngle = driveTrain.getHeading() + deltaAngle - adjustment;
+//
+//        Log.d(TAG, String.format("TargetRPM %.1f Reached (%.1f) after %.1f seconds",
+//                targetRPM, actuators.getShooterRPM(), spinUpTimer.seconds()));
+
+        if (!isRed) { // BLUE
+            if (isFar) {
+                earlyStopByDegrees = (Math.abs(deltaAngle) < 90) ? 2 : 3; // Early stop for large turns  -- BLUE FAR
+            } else {
+                earlyStopByDegrees = (Math.abs(deltaAngle) < 90) ? 3 : 6; // Early stop for large turns  -- BLUE NEAR
+            }
+            adjustment = Math.copySign(earlyStopByDegrees, deltaAngle);
+            targetAngle = driveTrain.getHeading() + deltaAngle + adjustment;
+        }
         driveTrain.turnToHeading(targetAngle, TURN_POWER);
     }
 
