@@ -26,7 +26,7 @@ public class VexActuators {
     private ElapsedTime shooterSpinupTimer = new ElapsedTime();
 
     public boolean enablePowerAdjustment = false;
-    public double powerAdjustementFactor = 0.25;
+    public double powerAdjustementFactor = 0.05;
 
 
     public VexActuators(LinearOpMode opMode) {
@@ -128,7 +128,7 @@ public class VexActuators {
         // Calculate the difference between the current RPM and the desired target RPM.
         double error = currentRPM - targetRPM;
 
-        Log.d(TAG, String.format("calculateAdjustedShooterPowerForTargetRPM: Target=%.1f, Current=%.1f, Error=%.1f", targetRPM, currentRPM, error));
+        Log.d(TAG, String.format("calculateAdjustedShooterPowerForTargetRPM: Since=%.1f(s), Target=%.1f, Current=%.1f, Error=%.1f", shooterSpinupTimer.seconds(), targetRPM, currentRPM, error));
 
         // Check if the absolute error is within an acceptable tolerance.
         if (Math.abs(error) < SHOOTER_RPM_TOLERANCE) {
@@ -137,9 +137,9 @@ public class VexActuators {
             return shooterPower;
         } else {
             // If the error is too large, a correction is needed.
-            // Only apply a power correction periodically to avoid unstable oscillations.
+            // Only apply a power correction after a certain time to avoid unstable oscillations.
             if (shooterPower > 0 && shooterSpinupTimer.seconds() > 1 && enablePowerAdjustment) {
-                Log.d(TAG, "calculateAdjustedShooterPowerForTargetRPM: RPM outside tolerance. Calculating correction.");
+//                Log.d(TAG, "calculateAdjustedShooterPowerForTargetRPM: RPM outside tolerance. Calculating correction.");
                 // Apply a proportional correction to the current power.
                 // If the shooter is too slow (error is negative), this increases the power.
                 // If the shooter is too fast (error is positive), this decreases the power.
@@ -165,10 +165,9 @@ public class VexActuators {
         return Math.abs(error) < SHOOTER_RPM_TOLERANCE;
     }
 
-    /**
-     * Predicts the motor power needed to achieve a target RPM, with voltage compensation.
-     * This function is based on the quadratic model:
-     *   y = 0.1877x^2 + 3.9794x + 1.6133
+    /*** Predicts the motor power needed to achieve a target RPM, with voltage compensation.
+     * This function is based on the linear model:
+     *   y = 4.2109x + 1.5945
      * where:
      *   y = Power * Voltage
      *   x = RPM / 1000
@@ -193,8 +192,8 @@ public class VexActuators {
         // Calculate 'x' as defined by the formula (RPM / 1000).
         double x = targetRPM / 1000.0;
 
-        // Calculate 'y' (the Power * Voltage product) using the provided quadratic model.
-        double powerVoltageProduct = (0.1877 * x * x) + (3.9794 * x) + 1.6133;
+        // Calculate 'y' (the Power * Voltage product) using the provided linear model.
+        double powerVoltageProduct = (4.2109 * x) + 1.5945;
 
         // Solve for the final power by dividing the result by the current voltage.
         double calculatedPower = powerVoltageProduct / currentVoltage;
@@ -203,77 +202,10 @@ public class VexActuators {
         return Range.clip(calculatedPower, 0.0, 1.0);
     }
 
-
-//    /**
-//     * Predicts the motor power needed to achieve a target RPM, with voltage compensation.
-//     * This function is based on the linear model:
-//     *   RPM = 223.64 * (voltage * power) - 302.06
-//     *
-//     * By rearranging for power, we get:
-//     *   power = (RPM + 302.06) / (223.64 * voltage)
-//     *
-//     * @param targetRPM The desired rotations per minute for the shooter.
-//     * @return The calculated motor power (from 0.0 to 1.0) required to reach the target RPM.
-//     */
-//    public double predictShooterPowerForTargetRPM(double targetRPM) {
-//        // If the target RPM is zero or less, the power should be zero.
-//        if (targetRPM <= 0) {
-//            return 0.0;
-//        }
-//
-//        // Get the current battery voltage to compensate for power level changes.
-//        double currentVoltage = getVoltage();
-//
-//        // If for some reason voltage is very low, prevent division by zero or invalid values.
-//        if (currentVoltage < 5.0) { // A reasonable minimum voltage threshold.
-//            return 0.0;
-//        }
-//
-//        // Calculate the required power using the rearranged formula.
-//        double calculatedPower = (targetRPM + 302.06) / (223.64 * currentVoltage);
-//
-//        // Clamp the result to the valid motor power range [0.0, 1.0].
-//        return Range.clip(calculatedPower, 0.0, 1.0);
-//    }
-
-//    /**
-//     * Calculates the shooter power based on the target RPM with voltage compensation.
-//     * This method is an alternative to using DcMotorEx.setVelocity() when you want to manage the power calculation manually.
-//     * It uses a linear model derived from experimental data to map RPM to power.
-//     *
-//     * @param targetRPM The desired rotations per minute for the shooter wheels.
-//     * @return The calculated motor power, a value between 0.0 and 1.0.
-//     */
-//    private double predictShooterPowerForTargetRPM(double targetRPM) {
-//        if (targetRPM <= 0) {
-//            return 0.0;
-//        }
-//
-//        // Get the current battery voltage.
-//        double voltage = getVoltage();
-//
-//        // This scale factor is used to compensate for battery voltage drops.
-//        // It increases the target power when the voltage is below 12V
-//        // and decreases it when the voltage is above 12V.
-//        double scaleRPMFor12V = 1 + (12.0 - voltage) / 12.0; // same as: 2 - V/12
-////        double scaleRPMFor12V = 12.0 / voltage; // simpler, slightly more aggressive
-//
-//        // This formula converts the desired RPM into a motor power value.
-//        // It's based on a linear model (y = mx + b) where:
-//        // y = shooterPower
-//        // m = 1 / SHOOTER_12V_RPM_TO_POWER_GAIN
-//        // x = targetShooterRPM * scaleRPMTo12V
-//        // b = -SHOOTER_12V_RPM_TO_POWER_OFFSET / SHOOTER_12V_RPM_TO_POWER_GAIN
-//        // The result is a power value that should achieve the target RPM at the current voltage.
-//        double calculatedPower = (scaleRPMFor12V * targetRPM - SHOOTER_12V_RPM_TO_POWER_OFFSET) / SHOOTER_12V_RPM_TO_POWER_GAIN;
-//
-//        // Clamp the power to the valid range [0.0, 1.0] for the motor.
-//        return Range.clip(calculatedPower, 0.0, 1.0);
-//    }
-
     /**
      * Predicts the target shooter RPM based on the distance from the target.
-     * The formula provided is y = -11.636x^3 + 180.9x^2 - 814x + 2556.9,
+     * The formula provided is:
+     * y = 6.3102x^4 - 130.43x^3 + 980.68x^2 - 3082x + 4628.2
      * where 'x' is in tile units (1 tile = 24 inches) and 'y' is RPM.
      *
      * @param distanceInInches The distance from the target in inches.
@@ -283,14 +215,15 @@ public class VexActuators {
         // Convert the distance from inches to tile units, as required by the formula.
         double x = distanceInInches / 24.0;
 
-        // Because of the cubic fit, do not extrapolate outside the valid range.
-        x = Range.clip(x, 2.9, 7); // tiles
+        // Because of the polynomial fit, do not extrapolate outside the valid range.
+        x = Range.clip(x, 2.5, 7); // tiles
 
-        // Apply the polynomial formula to calculate the target RPM.
-        double rpm = -11.636 * Math.pow(x, 3)
-                + 180.9 * Math.pow(x, 2)
-                - 814 * x
-                + 2556.9;
+        // Apply the 4th degree polynomial formula to calculate the target RPM.
+        double rpm = 6.3102 * Math.pow(x, 4)
+                - 130.43 * Math.pow(x, 3)
+                + 980.68 * Math.pow(x, 2)
+                - 3082.0 * x
+                + 4628.2;
 
         // It's good practice to ensure the returned value is within a sensible range.
         return Range.clip(rpm, 0, SHOOTER_RPM_MAX);
@@ -350,11 +283,9 @@ public class VexActuators {
 
     // Shooter Constants
     static private final double SHOOTER_TICKS_PER_REVOLUTION = 28;
-    // static private final double SHOOTER_12V_RPM_TO_POWER_OFFSET = -85.0;
-    // static private final double SHOOTER_12V_RPM_TO_POWER_GAIN = 2100.0;
-    static public final double SHOOTER_RPM_LOW = 1200;
+    static public final double SHOOTER_RPM_LOW = 1000;
     static public final double SHOOTER_RPM_MAX = 2000;
-    static public final double SHOOTER_RPM_TOLERANCE = 40;
+    static public final double SHOOTER_RPM_TOLERANCE = 20;
     static public final double SHOOTER_RPM_INCREMENT = 40;
 
     private static final String TAG = "VEX::Actuators";
