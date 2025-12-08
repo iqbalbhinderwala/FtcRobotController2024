@@ -15,7 +15,9 @@ public class VexActuators {
     private LinearOpMode opMode;
 
     // Declare OpMode members.
-    private DcMotor intakeMotor = null;
+    private DcMotor intakeMotorA = null;
+    private DcMotor intakeMotorB = null;
+
     private DcMotorEx topShooterMotor = null;
     private DcMotorEx bottomShooterMotor = null;
     private Servo firstGateServo = null;
@@ -35,18 +37,21 @@ public class VexActuators {
 
     public void init(HardwareMap hardwareMap) {
         // Initialize the hardware variables.
-        intakeMotor = hardwareMap.get(DcMotor.class, "m2");
+        intakeMotorA = hardwareMap.get(DcMotor.class, "m2");
+        intakeMotorB = hardwareMap.get(DcMotor.class, "m3");
         topShooterMotor = hardwareMap.get(DcMotorEx.class, "m0");
         bottomShooterMotor = hardwareMap.get(DcMotorEx.class, "m1");
 
         firstGateServo = hardwareMap.get(Servo.class, "gate a");
         secondGateServo = hardwareMap.get(Servo.class, "gate b");
 
-        intakeMotor.setDirection(DcMotor.Direction.FORWARD);
+        intakeMotorA.setDirection(DcMotor.Direction.FORWARD);
+        intakeMotorB.setDirection(DcMotor.Direction.FORWARD);
         topShooterMotor.setDirection(DcMotor.Direction.REVERSE);
         bottomShooterMotor.setDirection(DcMotor.Direction.REVERSE);
 
-        intakeMotor.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
+        intakeMotorA.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
+        intakeMotorB.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
         topShooterMotor.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
         bottomShooterMotor.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
 
@@ -56,7 +61,8 @@ public class VexActuators {
     }
 
     public void setIntakePower(double power) {
-        intakeMotor.setPower(power);
+        intakeMotorA.setPower(power);
+        intakeMotorB.setPower(power);
     }
 
     public void setShooterPower(double power) {
@@ -167,7 +173,7 @@ public class VexActuators {
 
     /*** Predicts the motor power needed to achieve a target RPM, with voltage compensation.
      * This function is based on the linear model:
-     *   y = 4.2109x + 1.5945
+     *   y = a * x + b
      * where:
      *   y = Power * Voltage
      *   x = RPM / 1000
@@ -193,7 +199,8 @@ public class VexActuators {
         double x = targetRPM / 1000.0;
 
         // Calculate 'y' (the Power * Voltage product) using the provided linear model.
-        double powerVoltageProduct = (4.2109 * x) + 1.5945;
+        // double powerVoltageProduct = 2.1034 * x + 1.5139; // uses all recorded points
+        double powerVoltageProduct = 2.01014 * x + 1.75808; // uses points with x between 2.1 and 3.4
 
         // Solve for the final power by dividing the result by the current voltage.
         double calculatedPower = powerVoltageProduct / currentVoltage;
@@ -205,7 +212,7 @@ public class VexActuators {
     /**
      * Predicts the target shooter RPM based on the distance from the target.
      * The formula provided is:
-     * y = 6.3102x^4 - 130.43x^3 + 980.68x^2 - 3082x + 4628.2
+     * y = 11.019x^4 - 204.17x^3 + 1396.3x^2 - 3998.5x + 6498.1
      * where 'x' is in tile units (1 tile = 24 inches) and 'y' is RPM.
      *
      * @param distanceInInches The distance from the target in inches.
@@ -216,14 +223,14 @@ public class VexActuators {
         double x = distanceInInches / 24.0;
 
         // Because of the polynomial fit, do not extrapolate outside the valid range.
-        x = Range.clip(x, 2.5, 7); // tiles
+        x = Range.clip(x, 2.1, 7); // tiles
 
         // Apply the 4th degree polynomial formula to calculate the target RPM.
-        double rpm = 6.3102 * Math.pow(x, 4)
-                - 130.43 * Math.pow(x, 3)
-                + 980.68 * Math.pow(x, 2)
-                - 3082.0 * x
-                + 4628.2;
+        double rpm = 11.019 * Math.pow(x, 4)
+                - 204.17 * Math.pow(x, 3)
+                + 1396.3 * Math.pow(x, 2)
+                - 3998.5 * x
+                + 6498.1;
 
         // It's good practice to ensure the returned value is within a sensible range.
         return Range.clip(rpm, 0, SHOOTER_RPM_MAX);
@@ -284,7 +291,7 @@ public class VexActuators {
     // Shooter Constants
     static private final double SHOOTER_TICKS_PER_REVOLUTION = 28;
     static public final double SHOOTER_RPM_LOW = 1000;
-    static public final double SHOOTER_RPM_MAX = 2000;
+    static public final double SHOOTER_RPM_MAX = 5000;
     static public final double SHOOTER_RPM_TOLERANCE = 20;
     static public final double SHOOTER_RPM_INCREMENT = 40;
 

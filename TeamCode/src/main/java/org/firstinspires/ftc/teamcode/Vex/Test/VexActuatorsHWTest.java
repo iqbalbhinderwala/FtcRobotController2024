@@ -32,6 +32,7 @@ package org.firstinspires.ftc.teamcode.Vex.Test;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 import com.qualcomm.robotcore.hardware.DcMotor;
+import com.qualcomm.robotcore.hardware.DcMotorSimple;
 import com.qualcomm.robotcore.hardware.Servo;
 import com.qualcomm.robotcore.util.ElapsedTime;
 
@@ -40,7 +41,8 @@ import com.qualcomm.robotcore.util.ElapsedTime;
 public class VexActuatorsHWTest extends LinearOpMode {
 
     // Declare OpMode members.
-    private DcMotor intakeMotor = null;
+    private DcMotor intakeMotorA = null; // first (bottom)
+    private DcMotor intakeMotorB = null; // second (top)
     private DcMotor topShooterMotor = null; // top
     private DcMotor bottomShooterMotor = null; // bottom
     private Servo gateAServo = null;
@@ -51,25 +53,26 @@ public class VexActuatorsHWTest extends LinearOpMode {
         // to 'get' must correspond to the names assigned during the robot configuration
         // step (using the FTC Robot Controller app on the phone).
 
-        intakeMotor = hardwareMap.get(DcMotor.class, "m2");
         topShooterMotor = hardwareMap.get(DcMotor.class, "m0");
         bottomShooterMotor = hardwareMap.get(DcMotor.class, "m1");
+        intakeMotorA = hardwareMap.get(DcMotor.class, "m2");    // first (bottom)
+        intakeMotorB = hardwareMap.get(DcMotor.class, "m3");    // second (top)
+
+        topShooterMotor.setDirection(DcMotor.Direction.REVERSE);
+        bottomShooterMotor.setDirection(DcMotor.Direction.REVERSE);
+        intakeMotorA.setDirection(DcMotor.Direction.FORWARD);
+        intakeMotorB.setDirection(DcMotor.Direction.FORWARD);
 
         gateAServo = hardwareMap.get(Servo.class, "gate a");
         gateBServo = hardwareMap.get(Servo.class, "gate b");
 
-        intakeMotor.setDirection(DcMotor.Direction.FORWARD);
-        topShooterMotor.setDirection(DcMotor.Direction.REVERSE);
-        bottomShooterMotor.setDirection(DcMotor.Direction.REVERSE);
+        gateAServo.setPosition(0);
+        gateBServo.setPosition(0);
     }
 
     @Override
     public void runOpMode() {
-
         initJointsHardware();
-
-        gateAServo.setPosition(0);
-        gateBServo.setPosition(0);
 
         telemetry.addData("Status", "Initialized");
         telemetry.update();
@@ -77,7 +80,7 @@ public class VexActuatorsHWTest extends LinearOpMode {
         // Wait for the game to start (driver presses PLAY)
         waitForStart();
 
-        for (DcMotor motor : new DcMotor[] {intakeMotor, topShooterMotor, bottomShooterMotor}) {
+        for (DcMotor motor : new DcMotor[] {intakeMotorA, intakeMotorB, topShooterMotor, bottomShooterMotor}) {
             motor.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
             motor.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
         }
@@ -90,7 +93,8 @@ public class VexActuatorsHWTest extends LinearOpMode {
             double intakePower   = -gamepad1.left_stick_y; // Note: pushing stick forward gives negative stick_y value
             double shooterPower  = -gamepad1.right_stick_y; // Note: pushing stick forward gives negative stick_y value
 
-            intakeMotor.setPower(intakePower);
+            intakeMotorA.setPower(gamepad1.left_stick_button ? 0 : intakePower);
+            intakeMotorB.setPower(gamepad1.left_stick_button ? intakePower : 0);
             topShooterMotor.setPower(gamepad1.right_stick_button ? 0 : shooterPower);
             bottomShooterMotor.setPower(gamepad1.right_stick_button ? shooterPower : 0);
 
@@ -115,13 +119,17 @@ public class VexActuatorsHWTest extends LinearOpMode {
                 gateBServo.setPosition(Math.max(0.0, gateBServo.getPosition() - SERVO_INCREMENT));
             }
 
-            telemetry.addData(">", "Left Stick Y: Control Intake");
-            telemetry.addData(">", "Right Stick Y: Control Shooters");
+            telemetry.addData(">", "Left Stick Y: Control Intake (press for second)");
+            telemetry.addData(">", "Right Stick Y: Control Shooters (press for bottom)");
             telemetry.addData(">", "DPad U/D: Adjust Gate A");
             telemetry.addData(">", "DPad L/R: Adjust Gate B");
             telemetry.addData("", "--------------------------------");
-            telemetry.addData("INTAKE", "Pwr=%.1f", intakeMotor.getPower());
-            telemetry.addData("SHOOTER", "Pwr=%.1f", topShooterMotor.getPower());
+            telemetry.addData("INTAKE A Power", "%.2f", intakeMotorA.getPower());
+            telemetry.addData("INTAKE B Power", "%.2f", intakeMotorB.getPower());
+            telemetry.addData("SHOOTER Top Power", "%.2f", topShooterMotor.getPower());
+            telemetry.addData("SHOOTER Bot Power", "%.2f", bottomShooterMotor.getPower());
+            telemetry.addData("SHOOTER Top Pos", "%d", topShooterMotor.getCurrentPosition());
+            telemetry.addData("SHOOTER Bot Pos", "%d", bottomShooterMotor.getCurrentPosition());
             telemetry.addData("GATE A", "Pos=%.2f", gateAServo.getPosition());
             telemetry.addData("GATE B", "Pos=%.2f", gateBServo.getPosition());
             telemetry.update();
