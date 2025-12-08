@@ -1,6 +1,8 @@
 package org.firstinspires.ftc.teamcode.Vex.Hardware;
 
 import android.util.Log;
+import java.util.List;
+
 import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit;
 import org.firstinspires.ftc.robotcore.external.navigation.DistanceUnit;
 import org.firstinspires.ftc.robotcore.external.navigation.Pose2D;
@@ -17,8 +19,8 @@ public class DecodeField {
     // --- FIELD & ROBOT CONSTANTS ---
     // Moved these declarations to the top so they are defined before being used in the enum.
     private static final double TILE = 24.0; // inches
-    private static final double ROBOT_LENGTH = 18.0; // inches
-    private static final double ROBOT_WIDTH = 16.0; // inches
+    private static final double ROBOT_LENGTH = 17.5; // inches
+    private static final double ROBOT_WIDTH  = 17.0; // inches
     private static final double ROBOT_HALF_LENGTH = ROBOT_LENGTH / 2.0; // inches
     private static final double ROBOT_HALF_WIDTH = ROBOT_WIDTH / 2.0; // inches
     private static final double SHOOTER_OFFSET_INCHES = 4.0; // inches to the right
@@ -66,6 +68,29 @@ public class DecodeField {
                 -2 * TILE + ROBOT_HALF_LENGTH,  // Left side
                 AngleUnit.DEGREES, 90)), // North facing
 
+        // Red Alliance, Facing Red Target Corner
+        RED__START_NEAR__FACING_TARGET(new Pose2D(DistanceUnit.INCH,
+                -2.493 * TILE,
+                +1.918 * TILE,
+                AngleUnit.DEGREES, 36)),
+
+        RED__SHOOT_NEAR(new Pose2D(DistanceUnit.INCH,
+                -1.5 * TILE,
+                +0.7 * TILE,
+                AngleUnit.DEGREES, 36)),
+
+        // Blue Alliance, Facing Red Target Corner
+        BLUE__START_NEAR__FACING_TARGET(new Pose2D(DistanceUnit.INCH,
+                -2.493 * TILE,
+                -1.918 * TILE,
+                AngleUnit.DEGREES, 180-36)),
+
+        BLUE__SHOOT_NEAR(new Pose2D(DistanceUnit.INCH,
+                -1.3 * TILE,
+                -0.9 * TILE,
+                AngleUnit.DEGREES, 180-36)),
+
+
         // Added a semicolon here to terminate the list of enum constants.
         ;
 
@@ -76,6 +101,17 @@ public class DecodeField {
         }
 
         public Pose2D getPose() { return pose; }
+
+        public static List<KeyLocation> getStartingLocations(Alliance currentAlliance) {
+            switch (currentAlliance) {
+                case RED:
+                    return List.of(RED__START_NEAR__FACING_TARGET, RED__AUDIENCE_WALL__HEADING_NORTH, RED__OBELISK_WALL__HEADING_NORTH);
+                case BLUE:
+                    return List.of(BLUE__START_NEAR__FACING_TARGET, BLUE__AUDIENCE_WALL__HEADING_NORTH, BLUE__OBELISK_WALL__HEADING_NORTH);
+                default:
+                    return List.of();
+            }
+        }
     }
 
     private static Pose2D getShooterPose(Pose2D robotPose) {

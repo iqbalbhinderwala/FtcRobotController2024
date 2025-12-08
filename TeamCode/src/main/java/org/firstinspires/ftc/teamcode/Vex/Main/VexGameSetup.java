@@ -71,10 +71,10 @@ public class VexGameSetup extends LinearOpMode {
                     telemetry.addLine("Press [X] for BLUE");
 
                     if (gamepad1.b && !lastB) {
-                        populateFilteredLocations("RED", filteredLocations);
+                        filteredLocations = DecodeField.KeyLocation.getStartingLocations(DecodeField.Alliance.RED);
                         currentState = SetupState.SELECT_LOCATION;
                     } else if (gamepad1.x && !lastX) {
-                        populateFilteredLocations("BLUE", filteredLocations);
+                        filteredLocations = DecodeField.KeyLocation.getStartingLocations(DecodeField.Alliance.BLUE);
                         currentState = SetupState.SELECT_LOCATION;
                     }
                     break;
@@ -136,15 +136,6 @@ public class VexGameSetup extends LinearOpMode {
 
         waitForStart();
         // The rest of your OpMode can run here, or just end to lock in the selection.
-    }
-
-    private void populateFilteredLocations(String allianceColor, List<DecodeField.KeyLocation> filteredList) {
-        filteredList.clear();
-        for (DecodeField.KeyLocation loc : DecodeField.KeyLocation.values()) {
-            if (loc.name().startsWith(allianceColor)) {
-                filteredList.add(loc);
-            }
-        }
     }
 
     private void saveSelectionToBlackboard(VexBlackboard blackboard, DecodeField.KeyLocation selection) {
