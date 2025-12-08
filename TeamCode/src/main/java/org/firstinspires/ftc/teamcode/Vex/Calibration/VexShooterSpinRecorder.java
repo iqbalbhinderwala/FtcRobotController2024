@@ -18,7 +18,7 @@ import java.util.List;
 import java.util.Locale;
 
 @TeleOp(name = "[Vex] Shooter Spin Recorder", group = "VexTest")
-@Disabled
+//@Disabled
 public class VexShooterSpinRecorder extends LinearOpMode {
 
     // Using a simple data class to hold our measurements
@@ -75,29 +75,29 @@ public class VexShooterSpinRecorder extends LinearOpMode {
         double initialVoltage = actuators.getVoltage();
 
         // Iterate through power levels from 0.0 to 1.0
-        for (double power = 0.3; power <= 1.0; power += 0.05) {
+        for (double power = 0.4; power <= 1.0; power += 0.05) {
             if (!opModeIsActive()) break; // Exit loop if OpMode is stopped
 
             // Set the shooter power
             actuators.setShooterPower(power);
 
-            // Display current status on the driver station
-            telemetry.addData("Testing Power", "%.2f", power);
-            telemetry.update();
-
             // Wait for the motors to stabilize at the new power level
-            sleep(3000);
+            ElapsedTime stabilizationTimer = new ElapsedTime();
+            while (stabilizationTimer.seconds() < 3.0 && opModeIsActive()) {
+                double liveVoltage = actuators.getVoltage();
+                double liveRpm = actuators.getShooterRPM();
+
+                telemetry.addData("Testing Power", "%.2f", power);
+                telemetry.addData("Status", "Stabilizing... (%.1fs remaining)", 3.0 - stabilizationTimer.seconds());
+                telemetry.addData("Live Voltage", "%.3f", liveVoltage);
+                telemetry.addData("Live RPM", "%.1f", liveRpm);
+                telemetry.update();
+            }
 
             // Record the measurements
             double currentVoltage = actuators.getVoltage();
             double currentRpm = actuators.getShooterRPM();
             dataLog.add(new CalibrationDataPoint(power, currentVoltage, currentRpm));
-
-            // Display the recorded data immediately
-            telemetry.addData("Testing Power", "%.2f", power);
-            telemetry.addData("Voltage", "%.3f", currentVoltage);
-            telemetry.addData("RPM", "%.1f", currentRpm);
-            telemetry.update();
         }
 
         // Turn off the shooter motors after the run
