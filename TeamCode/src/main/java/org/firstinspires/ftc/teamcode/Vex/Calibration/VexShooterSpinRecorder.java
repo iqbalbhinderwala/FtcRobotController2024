@@ -83,12 +83,13 @@ public class VexShooterSpinRecorder extends LinearOpMode {
 
             // Wait for the motors to stabilize at the new power level
             ElapsedTime stabilizationTimer = new ElapsedTime();
-            while (stabilizationTimer.seconds() < 3.0 && opModeIsActive()) {
+            double STABILIZATION_TIME_SEC = 7.0; // seconds
+            while (stabilizationTimer.seconds() < STABILIZATION_TIME_SEC && opModeIsActive()) {
                 double liveVoltage = actuators.getVoltage();
                 double liveRpm = actuators.getShooterRPM();
 
                 telemetry.addData("Testing Power", "%.2f", power);
-                telemetry.addData("Status", "Stabilizing... (%.1fs remaining)", 3.0 - stabilizationTimer.seconds());
+                telemetry.addData("Status", "Stabilizing... (%.1fs remaining)", STABILIZATION_TIME_SEC - stabilizationTimer.seconds());
                 telemetry.addData("Live Voltage", "%.3f", liveVoltage);
                 telemetry.addData("Live RPM", "%.1f", liveRpm);
                 telemetry.update();
