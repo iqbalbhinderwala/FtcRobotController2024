@@ -200,7 +200,8 @@ public class VexActuators {
 
         // Calculate 'y' (the Power * Voltage product) using the provided linear model.
         // double powerVoltageProduct = 2.1034 * x + 1.5139; // uses all recorded points
-        double powerVoltageProduct = 2.01014 * x + 1.75808; // uses points with x between 2.1 and 3.4
+        // double powerVoltageProduct = 2.01014 * x + 1.75808; // uses points with x between 2.1 and 3.4
+        double powerVoltageProduct = 2.09819 * x + 1.38837; // uses resting RPM after 7 seconds
 
         // Solve for the final power by dividing the result by the current voltage.
         double calculatedPower = powerVoltageProduct / currentVoltage;
