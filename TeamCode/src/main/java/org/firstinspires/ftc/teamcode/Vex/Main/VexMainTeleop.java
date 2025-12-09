@@ -630,7 +630,7 @@ public class VexMainTeleop extends LinearOpMode {
 
     final double MAX_INTAKE_POWER = 1.0;
     private final double RPM_INCREMENT = VexActuators.SHOOTER_RPM_INCREMENT; // 40
-    private final double SPIN_UP_TIME_S = 2;
+    private final double SPIN_UP_TIME_S = 2*10;
     private final long GATE_DELAY_MS = 350;
 
     private final double POWER_ADJUST_FACTOR_NEAR = 0.05;

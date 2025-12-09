@@ -149,7 +149,7 @@ public class VexMainAuto extends LinearOpMode {
 
         // 4. Turn back to 90 degrees, and drive off the launch line
         driveTrain.turnToHeading(90, TURN_POWER);
-        driveTrain.driveRelative(-1.25*TILE, 0, 0.4);
+        driveTrain.driveRelative(1.5*TILE, 0, 0.4);
     }
 
     /**
@@ -294,7 +294,7 @@ public class VexMainAuto extends LinearOpMode {
         actuators.enablePowerAdjustment = false;
 
         // Set RPM based on distance
-        double targetRPM = actuators.predictShooterRPMFromDistance(dist) + (isFar ? 60 : 20);
+        double targetRPM = actuators.predictShooterRPMFromDistance(dist) + (isFar ? 440 : 280);
         actuators.setShooterRPM(targetRPM);
 
         // Turn on intake to pressurize the stack
