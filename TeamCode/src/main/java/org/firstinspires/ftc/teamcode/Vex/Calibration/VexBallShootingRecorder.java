@@ -33,12 +33,6 @@ public class VexBallShootingRecorder extends LinearOpMode {
             this.rpm = rpm;
             this.mrpm = rpm / 1000.0;
         }
-
-        @Override
-        public String toString() {
-            // CSV Format: Time,Power,Voltage,RPM,mRPM
-            return String.format(Locale.US, "%.4f,%.3f,%.3f,%.1f,%.3f", timeSeconds, power, voltage, rpm, mrpm);
-        }
     }
 
     // --- Hardware & State ---
@@ -47,15 +41,15 @@ public class VexBallShootingRecorder extends LinearOpMode {
     private final List<RpmDataPoint> recordedData = new ArrayList<>();
 
     // --- Configuration ---
-    private final double CLOSR_RPM = 2300;
+    private final double CLOSE_RPM = 2300;
     private final double FAR_RPM = 3100;
 
     // Default selection
-    private double selectedTargetRpm = CLOSR_RPM;
+    private double selectedTargetRpm = CLOSE_RPM;
 
     // Sequence Timings
     private final double GATE_CLOSED_WAIT_SEC = 0.5;
-    private final double SHOOTING_DURATION_SEC = 3.0;
+    private final double SHOOTING_DURATION_SEC = 7.0;
 
     // Session State
     private int runIndex = 0;
@@ -70,7 +64,7 @@ public class VexBallShootingRecorder extends LinearOpMode {
         while (!isStarted() && !isStopRequested()) {
             // Use X vs B to choose target
             if (gamepad1.x) {
-                selectedTargetRpm = CLOSR_RPM;
+                selectedTargetRpm = CLOSE_RPM;
             } else if (gamepad1.b) {
                 selectedTargetRpm = FAR_RPM;
             }
@@ -103,12 +97,15 @@ public class VexBallShootingRecorder extends LinearOpMode {
      * 1. Close Gate -> Wait
      * 2. Spin Up (1.0 Power) -> Wait for RPM
      * 3. Set Holding Power -> Open Gate
-     * 4. Record for 3 seconds -> Stop -> Save
+     * 4. Record for 7 seconds -> Stop -> Save
      */
     private void runTestSequence(double targetRpm) {
         telemetry.clearAll();
         telemetry.addLine(String.format(Locale.US, "RUN %d STARTING...", runIndex));
         telemetry.update();
+
+        // CAPTURE RESTING VOLTAGE (before motors start)
+        double restingVoltage = actuators.getVoltage();
 
         // 1. Close gate and wait
         actuators.closeGateA();
@@ -119,46 +116,55 @@ public class VexBallShootingRecorder extends LinearOpMode {
         recordedData.clear();
 
         // 3. Spin up phase (Max Power)
-        double predictMaintainPower = 1.0;
-        actuators.setShooterPower(predictMaintainPower);
+        actuators.setShooterPower(1.0);
 
         // Wait until RPM >= Target (but keep recording)
         while (opModeIsActive() && actuators.getShooterRPM() < targetRpm) {
             double now = recordingTimer.seconds();
             double volts = actuators.getVoltage();
             double rpm = actuators.getShooterRPM();
+            double power = actuators.getShooterPower();
 
-            recordedData.add(new RpmDataPoint(now, predictMaintainPower, volts, rpm));
+            recordedData.add(new RpmDataPoint(now, power, volts, rpm));
 
             telemetry.addData("Run", runIndex);
             telemetry.addData("Phase", "Spin Up");
             telemetry.addData("Target", "%.0f", targetRpm);
             telemetry.addData("RPM", "%.1f", rpm);
+            telemetry.addData("Power", "%.2f", power);
             telemetry.update();
         }
 
         if (!opModeIsActive()) return;
 
         // 4. Target Reached: Switch to predictive power & Open Gate
-        predictMaintainPower = actuators.predictShooterPowerForTargetRPM(targetRpm);
-        actuators.setShooterPower(predictMaintainPower);
+        actuators.setShooterPower(actuators.predictShooterPowerForTargetRPM(targetRpm));
 
         actuators.openGateA();
 
-        // 5. Shooting Phase (Wait 3 seconds while recording)
+        // 5. Shooting Phase (Wait SHOOTING_DURATION_SEC while recording)
         ElapsedTime shootingTimer = new ElapsedTime();
 
         while (opModeIsActive() && shootingTimer.seconds() < SHOOTING_DURATION_SEC) {
+            if (actuators.getShooterRPM() < targetRpm) {
+                actuators.setShooterPower(1.0);
+            } else {
+                actuators.setShooterPower(actuators.predictShooterPowerForTargetRPM(targetRpm));
+            }
+
             double now = recordingTimer.seconds();
             double volts = actuators.getVoltage();
             double rpm = actuators.getShooterRPM();
+            double power = actuators.getShooterPower();
 
-            recordedData.add(new RpmDataPoint(now, predictMaintainPower, volts, rpm));
+            recordedData.add(new RpmDataPoint(now, power, volts, rpm));
 
             telemetry.addData("Run", runIndex);
             telemetry.addData("Phase", "Shooting / Open Gate");
             telemetry.addData("Time Left", "%.1fs", SHOOTING_DURATION_SEC - shootingTimer.seconds());
+            telemetry.addData("Target", "%.0f", targetRpm);
             telemetry.addData("RPM", "%.1f", rpm);
+            telemetry.addData("Power", "%.2f", power);
             telemetry.update();
         }
 
@@ -168,7 +174,7 @@ public class VexBallShootingRecorder extends LinearOpMode {
         // 7. Save
         telemetry.addLine("Saving Data...");
         telemetry.update();
-        saveRecordingToFile(targetRpm);
+        saveRecordingToFile(targetRpm, restingVoltage);
 
         // Increment index for next run
         runIndex++;
@@ -177,23 +183,29 @@ public class VexBallShootingRecorder extends LinearOpMode {
         actuators.closeGateA();
     }
 
-    private void saveRecordingToFile(double targetRpm) {
+    private void saveRecordingToFile(double targetRpm, double restingVoltage) {
         if (recordedData.isEmpty()) return;
 
+        // Format: ShooterTune_Timestamp_RunX_TargetY_Z.zzV.csv
         String timestamp = new SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(new Date());
-
-        // Format: ShooterTune_RunX_TargetY_Timestamp.csv
-        String filename = String.format(Locale.US, "ShooterTune_Run%d_Target%.0f_%s.csv",
-                runIndex, targetRpm, timestamp);
+        String filename = String.format(Locale.US, "ShooterTune_%s_Run%d_Target%.0f_%.2fV.csv",
+                timestamp, runIndex, targetRpm, restingVoltage);
 
         File file = new File(AppUtil.FIRST_FOLDER, filename);
 
         try (FileWriter writer = new FileWriter(file)) {
-            writer.append("RunIndex,Time,Power,Voltage,RPM,mRPM\n");
+            // Write the custom header order
+            writer.append("RunIndex,Time,mRPM,Power,Voltage,RPM\n");
 
             for (RpmDataPoint point : recordedData) {
-                // Prepend RunIndex to every line for easy concatenation later
-                writer.append(String.format(Locale.US, "%d,%s\n", runIndex, point.toString()));
+                // Manually format the columns instead of using point.toString()
+                writer.append(String.format(Locale.US, "%d,%.4f,%.3f,%.3f,%.3f,%.1f\n",
+                        runIndex,
+                        point.timeSeconds,
+                        point.mrpm,
+                        point.power,
+                        point.voltage,
+                        point.rpm));
             }
 
             writer.flush();
@@ -210,10 +222,10 @@ public class VexBallShootingRecorder extends LinearOpMode {
 
         // Show RPM Selection State
         telemetry.addLine("\nTARGET SELECTION:");
-        String lowMark = (selectedTargetRpm == CLOSR_RPM) ? ">> " : "   ";
+        String lowMark = (selectedTargetRpm == CLOSE_RPM) ? ">> " : "   ";
         String highMark = (selectedTargetRpm == FAR_RPM) ? ">> " : "   ";
 
-        telemetry.addData(lowMark + "[X]", "Low RPM (%.0f)", CLOSR_RPM);
+        telemetry.addData(lowMark + "[X]", "Low RPM (%.0f)", CLOSE_RPM);
         telemetry.addData(highMark + "[B]", "High RPM (%.0f)", FAR_RPM);
 
         telemetry.addLine("\n---------------------------");

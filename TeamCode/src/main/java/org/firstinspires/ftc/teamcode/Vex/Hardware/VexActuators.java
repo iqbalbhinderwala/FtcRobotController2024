@@ -81,7 +81,9 @@ public class VexActuators {
     }
 
     public double getShooterTicksPerSecond() {
-        return (topShooterMotor.getVelocity() + bottomShooterMotor.getVelocity()) / 2.0;
+        double topVel = topShooterMotor.getVelocity();
+        double bottomVel = bottomShooterMotor.getVelocity();
+        return (Math.abs(topVel) > Math.abs(bottomVel)) ? topVel : bottomVel;
     }
 
     public double getShooterRPM() {
