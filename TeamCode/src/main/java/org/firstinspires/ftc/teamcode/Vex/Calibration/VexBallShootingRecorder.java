@@ -117,6 +117,7 @@ public class VexBallShootingRecorder extends LinearOpMode {
 
         // 3. Spin up phase (Max Power)
         actuators.setShooterPower(1.0);
+        actuators.setIntakePower(1.0);
 
         // Wait until RPM >= Target (but keep recording)
         while (opModeIsActive() && actuators.getShooterRPM() < targetRpm) {
@@ -170,6 +171,7 @@ public class VexBallShootingRecorder extends LinearOpMode {
 
         // 6. Stop
         actuators.setShooterPower(0);
+        actuators.setIntakePower(0);
 
         // 7. Save
         telemetry.addLine("Saving Data...");
