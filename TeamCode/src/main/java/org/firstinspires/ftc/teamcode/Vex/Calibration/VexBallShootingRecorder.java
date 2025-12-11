@@ -49,7 +49,7 @@ public class VexBallShootingRecorder extends LinearOpMode {
 
     // Sequence Timings
     private final double GATE_CLOSED_WAIT_SEC = 0.5;
-    private final double SHOOTING_DURATION_SEC = 7.0;
+    private final double SHOOTING_DURATION_SEC = 4.0;
 
     // Session State
     private int runIndex = 0;
@@ -120,7 +120,7 @@ public class VexBallShootingRecorder extends LinearOpMode {
         actuators.setIntakePower(1.0);
 
         // Wait until RPM >= Target (but keep recording)
-        while (opModeIsActive() && actuators.getShooterRPM() < targetRpm) {
+        while (opModeIsActive() && actuators.getShooterRPM() < targetRpm - actuators.SHOOTER_RPM_INCREMENT ) {
             double now = recordingTimer.seconds();
             double volts = actuators.getVoltage();
             double rpm = actuators.getShooterRPM();
@@ -147,7 +147,7 @@ public class VexBallShootingRecorder extends LinearOpMode {
         ElapsedTime shootingTimer = new ElapsedTime();
 
         while (opModeIsActive() && shootingTimer.seconds() < SHOOTING_DURATION_SEC) {
-            if (actuators.getShooterRPM() < targetRpm) {
+            if (actuators.getShooterRPM() < targetRpm - actuators.SHOOTER_RPM_INCREMENT ) {
                 actuators.setShooterPower(1.0);
             } else {
                 actuators.setShooterPower(actuators.predictShooterPowerForTargetRPM(targetRpm));
