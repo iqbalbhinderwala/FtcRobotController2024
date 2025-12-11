@@ -106,8 +106,22 @@ public class VexActuators {
 
     public void setShooterRPM(double targetRPM) {
         targetRPM = Range.clip(targetRPM, 0, SHOOTER_RPM_MAX);
-        double adjustedPower = calculateAdjustedShooterPowerForTargetRPM(targetRPM);
-        setShooterPower(adjustedPower);
+
+//        // DEPRECATED OPTION: enablePowerAdjustment
+//        if (enablePowerAdjustment) {
+//            double adjustedPower = calculateAdjustedShooterPowerForTargetRPM(targetRPM);
+//            setShooterPower(adjustedPower);
+//            return;
+//        }
+
+        // New RPM STRATEGY:
+        //  - Ramp up at max power until target RPM, then use predicted power to maintain it.
+        boolean isShooterBelowTargetRPM = !didShooterReachMinimumTargetRPM(targetRPM);
+        double predictedPower = isShooterBelowTargetRPM ? SHOOTER_MAX_POWER : predictShooterPowerForTargetRPM(targetRPM);
+        setShooterPower(predictedPower);
+
+        Log.d(TAG, String.format("setShooterRPM: Since=%.1f(s), Target RPM=%.1f, Current RPM=%.1f, Power=%.2f",
+                shooterSpinupTimer.seconds(), targetRPM, getShooterRPM(), shooterPower));
     }
 
     private double calculateAdjustedShooterPowerForTargetRPM(double targetRPM) {
@@ -125,7 +139,7 @@ public class VexActuators {
         Log.d(TAG, String.format("calculateAdjustedShooterPowerForTargetRPM: Since=%.1f(s), Target=%.1f, Current=%.1f, Error=%.1f", shooterSpinupTimer.seconds(), targetRPM, currentRPM, error));
 
         // Check if the absolute error is within an acceptable tolerance.
-        if (Math.abs(error) < SHOOTER_RPM_TOLERANCE) {
+        if (Math.abs(error) < SHOOTER_RPM_STEP_SIZE) {
             // If the RPM is close enough to the target, no change is needed.
             Log.d(TAG, String.format("calculateAdjustedShooterPowerForTargetRPM: RPM is within tolerance. Maintaining current power: %.2f", shooterPower));
             return shooterPower;
@@ -156,7 +170,18 @@ public class VexActuators {
      */
     public boolean isShooterAtTargetRPM(double targetRPM) {
         double error = getShooterRPM() - targetRPM;
-        return Math.abs(error) < SHOOTER_RPM_TOLERANCE;
+        return Math.abs(error) < SHOOTER_RPM_STEP_SIZE;
+    }
+
+    /**
+     * Checks if the shooter has reached the minimum acceptable RPM for the given target.
+     * This is useful for trigger logic where being slightly above target is acceptable, but below is not.
+     *
+     * @param targetRPM The desired target RPM.
+     * @return true if current RPM >= (targetRPM - tolerance), false otherwise.
+     */
+    public boolean didShooterReachMinimumTargetRPM(double targetRPM) {
+        return getShooterRPM() >= (targetRPM - SHOOTER_RPM_STEP_SIZE);
     }
 
     /*** Predicts the motor power needed to achieve a target RPM, with voltage compensation.
@@ -244,8 +269,8 @@ public class VexActuators {
     static private final double SHOOTER_TICKS_PER_REVOLUTION = 28;
     static public final double SHOOTER_RPM_LOW = 1000;
     static public final double SHOOTER_RPM_MAX = 5000;
-    static public final double SHOOTER_RPM_TOLERANCE = 20;
-    static public final double SHOOTER_RPM_INCREMENT = 40;
+    static public final double SHOOTER_RPM_STEP_SIZE = 43;
+    static public final double SHOOTER_MAX_POWER = 1.0;
 
     private static final String TAG = "VEX::Actuators";
 }

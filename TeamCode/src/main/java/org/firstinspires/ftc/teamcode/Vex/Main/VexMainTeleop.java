@@ -437,11 +437,10 @@ public class VexMainTeleop extends LinearOpMode {
         double distanceToCorner = DecodeField.getDistanceToAllianceCorner(currentAlliance, driveTrain.getPose2D());
         double predictedShooterRPM = actuators.predictShooterRPMFromDistance(distanceToCorner);
 
-        if (USE_BURST_FIRE_INSTEAD_OF_GATES_SHOOTING_CYCLE) {
-            predictedShooterRPM += (isFar ? 100 : 60);
-        }
+        // ADJUST DEFAULT PREDICTED SHOOTER RPM
+        //predictedShooterRPM += (isFar ? 0 : 0);
 
-        // Apply the offset and clip the value to a safe range [0, 2000]
+        // Apply the offset and clip the value to a safe range [0, 5000]
         shooterRPM = Range.clip(predictedShooterRPM + shooterRPMAdjustment, 0, VexActuators.SHOOTER_RPM_MAX);
 
         // Alert if not in range
@@ -474,25 +473,23 @@ public class VexMainTeleop extends LinearOpMode {
                     shootingState = ShootingState.IDLE;
                 } else if (bothTriggers) {
                     // Check conditions to start firing
-                    boolean rpmReached = actuators.isShooterAtTargetRPM(shooterRPM);
+                    boolean rpmReached = actuators.didShooterReachMinimumTargetRPM(shooterRPM);
                     boolean timeOutReached = spinUpTimer.seconds() >= SPIN_UP_TIME_S;
 
                     // Transition to SHOOTING if RPM ready or Timeout reached
                     if (rpmReached || timeOutReached) {
-                        if (USE_BURST_FIRE_INSTEAD_OF_GATES_SHOOTING_CYCLE) {
-                            // Spin-up complete, transition to BURST_FIRE
-                            shootingState = ShootingState.BURST_FIRE;
-                            actuators.setShooterRPM(shooterRPM);
-                            actuators.openGateA(); // Release the stream!
-                            Log.d(TAG, "handleShooting: Starting BURST_FIRE");
-                        }
+                        // Spin-up complete, transition to BURST_FIRE
+                        shootingState = ShootingState.BURST_FIRE;
+                        actuators.setShooterRPM(shooterRPM);
+                        actuators.openGateA(); // Release the stream!
+                        Log.d(TAG, "handleShooting: Starting BURST_FIRE");
                     }
                 }
                 break;
 
             case BURST_FIRE:
                 // Maintain RPM and Intake pressure
-                actuators.enablePowerAdjustment = true;
+//                actuators.enablePowerAdjustment = true;
                 actuators.setShooterRPM(shooterRPM);
                 actuators.setIntakePower(MAX_INTAKE_POWER);
 
@@ -550,7 +547,7 @@ public class VexMainTeleop extends LinearOpMode {
         telemetry.addData("Shooter Target RPM", "%.1f", shooterRPM);
         telemetry.addData("Shooter Actual RPM", "%.2f", actuators.getShooterRPM());
         telemetry.addData("Shooter Power", "%.2f", actuators.getShooterPower());
-        telemetry.addData("Shooter Ready", actuators.isShooterAtTargetRPM(shooterRPM));
+        telemetry.addData("Shooter Ready", actuators.didShooterReachMinimumTargetRPM(shooterRPM));
 
        vision.addTelemetry();
 
@@ -566,14 +563,11 @@ public class VexMainTeleop extends LinearOpMode {
     final double TURN_TOLERANCE_DEGREES = 5.0;
 
     final double MAX_INTAKE_POWER = 1.0;
-    private final double RPM_INCREMENT = VexActuators.SHOOTER_RPM_INCREMENT; // 40
-    private final double SPIN_UP_TIME_S = 2*10;
-    private final long GATE_DELAY_MS = 350;
+    private final double RPM_INCREMENT = VexActuators.SHOOTER_RPM_STEP_SIZE * 2; // 86
+    private final double SPIN_UP_TIME_S = 2.0; // seconds
 
     private final double POWER_ADJUST_FACTOR_NEAR = 0.05;
     private final double POWER_ADJUST_FACTOR_FAR = 0.05;
-    boolean USE_BURST_FIRE_INSTEAD_OF_GATES_SHOOTING_CYCLE = true;
-
 
     private static final double VISION_POSE_UPDATE_INTERVAL_SECONDS = 1.0; // Seconds
     //    final double VISION_HEADING_FILTER_ALPHA = 0.1; // 10% correction per loop for small errors

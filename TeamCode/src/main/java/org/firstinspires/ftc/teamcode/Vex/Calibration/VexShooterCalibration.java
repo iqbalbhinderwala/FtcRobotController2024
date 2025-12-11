@@ -44,7 +44,7 @@ public class VexShooterCalibration extends LinearOpMode {
         ElapsedTime lastPress = new ElapsedTime();
         final double BUTTON_DELAY = 0.25;
 
-        double shooterTargetRPM = VexActuators.SHOOTER_RPM_MAX / 2;
+        double shooterTargetRPM = 2500;
 
         // Run until the end of the match (driver presses STOP)
         while (opModeIsActive()) {
@@ -76,7 +76,7 @@ public class VexShooterCalibration extends LinearOpMode {
             driveTrain.moveHumanCentric(forwardInput, strafeInput, turnInput, robotHeading, humanDirection);
 
             // --- Adjust Shooter ---
-            final double SHOOTER_INCREMENT = VexActuators.SHOOTER_RPM_INCREMENT; // 40 RPM per second
+            final double SHOOTER_INCREMENT = VexActuators.SHOOTER_RPM_STEP_SIZE; // 43 RPM per second
             if (gamepad1.dpad_up && lastPress.seconds() > BUTTON_DELAY) {
                 lastPress.reset();
                 shooterTargetRPM = Range.clip(shooterTargetRPM + SHOOTER_INCREMENT, 0, VexActuators.SHOOTER_RPM_MAX);
@@ -142,7 +142,7 @@ public class VexShooterCalibration extends LinearOpMode {
             telemetry.addData("Shooter Target RPM", "%.2f", shooterTargetRPM);
             telemetry.addData("Shooter Actual RPM", "%.2f", actuators.getShooterRPM());
             telemetry.addData("Shooter Power", "%.2f", actuators.getShooterPower());
-            telemetry.addData("Shooter Ready", actuators.isShooterAtTargetRPM(shooterTargetRPM));
+            telemetry.addData("Shooter Ready", actuators.didShooterReachMinimumTargetRPM(shooterTargetRPM));
             telemetry.addData("Coordinates", "(%.2f, %.2f) inch", pose.getX(DistanceUnit.INCH), pose.getY(DistanceUnit.INCH));
             telemetry.addData("Tile Coordinates", "(%.2f, %.2f) TILES", pose.getX(DistanceUnit.INCH)/TILE, pose.getY(DistanceUnit.INCH)/TILE);
             telemetry.addData("Distance to Corner", "%.2f inch", DecodeField.getDistanceToAllianceCorner(DecodeField.Alliance.RED, pose));
