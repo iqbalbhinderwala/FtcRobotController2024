@@ -57,7 +57,7 @@ public class VexMainTeleop extends LinearOpMode {
     private DecodeField.Alliance currentAlliance;
 
     // Shooting state machine
-    private enum ShootingState { IDLE, SPIN_UP, SHOOTING_CYCLE, BURST_FIRE }
+    private enum ShootingState { IDLE, SPIN_UP, BURST_FIRE }
     private ShootingState shootingState = ShootingState.IDLE;
     private enum GateCycleState { READY, STEP_1_CLOSE_B, STEP_2_OPEN_A, STEP_3_CLOSE_A, STEP_4_OPEN_B }
     private GateCycleState gateCycleState = GateCycleState.READY;
@@ -112,7 +112,6 @@ public class VexMainTeleop extends LinearOpMode {
         vision.init();
 
         actuators.closeGateA(); // Start with Gate A closed
-        actuators.openGateB();  // and Gate B open (ready for intake)
 
         // Read alliance selection from the blackboard
         currentAlliance = blackboardHelper.getAlliance();
@@ -455,7 +454,6 @@ public class VexMainTeleop extends LinearOpMode {
                 actuators.enablePowerAdjustment = false; // Ensure this is off when not shooting
                 actuators.setShooterPower(0);
                 actuators.closeGateA();
-                actuators.openGateB();
 
                 if (anyTrigger) {
                     // Transition to SPIN_UP
@@ -469,7 +467,6 @@ public class VexMainTeleop extends LinearOpMode {
                 actuators.enablePowerAdjustment = false;
                 actuators.setShooterRPM(shooterRPM);
                 actuators.closeGateA();
-                actuators.openGateB();
                 actuators.setIntakePower(MAX_INTAKE_POWER);
 
                 if (!anyTrigger) {
@@ -488,12 +485,6 @@ public class VexMainTeleop extends LinearOpMode {
                             actuators.setShooterRPM(shooterRPM);
                             actuators.openGateA(); // Release the stream!
                             Log.d(TAG, "handleShooting: Starting BURST_FIRE");
-                        } else {
-                            // Spin-up complete, transition to SHOOTING_CYCLE
-                            shootingState = ShootingState.SHOOTING_CYCLE;
-                            gateCycleState = GateCycleState.STEP_1_CLOSE_B; // Start the cycle
-                            gateCycleTimer.reset(); // Reset timer for the first gate delay
-                            Log.d(TAG, "handleShooting: Starting SHOOTING_CYCLE");
                         }
                     }
                 }
@@ -518,64 +509,10 @@ public class VexMainTeleop extends LinearOpMode {
                     Log.d(TAG, "handleShooting: BURST_FIRE stopped. Returning to SPIN_UP.");
                 }
                 break;
-
-            case SHOOTING_CYCLE:
-                // Maintain RPM and Intake pressure
-                actuators.setShooterRPM(shooterRPM);
-                actuators.setIntakePower(MAX_INTAKE_POWER);
-
-                if (!bothTriggers) {
-                    // Released one or both triggers, go back to spinning up.
-                    // The spinUpTimer is NOT reset, as the wheels are still spinning.
-                    shootingState = ShootingState.SPIN_UP;
-                    gateCycleState = GateCycleState.READY;
-                    actuators.closeGateA(); // Reset gates to ready-to-shoot state
-                    actuators.openGateB();
-                } else {
-                    runShootingCycleIteration();
-                }
-                break;
         }
 
         if (lastState != shootingState) {
             Log.d(TAG, "handleShooting: State changed from " + lastState + " to " + shootingState);
-        }
-    }
-
-    private void runShootingCycleIteration() {
-        // Use the dedicated gate timer
-        if (gateCycleState != GateCycleState.READY && gateCycleTimer.milliseconds() < GATE_DELAY_MS) {
-            return; // Wait for delay
-        }
-
-        gateCycleTimer.reset(); // Reset timer for the next step in the cycle
-        GateCycleState lastState = gateCycleState;
-
-        switch (gateCycleState) {
-            case STEP_1_CLOSE_B:
-                actuators.closeGateB();
-                    gateCycleState = GateCycleState.STEP_2_OPEN_A;
-                break;
-            case STEP_2_OPEN_A:
-                actuators.openGateA();
-                    gateCycleState = GateCycleState.STEP_3_CLOSE_A;
-                break;
-            case STEP_3_CLOSE_A:
-                actuators.closeGateA();
-                    gateCycleState = GateCycleState.STEP_4_OPEN_B;
-                break;
-            case STEP_4_OPEN_B:
-                actuators.openGateB();
-                gateCycleState = GateCycleState.STEP_1_CLOSE_B; // Loop back
-                break;
-            default:
-                // Should not happen, but as a safe-guard, reset to ready
-                gateCycleState = GateCycleState.READY;
-                break;
-        }
-
-        if (lastState != gateCycleState) {
-            Log.d(TAG, "runShootingCycleIteration: State changed from " + lastState + " to " + gateCycleState);
         }
     }
 

@@ -104,45 +104,31 @@ public class VexActuatorsControlTest extends LinearOpMode {
                 intakePower = Math.max(0.0, intakePower - POWER_INCREMENT);
             }
 
-            // --- Shooting Sequence (Y Button) ---
-            if (gamepad1.y) {
-                actuators.shootSequence(shooterPower); // blocking
-            } else { // Not in shooting sequence
+            // --- Manual Shooter (X Button) ---
+            if (gamepad1.x) {
+                actuators.setShooterPower(shooterPower);
+            } else {
+                actuators.setShooterPower(0);
+            }
 
-                // --- Manual Shooter (X Button) ---
-                if (gamepad1.x) {
-                    actuators.setShooterPower(shooterPower);
-                } else {
-                    actuators.setShooterPower(0);
-                }
+            // --- Intake (A/B Buttons) ---
+            if (gamepad1.a) {
+                actuators.setIntakePower(intakePower);
+                // When intake is on, gate A is closed
+                actuators.closeGateA();
+            } else if (gamepad1.b) {
+                actuators.setIntakePower(-intakePower);
+            } else {
+                actuators.setIntakePower(0);
+            }
 
-                // --- Intake (A/B Buttons) ---
-                if (gamepad1.a) {
-                    actuators.setIntakePower(intakePower);
-                    // When intake is on, gate A is closed, and gateB is open
+            // --- Manual Gate Control (if not intaking) ---
+            if (!gamepad1.a) { // only allow manual if intake is off
+                // LEFT BUMPER to CLOSE, TRIGGER to OPEN
+                if (gamepad1.left_bumper) {
                     actuators.closeGateA();
-                    actuators.openGateB();
-                } else if (gamepad1.b) {
-                    actuators.setIntakePower(-intakePower);
-                } else {
-                    actuators.setIntakePower(0);
-                }
-
-                // --- Manual Gate Control (if not intaking) ---
-                if (!gamepad1.a) { // only allow manual if intake is off
-                    // LEFT BUMPER to CLOSE, TRIGGER to OPEN
-                    if (gamepad1.left_bumper) {
-                        actuators.closeGateA();
-                    } else if (gamepad1.left_trigger > 0.5) {
-                        actuators.openGateA();
-                    }
-
-                    // RIGHT BUMPER to CLOSE, TRIGGER to OPEN
-                    if (gamepad1.right_bumper) {
-                        actuators.closeGateB();
-                    } else if (gamepad1.right_trigger > 0.5) {
-                        actuators.openGateB();
-                    }
+                } else if (gamepad1.left_trigger > 0.5) {
+                    actuators.openGateA();
                 }
             }
 
@@ -155,13 +141,12 @@ public class VexActuatorsControlTest extends LinearOpMode {
             telemetry.addData("Pose", driveTrain.getPose().toString());
 
             telemetry.addData("--- Actuators ---", "");
-            telemetry.addData(">", "A: Intake, B: Reverse, Y: Auto-Shoot, X: Manual-Shoot");
+            telemetry.addData(">", "A: Intake, B: Reverse, X: Manual-Shoot");
             telemetry.addData(">", "DPad U/D: Shooter pwr, L/R: Intake pwr");
-            telemetry.addData(">", "L/R Bumper/Trigger: Manual Gate Control");
+            telemetry.addData(">", "Left Bumper/Trigger: Manual Gate Control");
             telemetry.addData("Intake Power", "%.2f", intakePower);
             telemetry.addData("Shooter Power", "%.2f", shooterPower);
             telemetry.addData("Gate A Pos", "%.2f", actuators.getGateAPosition());
-            telemetry.addData("Gate B Pos", "%.2f", actuators.getGateBPosition());
             telemetry.update();
         }
 
