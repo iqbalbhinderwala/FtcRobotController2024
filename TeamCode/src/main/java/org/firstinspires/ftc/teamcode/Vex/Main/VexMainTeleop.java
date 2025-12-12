@@ -57,12 +57,13 @@ public class VexMainTeleop extends LinearOpMode {
     private DecodeField.Alliance currentAlliance;
 
     // Shooting state machine
-    private enum ShootingState { IDLE, SPIN_UP, BURST_FIRE }
+    private enum ShootingState { IDLE, SPIN_UP, STABILIZE, BURST_FIRE }
     private ShootingState shootingState = ShootingState.IDLE;
     private enum GateCycleState { READY, STEP_1_CLOSE_B, STEP_2_OPEN_A, STEP_3_CLOSE_A, STEP_4_OPEN_B }
     private GateCycleState gateCycleState = GateCycleState.READY;
     private ElapsedTime gateCycleTimer; // For timing gate movements
     private ElapsedTime spinUpTimer;    // For timing wheel spin-up
+    private ElapsedTime stabilizeTimer; // For stabilize state
 
     private double targetHeading;
     private ElapsedTime visionUpdateTimer;
@@ -111,7 +112,6 @@ public class VexMainTeleop extends LinearOpMode {
         actuators.init(hardwareMap);
         vision.init();
 
-        actuators.closeGateA(); // Start with Gate A closed
 
         // Read alliance selection from the blackboard
         currentAlliance = blackboardHelper.getAlliance();
@@ -120,6 +120,7 @@ public class VexMainTeleop extends LinearOpMode {
         lastPress = new ElapsedTime();
         gateCycleTimer = new ElapsedTime();
         spinUpTimer = new ElapsedTime();
+        stabilizeTimer = new ElapsedTime();
         visionUpdateTimer = new ElapsedTime();
 
         // Set humanDirection based on the alliance: 0 for RED, 180 for BLUE
@@ -166,6 +167,7 @@ public class VexMainTeleop extends LinearOpMode {
         lastPress.reset(); // Reset timer on start
         gateCycleTimer.reset();
         spinUpTimer.reset();
+        stabilizeTimer.reset();
         visionUpdateTimer.reset();
 
         acceptVisionHeadingOverIMU = false;
@@ -465,7 +467,30 @@ public class VexMainTeleop extends LinearOpMode {
                 // Keep RPM updated
                 actuators.enablePowerAdjustment = false;
                 actuators.setShooterRPM(shooterRPM);
-                actuators.closeGateA();
+                actuators.setIntakePower(MAX_INTAKE_POWER);
+
+                if (!anyTrigger) {
+                    // Transition back to IDLE
+                    shootingState = ShootingState.IDLE;
+                } else {
+                    // Check conditions to advance to STABILIZE
+                    boolean rpmReached = actuators.didShooterReachMinimumTargetRPM(shooterRPM);
+                    boolean timeOutReached = spinUpTimer.seconds() >= SPIN_UP_TIME_S;
+
+                    // Transition to STABILIZING if RPM ready or Timeout reached
+                    if (rpmReached || timeOutReached) {
+                        // Spin-up complete, transition to BURST_FIRE
+                        shootingState = ShootingState.STABILIZE;
+                        actuators.setShooterRPM(shooterRPM);
+                        stabilizeTimer.reset();
+                        Log.d(TAG, "handleShooting: Starting STABILIZE");
+                    }
+                }
+                break;
+
+            case STABILIZE:
+                // Keep RPM updated
+                actuators.setShooterRPM(shooterRPM);
                 actuators.setIntakePower(MAX_INTAKE_POWER);
 
                 if (!anyTrigger) {
@@ -473,15 +498,8 @@ public class VexMainTeleop extends LinearOpMode {
                     shootingState = ShootingState.IDLE;
                 } else if (bothTriggers) {
                     // Check conditions to start firing
-                    boolean rpmReached = actuators.didShooterReachMinimumTargetRPM(shooterRPM);
-                    boolean timeOutReached = spinUpTimer.seconds() >= SPIN_UP_TIME_S;
-
-                    // Transition to SHOOTING if RPM ready or Timeout reached
-                    if (rpmReached || timeOutReached) {
-                        // Spin-up complete, transition to BURST_FIRE
+                    if (stabilizeTimer.seconds() > STABILIZE_TIME_S) {
                         shootingState = ShootingState.BURST_FIRE;
-                        actuators.setShooterRPM(shooterRPM);
-                        actuators.openGateA(); // Release the stream!
                         Log.d(TAG, "handleShooting: Starting BURST_FIRE");
                     }
                 }
@@ -490,20 +508,20 @@ public class VexMainTeleop extends LinearOpMode {
             case BURST_FIRE:
                 // Maintain RPM and Intake pressure
 //                actuators.enablePowerAdjustment = true;
+                actuators.openGateA(); // Release the stream!
                 actuators.setShooterRPM(shooterRPM);
                 actuators.setIntakePower(MAX_INTAKE_POWER);
 
                 // Exit conditions
-                if (!bothTriggers) {
-                    shootingState = ShootingState.SPIN_UP;
+                if (!anyTrigger) {
+                    // Transition back to IDLE
+                    shootingState = ShootingState.IDLE;
 
                     // Shutdown sequence
                     actuators.setShooterPower(0);
                     actuators.setIntakePower(0);
-                    actuators.closeGateA();
-                    actuators.enablePowerAdjustment = false;
 
-                    Log.d(TAG, "handleShooting: BURST_FIRE stopped. Returning to SPIN_UP.");
+                    Log.d(TAG, "handleShooting: BURST_FIRE stopped. Returning to IDLE.");
                 }
                 break;
         }
@@ -543,7 +561,7 @@ public class VexMainTeleop extends LinearOpMode {
 //        telemetry.addData("Gate A Pos", "%.2f", actuators.getGateAPosition());
 //        telemetry.addData("Gate B Pos", "%.2f", actuators.getGateBPosition());
 
-        telemetry.addData("Voltage", "%.2f", actuators.getVoltage());
+        // telemetry.addData("Voltage", "%.2f", actuators.getVoltage());
         telemetry.addData("Shooter Target RPM", "%.1f", shooterRPM);
         telemetry.addData("Shooter Actual RPM", "%.2f", actuators.getShooterRPM());
         telemetry.addData("Shooter Power", "%.2f", actuators.getShooterPower());
@@ -565,6 +583,7 @@ public class VexMainTeleop extends LinearOpMode {
     final double MAX_INTAKE_POWER = 1.0;
     private final double RPM_INCREMENT = VexActuators.SHOOTER_RPM_STEP_SIZE * 2; // 86
     private final double SPIN_UP_TIME_S = 2.0; // seconds
+    private final double STABILIZE_TIME_S = 0.2; // seconds
 
     private final double POWER_ADJUST_FACTOR_NEAR = 0.05;
     private final double POWER_ADJUST_FACTOR_FAR = 0.05;
