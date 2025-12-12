@@ -112,7 +112,6 @@ public class VexMainTeleop extends LinearOpMode {
         actuators.init(hardwareMap);
         vision.init();
 
-
         // Read alliance selection from the blackboard
         currentAlliance = blackboardHelper.getAlliance();
 
@@ -144,18 +143,6 @@ public class VexMainTeleop extends LinearOpMode {
         blackboardHelper.addBlackboardTelemetry();
 
         telemetry.addData("--- Status ---", "Initialization Complete.");
-//         telemetry.addData(">", "Searching for AprilTag... Press PLAY to start without one.");
-
-//         AprilTagDetection detection = vision.getMostAccurateTarget();
-//         if (detection != null && detection.robotPose != null) {
-//             telemetry.addLine("AprilTag found! Pose will be updated from this tag.");
-// //            vision.addTelemetry();
-//         } else {
-//             telemetry.addLine("Searching for AprilTag...");
-//         }
-
-//         telemetry.update();
-//         sleep(50); // Small sleep to prevent busy-looping
     }
 
     /**
@@ -581,7 +568,7 @@ public class VexMainTeleop extends LinearOpMode {
     final double TURN_TOLERANCE_DEGREES = 5.0;
 
     final double MAX_INTAKE_POWER = 1.0;
-    private final double RPM_INCREMENT = VexActuators.SHOOTER_RPM_STEP_SIZE * 2; // 86
+    private final double RPM_INCREMENT = VexActuators.SHOOTER_RPM_STEP_SIZE; // 43
     private final double SPIN_UP_TIME_S = 2.0; // seconds
     private final double STABILIZE_TIME_S = 0.2; // seconds
 

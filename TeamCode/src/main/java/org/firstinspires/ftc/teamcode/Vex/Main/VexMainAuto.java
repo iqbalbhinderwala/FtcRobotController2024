@@ -182,7 +182,7 @@ public class VexMainAuto extends LinearOpMode {
         driveTrain.turnToHeading(90, TURN_POWER);
 
         // 5. Drive off the launch line
-        driveTrain.driveRelative(-1.25*TILE, 0, 0.4);
+        driveTrain.driveRelative(-0.75*TILE, +0.75*TILE * (isRed?1:-1), 0.4);
     }
 
     /**
@@ -289,22 +289,18 @@ public class VexMainAuto extends LinearOpMode {
         double dist = DecodeField.getDistanceToAllianceCorner(currentAlliance, driveTrain.getPose2D());
         boolean isFar = (dist > 5 * TILE);
 
-        // Set Power Adjustment Factor and enable power adjustment
-        actuators.powerAdjustementFactor = (isFar ? 0.05 : 0.05);
-        actuators.enablePowerAdjustment = false;
-
         // Set RPM based on distance
-        double targetRPM = actuators.predictShooterRPMFromDistance(dist) + (isFar ? 440 : 280);
+        double targetRPM = actuators.predictShooterRPMFromDistance(dist) + (isFar ? 0 : 0);
         actuators.setShooterRPM(targetRPM);
 
-        // Turn on intake to pressurize the stack
+        // Turn on intake to queue the balls
         actuators.setIntakePower(1.0);
 
         // 6. Wait for shooter RPM to be reached
         spinUpTimer.reset();
         while (opModeIsActive() && spinUpTimer.seconds() < SPIN_UP_TIME_S)
         {
-            if (actuators.isShooterAtTargetRPM(targetRPM)) {
+            if (actuators.didShooterReachMinimumTargetRPM(targetRPM)) {
                 Log.d(TAG, String.format("TargetRPM %.1f Reached (%.1f) after %.1f seconds",
                         targetRPM, actuators.getShooterRPM(), spinUpTimer.seconds()));
                 break;
@@ -316,11 +312,10 @@ public class VexMainAuto extends LinearOpMode {
 
         // Open Gate A to release the stream of balls
         actuators.openGateA();
-        actuators.enablePowerAdjustment = true;
 
         // Wait for all 3 balls to shoot
         ElapsedTime timer = new ElapsedTime();
-        while (opModeIsActive() && timer.milliseconds() < 5000) {
+        while (opModeIsActive() && timer.milliseconds() < 600 * 4) {
             driveTrain.update();
             actuators.setShooterRPM(targetRPM); // IMPORTANT: Keep RPM updated to do power adjustments
             idle();
@@ -332,7 +327,6 @@ public class VexMainAuto extends LinearOpMode {
 
         // Reset gates and logic for next run
         actuators.closeGateA();
-        actuators.enablePowerAdjustment = false;
     }
 
     /**

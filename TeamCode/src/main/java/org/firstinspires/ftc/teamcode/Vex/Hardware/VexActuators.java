@@ -163,15 +163,15 @@ public class VexActuators {
         }
     }
 
-    /**
-     * Checks if the shooter's current RPM is within the acceptable tolerance of the target RPM.
-     * This method has NO side effects; it only returns a boolean state.
-     * @return true if the shooter is at its target speed, false otherwise.
-     */
-    public boolean isShooterAtTargetRPM(double targetRPM) {
-        double error = getShooterRPM() - targetRPM;
-        return Math.abs(error) < SHOOTER_RPM_STEP_SIZE;
-    }
+//    /**
+//     * Checks if the shooter's current RPM is within the acceptable tolerance of the target RPM.
+//     * This method has NO side effects; it only returns a boolean state.
+//     * @return true if the shooter is at its target speed, false otherwise.
+//     */
+//    public boolean isShooterAtTargetRPM(double targetRPM) {
+//        double error = getShooterRPM() - targetRPM;
+//        return Math.abs(error) < SHOOTER_RPM_STEP_SIZE;
+//    }
 
     /**
      * Checks if the shooter has reached the minimum acceptable RPM for the given target.
