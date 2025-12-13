@@ -13,6 +13,7 @@ import org.firstinspires.ftc.robotcore.external.navigation.Pose3D;
 import org.firstinspires.ftc.teamcode.Vex.Hardware.DecodeField;
 import org.firstinspires.ftc.teamcode.Vex.Hardware.VexActuators;
 import org.firstinspires.ftc.teamcode.Vex.Hardware.VexBlackboard;
+import org.firstinspires.ftc.teamcode.Vex.Hardware.VexLeds;
 import org.firstinspires.ftc.teamcode.Vex.Hardware.VexOdometryDriveTrain;
 import org.firstinspires.ftc.teamcode.Vex.Hardware.VexVision;
 import org.firstinspires.ftc.vision.apriltag.AprilTagDetection;
@@ -45,6 +46,7 @@ public class VexMainTeleop extends LinearOpMode {
     private VexOdometryDriveTrain driveTrain;
     private VexVision vision;
     private VexActuators actuators;
+    private VexLeds leds;
     private VexBlackboard blackboardHelper;
 
     // OpMode Members
@@ -103,6 +105,7 @@ public class VexMainTeleop extends LinearOpMode {
         blackboardHelper = new VexBlackboard(this);
         driveTrain = new VexOdometryDriveTrain(this);
         actuators = new VexActuators(this);
+        leds = new VexLeds(this);
         vision = new VexVision(this);
 
         // Add blackboard telemetry
@@ -110,6 +113,7 @@ public class VexMainTeleop extends LinearOpMode {
 
         driveTrain.init();
         actuators.init(hardwareMap);
+        leds.init();
         vision.init();
 
         // Read alliance selection from the blackboard
@@ -433,9 +437,11 @@ public class VexMainTeleop extends LinearOpMode {
         shooterRPM = Range.clip(predictedShooterRPM + shooterRPMAdjustment, 0, VexActuators.SHOOTER_RPM_MAX);
 
         // Alert if not in range
-        if (!DecodeField.isInRangeForShooting(currentAlliance, driveTrain.getPose2D())) {
-            // USE RED LED
-        }
+        boolean isInRangeForShooting = DecodeField.isInRangeForShooting(currentAlliance, driveTrain.getPose2D());
+        // Turn RED leds on when not in range
+        // Red is 0, 2 and Green is 1, 3
+        leds.getLed(0).enable(!isInRangeForShooting);
+        leds.getLed(2).enable(!isInRangeForShooting);
 
         switch (shootingState) {
             case IDLE:

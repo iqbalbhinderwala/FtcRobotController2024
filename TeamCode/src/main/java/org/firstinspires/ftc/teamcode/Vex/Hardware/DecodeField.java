@@ -32,8 +32,9 @@ public class DecodeField {
     public static final double BLUE_CORNER_X = -3.0 * TILE; // -72 inches
     public static final double BLUE_CORNER_Y = -3.0 * TILE; // -72 inches
 
-    public static final double MINIMUM_SHOOTING_DISTANCE = 2 * TILE * Math.sqrt(2);
-    public static final double MAXIMUM_SHOOTING_ANGLE_ERROR_DEGREES = 10.0; // degrees
+    public static final double MINIMUM_SHOOTING_DISTANCE = 2.4 * TILE;
+    public static final double MAXIMUM_NEAR_SHOOTING_ANGLE_ERROR_DEGREES = 10.0; // degrees
+    public static final double MAXIMUM_FAR_SHOOTING_ANGLE_ERROR_DEGREES = 4.0; // degrees
 
     public enum Alliance { RED, BLUE, UNKNOWN }
 
@@ -223,11 +224,13 @@ public class DecodeField {
      * @return True if the robot is far enough and oriented correctly for shooting, false otherwise.
      */
     public static boolean isInRangeForShooting(Alliance currentAlliance, Pose2D robotPose) {
-        return true;
-
-//        double distance = getDistanceToAllianceCorner(currentAlliance, robotPose);
-//        double turnAngle = getTurnAngleToAllianceCorner(currentAlliance, robotPose);
-//        return distance >= MINIMUM_SHOOTING_DISTANCE && Math.abs(turnAngle) <= MAXIMUM_SHOOTING_ANGLE_ERROR_DEGREES;
+        double distance = getDistanceToAllianceCorner(currentAlliance, robotPose);
+        double turnAngle = getTurnAngleToAllianceCorner(currentAlliance, robotPose);
+        boolean isFar = (distance > 5 * TILE);
+        double maximum_shooting_angle_error = (isFar ?
+                MAXIMUM_FAR_SHOOTING_ANGLE_ERROR_DEGREES :
+                MAXIMUM_NEAR_SHOOTING_ANGLE_ERROR_DEGREES);
+        return distance >= MINIMUM_SHOOTING_DISTANCE && Math.abs(turnAngle) <= maximum_shooting_angle_error;
     }
 
     private static final String TAG = "VEX::DecodeField";
