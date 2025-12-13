@@ -260,25 +260,35 @@ public class VexMainAuto extends LinearOpMode {
     private void turnTowardsCorner(boolean isFar) {
         boolean isRed = (currentAlliance == DecodeField.Alliance.RED);
 
+        double currentHeading = driveTrain.getHeading();
         double deltaAngle = DecodeField.getTurnAngleToAllianceCorner(currentAlliance, driveTrain.getPose2D());
+        double predictedTargetAngle = currentHeading + deltaAngle;
 
-        double earlyStopByDegrees = (Math.abs(deltaAngle) < 90) ? 0 : 3; // Early stop for large turns
-        double adjustment = Math.copySign(earlyStopByDegrees, deltaAngle);
-        double targetAngle = driveTrain.getHeading() + deltaAngle - adjustment;
-//
-//        Log.d(TAG, String.format("TargetRPM %.1f Reached (%.1f) after %.1f seconds",
-//                targetRPM, actuators.getShooterRPM(), spinUpTimer.seconds()));
+        boolean isAcuteTurn = (Math.abs(deltaAngle) < 90);  // initial turn is acute, second turn is obtuse
 
-        if (!isRed) { // BLUE
-            if (isFar) {
-                earlyStopByDegrees = (Math.abs(deltaAngle) < 90) ? 2 : 3; // Early stop for large turns  -- BLUE FAR
-            } else {
-                earlyStopByDegrees = (Math.abs(deltaAngle) < 90) ? 3 : 6; // Early stop for large turns  -- BLUE NEAR
+        double adjustment;
+        double adjustedTargetAngle;
+
+        if (isRed) { // RED
+            if (isFar) {    // RED AUDIENCE SIDE
+                adjustment = isAcuteTurn ? 0 : 3; // CCW adjustment for acute / obtuse turns -- RED AUDIENCE SIDE
+            } else {        // RED OBELISK SIDE
+                adjustment = isAcuteTurn ? 0 : 3; // CCW adjustment for acute / obtuse turns -- RED OBELISK SIDE
             }
-            adjustment = Math.copySign(earlyStopByDegrees, deltaAngle);
-            targetAngle = driveTrain.getHeading() + deltaAngle + adjustment;
+        } else { // BLUE
+            if (isFar) {    // BLUE AUDIENCE SIDE
+                adjustment = isAcuteTurn ? 2 : 3; // CCW adjustment for acute / obtuse turns -- BLUE AUDIENCE SIDE
+            } else {        // BLUE OBELISK SIDE
+                adjustment = isAcuteTurn ? 3 : 6; // CCW adjustment for acute / obtuse turns -- BLUE OBELISK SIDE
+            }
         }
-        driveTrain.turnToHeading(targetAngle, TURN_POWER);
+
+        adjustedTargetAngle = predictedTargetAngle + adjustment;
+
+        Log.d(TAG, String.format("turnTowardsCorner: Heading: %.1f, PredictedTarget: %.1f, Delta: %.1f, adjustment: %.1f, adjustedTarget: %.1f",
+                currentHeading, predictedTargetAngle, deltaAngle, adjustment, adjustedTargetAngle));
+
+        driveTrain.turnToHeading(adjustedTargetAngle, TURN_POWER);
     }
 
     private void shootCycle_Burst_3() {
@@ -315,7 +325,7 @@ public class VexMainAuto extends LinearOpMode {
 
         // Wait for all 3 balls to shoot
         ElapsedTime timer = new ElapsedTime();
-        while (opModeIsActive() && timer.milliseconds() < 600 * 4) {
+        while (opModeIsActive() && timer.milliseconds() < 600 * 5) {
             driveTrain.update();
             actuators.setShooterRPM(targetRPM); // IMPORTANT: Keep RPM updated to do power adjustments
             idle();
