@@ -565,7 +565,7 @@ public class VexMainTeleop extends LinearOpMode {
     final double MAX_DRIVE_SPEED  = 1.0;
     final double MAX_STRAFE_SPEED = 1.0;
     final double MAX_TURN_SPEED   = 0.5;
-    final double TURN_TOLERANCE_DEGREES = 5.0;
+    final double TURN_TOLERANCE_DEGREES = 3.0;
 
     final double MAX_INTAKE_POWER = 1.0;
     private final double RPM_INCREMENT = VexActuators.SHOOTER_RPM_STEP_SIZE; // 43

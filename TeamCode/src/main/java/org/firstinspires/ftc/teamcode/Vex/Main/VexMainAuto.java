@@ -133,8 +133,8 @@ public class VexMainAuto extends LinearOpMode {
 
         // 2. Drive to PPG, and intake
         //   Intake is not in the middle of the robot (shift by 2 inches)
-        double targetX = -0.5 * TILE + (isRed ? -2 : 0);
-        double targetY = +0.5 * TILE * (isRed ? +1 :-1);
+        double targetX = -0.5 * TILE + (isRed ? -2 : 0); // x-offset up
+        double targetY = +0.5 * TILE * (isRed ? +1 :-1); // y-mirror
 
         driveTrain.driveTo(targetX-2, targetY, DRIVE_POWER); // underdrive by 2 inch to prevent overshoot towards +X
         driveTrain.turnToHeading((currentAlliance == DecodeField.Alliance.RED) ? 180 : 0, TURN_POWER);
@@ -324,8 +324,8 @@ public class VexMainAuto extends LinearOpMode {
         actuators.openGateA();
 
         // Wait for all 3 balls to shoot
-        ElapsedTime timer = new ElapsedTime();
-        while (opModeIsActive() && timer.milliseconds() < 600 * 5) {
+        ElapsedTime burst_timer = new ElapsedTime();
+        while (opModeIsActive() && burst_timer.seconds() < BURST_SHOOTING_TIME_S) {
             driveTrain.update();
             actuators.setShooterRPM(targetRPM); // IMPORTANT: Keep RPM updated to do power adjustments
             idle();
@@ -358,6 +358,8 @@ public class VexMainAuto extends LinearOpMode {
     private static final double DRIVE_POWER = 0.8;
     private static final double TURN_POWER = 0.5;
     private static final double SPIN_UP_TIME_S = 2.0;
+    private static final double BURST_SHOOTING_TIME_S = 3.0;
+
     private static final double TILE = 24.0; // inches
 
     private static final String TAG = "VEX::MainAuto";
