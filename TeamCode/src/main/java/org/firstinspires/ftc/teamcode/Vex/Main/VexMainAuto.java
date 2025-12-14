@@ -128,18 +128,18 @@ public class VexMainAuto extends LinearOpMode {
         double shootY = shootLocation.getPose().getY(DistanceUnit.INCH);
 
         // 1. Drive and shoot
-        driveTrain.driveTo(shootX, shootY, 0.4);
+        driveTrain.driveTo(shootX, shootY, 0.3);
         shootCycle_Burst_3();
 
         // 2. Drive to PPG, and intake
         //   Intake is not in the middle of the robot (shift by 2 inches)
-        double targetX = -0.5 * TILE + (isRed ? -2 : 0); // x-offset up
-        double targetY = +0.5 * TILE * (isRed ? +1 :-1); // y-mirror
+        double targetX = -0.5 * TILE + (isRed ? -2 :-1); // x-offset up
+        double targetY = +0.75 * TILE * (isRed ? +1 :-1); // y-mirror
 
-        if (isRed) {
+        if (isRed) { // RED
             driveTrain.driveTo(targetX - 1, targetY, DRIVE_POWER); // underdrive by 2 inch to prevent overshoot towards +X
-        } else {
-            driveTrain.driveTo(targetX - 0, targetY, DRIVE_POWER); // underdrive by 2 inch to prevent overshoot towards +X
+        } else {     // BLUE
+            driveTrain.driveTo(targetX + 1, targetY, DRIVE_POWER); // underdrive by 2 inch to prevent overshoot towards +X
         }
         driveTrain.turnToHeading((currentAlliance == DecodeField.Alliance.RED) ? 180 : 0, TURN_POWER);
         actuators.setIntakePower(1);
@@ -273,17 +273,18 @@ public class VexMainAuto extends LinearOpMode {
         double adjustment;
         double adjustedTargetAngle;
 
+        boolean isNear = !isFar;
         if (isRed) { // RED
-            if (isFar) {    // RED AUDIENCE SIDE
+            if (isNear) {   // RED AUDIENCE SIDE
                 adjustment = isAcuteTurn ? 0 : 3; // CCW adjustment for acute / obtuse turns -- RED AUDIENCE SIDE
             } else {        // RED OBELISK SIDE
                 adjustment = isAcuteTurn ? 0 : 3; // CCW adjustment for acute / obtuse turns -- RED OBELISK SIDE
             }
         } else { // BLUE
-            if (isFar) {    // BLUE AUDIENCE SIDE
-                adjustment = isAcuteTurn ? 2 : 10; // CCW adjustment for acute / obtuse turns -- BLUE AUDIENCE SIDE
+            if (isNear) {   // BLUE AUDIENCE SIDE
+                adjustment = isAcuteTurn ? 3 : 10; // CCW adjustment for acute / obtuse turns -- BLUE OBELISK SIDE
             } else {        // BLUE OBELISK SIDE
-                adjustment = isAcuteTurn ? 3 : 6; // CCW adjustment for acute / obtuse turns -- BLUE OBELISK SIDE
+                adjustment = isAcuteTurn ? 2 : 6; // CCW adjustment for acute / obtuse turns -- BLUE AUDIENCE SIDE
             }
         }
 
@@ -362,7 +363,7 @@ public class VexMainAuto extends LinearOpMode {
     private static final double DRIVE_POWER = 0.8;
     private static final double TURN_POWER = 0.5;
     private static final double SPIN_UP_TIME_S = 2.0;
-    private static final double BURST_SHOOTING_TIME_S = 4.0;
+    private static final double BURST_SHOOTING_TIME_S = 5.0;
 
     private static final double TILE = 24.0; // inches
 
