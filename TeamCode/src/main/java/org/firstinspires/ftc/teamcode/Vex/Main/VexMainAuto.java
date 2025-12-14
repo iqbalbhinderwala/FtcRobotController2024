@@ -136,7 +136,11 @@ public class VexMainAuto extends LinearOpMode {
         double targetX = -0.5 * TILE + (isRed ? -2 : 0); // x-offset up
         double targetY = +0.5 * TILE * (isRed ? +1 :-1); // y-mirror
 
-        driveTrain.driveTo(targetX-2, targetY, DRIVE_POWER); // underdrive by 2 inch to prevent overshoot towards +X
+        if (isRed) {
+            driveTrain.driveTo(targetX - 1, targetY, DRIVE_POWER); // underdrive by 2 inch to prevent overshoot towards +X
+        } else {
+            driveTrain.driveTo(targetX - 0, targetY, DRIVE_POWER); // underdrive by 2 inch to prevent overshoot towards +X
+        }
         driveTrain.turnToHeading((currentAlliance == DecodeField.Alliance.RED) ? 180 : 0, TURN_POWER);
         actuators.setIntakePower(1);
         driveTrain.driveTo(targetX, 2.36 * TILE * (isRed?1:-1), 0.3);
@@ -277,7 +281,7 @@ public class VexMainAuto extends LinearOpMode {
             }
         } else { // BLUE
             if (isFar) {    // BLUE AUDIENCE SIDE
-                adjustment = isAcuteTurn ? 2 : 6; // CCW adjustment for acute / obtuse turns -- BLUE AUDIENCE SIDE
+                adjustment = isAcuteTurn ? 2 : 10; // CCW adjustment for acute / obtuse turns -- BLUE AUDIENCE SIDE
             } else {        // BLUE OBELISK SIDE
                 adjustment = isAcuteTurn ? 3 : 6; // CCW adjustment for acute / obtuse turns -- BLUE OBELISK SIDE
             }
@@ -358,7 +362,7 @@ public class VexMainAuto extends LinearOpMode {
     private static final double DRIVE_POWER = 0.8;
     private static final double TURN_POWER = 0.5;
     private static final double SPIN_UP_TIME_S = 2.0;
-    private static final double BURST_SHOOTING_TIME_S = 3.0;
+    private static final double BURST_SHOOTING_TIME_S = 4.0;
 
     private static final double TILE = 24.0; // inches
 
