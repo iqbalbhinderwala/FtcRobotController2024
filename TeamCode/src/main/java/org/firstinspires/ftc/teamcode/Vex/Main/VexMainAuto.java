@@ -171,7 +171,7 @@ public class VexMainAuto extends LinearOpMode {
 
         // Drive to GPP
         //  Intake is not in the middle of the robot (shift by 2 inches)
-        double targetX = +1.5 * TILE + (isRed ? -2 : +2);
+        double targetX = +1.5 * TILE + (isRed ? 0 : +2);
         double targetY = +0.75 * TILE * (isRed?1:-1);
 
         if (isRed) {
@@ -253,7 +253,7 @@ public class VexMainAuto extends LinearOpMode {
         boolean isRed = (currentAlliance == DecodeField.Alliance.RED);
         double targetX = +3.0 * TILE - 9 - 8; // 8 inches from start position to clear wall
         double targetY = +0.5 * TILE * (isRed ? 1 : -1);
-        driveTrain.driveTo(targetX, targetY, 0.5);
+        driveTrain.driveTo(targetX, targetY, 0.4);
 
         // 2. Turn to face the alliance corner
         turnTowardsCorner(true);
