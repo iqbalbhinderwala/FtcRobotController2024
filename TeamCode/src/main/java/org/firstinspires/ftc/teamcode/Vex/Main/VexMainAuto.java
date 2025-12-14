@@ -277,7 +277,7 @@ public class VexMainAuto extends LinearOpMode {
             }
         } else { // BLUE
             if (isFar) {    // BLUE AUDIENCE SIDE
-                adjustment = isAcuteTurn ? 2 : 3; // CCW adjustment for acute / obtuse turns -- BLUE AUDIENCE SIDE
+                adjustment = isAcuteTurn ? 2 : 6; // CCW adjustment for acute / obtuse turns -- BLUE AUDIENCE SIDE
             } else {        // BLUE OBELISK SIDE
                 adjustment = isAcuteTurn ? 3 : 6; // CCW adjustment for acute / obtuse turns -- BLUE OBELISK SIDE
             }

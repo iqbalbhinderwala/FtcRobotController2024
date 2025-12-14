@@ -33,8 +33,8 @@ public class DecodeField {
     public static final double BLUE_CORNER_Y = -3.0 * TILE; // -72 inches
 
     public static final double MINIMUM_SHOOTING_DISTANCE = 2.4 * TILE;
-    public static final double MAXIMUM_NEAR_SHOOTING_ANGLE_ERROR_DEGREES = 10.0; // degrees
-    public static final double MAXIMUM_FAR_SHOOTING_ANGLE_ERROR_DEGREES = 4.0; // degrees
+    public static final double MAXIMUM_NEAR_SHOOTING_ANGLE_ERROR_DEGREES = 7.0; // degrees
+    public static final double MAXIMUM_FAR_SHOOTING_ANGLE_ERROR_DEGREES = 3.5; // degrees
 
     public enum Alliance { RED, BLUE, UNKNOWN }
 

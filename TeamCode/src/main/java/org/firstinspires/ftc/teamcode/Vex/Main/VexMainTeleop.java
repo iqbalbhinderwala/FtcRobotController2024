@@ -568,8 +568,8 @@ public class VexMainTeleop extends LinearOpMode {
 
     private final double BUTTON_DELAY = 0.25;
 
-    final double MAX_DRIVE_SPEED  = 1.0;
-    final double MAX_STRAFE_SPEED = 1.0;
+    final double MAX_DRIVE_SPEED  = 0.8;
+    final double MAX_STRAFE_SPEED = 0.8;
     final double MAX_TURN_SPEED   = 0.5;
     final double TURN_TOLERANCE_DEGREES = 3.0;
 

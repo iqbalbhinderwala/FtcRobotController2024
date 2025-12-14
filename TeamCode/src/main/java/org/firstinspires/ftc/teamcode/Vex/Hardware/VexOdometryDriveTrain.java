@@ -11,6 +11,7 @@ import com.qualcomm.robotcore.util.ElapsedTime;
 import com.qualcomm.robotcore.util.Range;
 
 import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit;
+import org.firstinspires.ftc.robotcore.external.navigation.AngularVelocity;
 import org.firstinspires.ftc.robotcore.external.navigation.DistanceUnit;
 import org.firstinspires.ftc.robotcore.external.navigation.Pose2D;
 import org.firstinspires.ftc.robotcore.external.navigation.Pose3D;
@@ -25,6 +26,7 @@ public class VexOdometryDriveTrain {
     private LinearOpMode opMode;
 
     // Core Components
+    private IMU imu;
     private IMUHeadingProvider headingProvider;
     private TwistOdometry odometry;
 
@@ -103,11 +105,25 @@ public class VexOdometryDriveTrain {
 
         // Now initialize the IMU with this mounting orientation
         // This sample expects the IMU to be in a REV Hub and named "imu".
-        IMU imu = hardwareMap.get(IMU.class, "imu");
+        imu = hardwareMap.get(IMU.class, "imu");
+
         imu.initialize(new IMU.Parameters(orientationOnRobot));
         imu.resetYaw(); // Reset the IMU heading.
 
         headingProvider = new IMUHeadingProvider(imu);
+    }
+
+    /**
+     * Gets the current rotational velocity of the robot.
+     * @return The turn speed in Degrees Per Second. Positive is usually Counter-Clockwise.
+     */
+    public double getTurnSpeed() {
+        // Get the angular velocity from the IMU
+        AngularVelocity angularVelocity = imu.getRobotAngularVelocity(AngleUnit.DEGREES);
+
+        // For a standard robot drive train on the floor, the Z-axis represents the turning speed.
+        // (The SDK handles axis remapping based on the orientation parameters set in the constructor).
+        return angularVelocity.zRotationRate;
     }
 
     /**
@@ -243,7 +259,7 @@ public class VexOdometryDriveTrain {
             double turnPower = calculateTurnPower(targetHeading, headingProvider.getHeading());
 
             // Limit the turn power to the maxPower
-            turnPower = Range.clip(turnPower, -maxPower, maxPower);
+            turnPower = Range.clip(turnPower, -maxPower, maxPower); 
 
             // Send power to the robot to make it turn. No forward or strafe movement.
             moveRobot(0, 0, turnPower);
