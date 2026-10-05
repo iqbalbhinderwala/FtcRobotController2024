@@ -17,6 +17,7 @@ import org.firstinspires.ftc.teamcode.Vex.Hardware.VexLeds;
 import org.firstinspires.ftc.teamcode.Vex.Hardware.VexOdometryDriveTrain;
 import org.firstinspires.ftc.teamcode.Vex.Hardware.VexVision;
 import org.firstinspires.ftc.vision.apriltag.AprilTagDetection;
+import org.firstinspires.ftc.vision.apriltag.AprilTagSingleDetection;
 
 /**
  * This is the main TeleOp program for the Vex robot, structured like an Iterative OpMode
@@ -221,7 +222,7 @@ public class VexMainTeleop extends LinearOpMode {
             Log.d(TAG, "opModeLoop: IMU TO VISION HEADING ERROR: " + headingError);
 
             // 3. DETERMINE IF IMU JUMPED (Hard Threshold)            
-            if (Math.abs(headingError) > IMU_ANOMALY_THRESHOLD_DEG && newDetection.decisionMargin > 70) {
+            if (Math.abs(headingError) > IMU_ANOMALY_THRESHOLD_DEG && newDetection instanceof AprilTagSingleDetection && ((AprilTagSingleDetection) newDetection).decisionMargin > 70) {
                 acceptVisionHeadingOverIMU = true; // If error > 12.5 deg, assume IMU jumped
             }
 

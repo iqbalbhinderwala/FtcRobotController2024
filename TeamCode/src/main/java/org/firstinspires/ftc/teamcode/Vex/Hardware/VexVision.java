@@ -17,6 +17,7 @@ import org.firstinspires.ftc.vision.VisionPortal;
 import org.firstinspires.ftc.vision.apriltag.AprilTagDetection;
 import org.firstinspires.ftc.vision.apriltag.AprilTagGameDatabase;
 import org.firstinspires.ftc.vision.apriltag.AprilTagProcessor;
+import org.firstinspires.ftc.vision.apriltag.AprilTagSingleDetection;
 
 import java.util.List;
 import java.util.concurrent.TimeUnit;
@@ -192,12 +193,15 @@ public class VexVision {
         double maxMargin = 0;
 
         for (AprilTagDetection detection : currentDetections) {
-            // Ensure the detection has metadata and a valid pose
-            if (detection.metadata != null && detection.metadata.name.contains("Target")
-                    && detection.decisionMargin > maxMargin) {
+            if (detection instanceof AprilTagSingleDetection) {
+                AprilTagSingleDetection singleDet = (AprilTagSingleDetection) detection;
+                // Ensure the detection has metadata and a valid pose
+                if (singleDet.metadata != null && singleDet.metadata.name.contains("Target")
+                        && singleDet.decisionMargin > maxMargin) {
 
-                maxMargin = detection.decisionMargin;
-                best = detection;
+                    maxMargin = singleDet.decisionMargin;
+                    best = detection;
+                }
             }
         }
 
@@ -220,12 +224,15 @@ public class VexVision {
         double minRange = Double.MAX_VALUE;
 
         for (AprilTagDetection detection : currentDetections) {
-            // Ensure the detection has metadata and a valid pose range
-            if (detection.metadata != null && detection.metadata.name.contains("Target")
-                    && detection.ftcPose.range < minRange) {
+            if (detection instanceof AprilTagSingleDetection) {
+                AprilTagSingleDetection singleDet = (AprilTagSingleDetection) detection;
+                // Ensure the detection has metadata and a valid pose range
+                if (singleDet.metadata != null && singleDet.metadata.name.contains("Target")
+                        && detection.ftcPose.range < minRange) {
 
-                minRange = detection.ftcPose.range;
-                closest = detection;
+                    minRange = detection.ftcPose.range;
+                    closest = detection;
+                }
             }
         }
 
@@ -240,24 +247,29 @@ public class VexVision {
             return;
         }
 
-        // DEBUG
-        telemetry.addLine(String.format("\n==== (ID %d) %s", detection.id, detection.metadata.name));
-        telemetry.addLine(String.format("Decision Margin %6.2f, Hamming %d", detection.decisionMargin, detection.hamming));
+        if (detection instanceof AprilTagSingleDetection) {
+            AprilTagSingleDetection singleDet = (AprilTagSingleDetection) detection;
+            // DEBUG
+            telemetry.addLine(String.format("\n==== (ID %d) %s", singleDet.id, singleDet.metadata.name));
+            telemetry.addLine(String.format("Decision Margin %6.2f, Hamming %d", singleDet.decisionMargin, singleDet.hamming));
 
-        telemetry.addLine(String.format("XYZ %6.1f %6.1f %6.1f  (inch)", detection.ftcPose.x, detection.ftcPose.y, detection.ftcPose.z));
-        telemetry.addLine(String.format("PRY %6.1f %6.1f %6.1f  (deg)", detection.ftcPose.pitch, detection.ftcPose.roll, detection.ftcPose.yaw));
-        telemetry.addLine(String.format("RBE %6.1f %6.1f %6.1f  (inch, deg, deg)", detection.ftcPose.range, detection.ftcPose.bearing, detection.ftcPose.elevation));
+            telemetry.addLine(String.format("XYZ %6.1f %6.1f %6.1f  (inch)", detection.ftcPose.x, detection.ftcPose.y, detection.ftcPose.z));
+            telemetry.addLine(String.format("PRY %6.1f %6.1f %6.1f  (deg)", detection.ftcPose.pitch, detection.ftcPose.roll, detection.ftcPose.yaw));
+            telemetry.addLine(String.format("RBE %6.1f %6.1f %6.1f  (inch, deg, deg)", detection.ftcPose.range, detection.ftcPose.bearing, detection.ftcPose.elevation));
 
-        telemetry.addLine(String.format("  Tag Field Pos: %s", detection.metadata.fieldPosition.toString()));
+            telemetry.addLine(String.format("  Tag Field Pos: %s", singleDet.metadata.fieldPosition.toString()));
+        }
 
-        telemetry.addLine(String.format("XYZ %6.1f %6.1f %6.1f  (inch)",
-                detection.robotPose.getPosition().x,
-                detection.robotPose.getPosition().y,
-                detection.robotPose.getPosition().z));
-        telemetry.addLine(String.format("PRY %6.1f %6.1f %6.1f  (deg)",
-                detection.robotPose.getOrientation().getPitch(AngleUnit.DEGREES),
-                detection.robotPose.getOrientation().getRoll(AngleUnit.DEGREES),
-                detection.robotPose.getOrientation().getYaw(AngleUnit.DEGREES)));
+        if (detection.robotPose != null) {
+            telemetry.addLine(String.format("XYZ %6.1f %6.1f %6.1f  (inch)",
+                    detection.robotPose.getPosition().x,
+                    detection.robotPose.getPosition().y,
+                    detection.robotPose.getPosition().z));
+            telemetry.addLine(String.format("PRY %6.1f %6.1f %6.1f  (deg)",
+                    detection.robotPose.getOrientation().getPitch(AngleUnit.DEGREES),
+                    detection.robotPose.getOrientation().getRoll(AngleUnit.DEGREES),
+                    detection.robotPose.getOrientation().getYaw(AngleUnit.DEGREES)));
+        }
 
 
         // Add "key" information to telemetry
