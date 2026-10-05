@@ -1,5 +1,6 @@
 package org.firstinspires.ftc.teamcode.Vex.Calibration;
 
+import com.qualcomm.robotcore.eventloop.opmode.Disabled;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 import com.qualcomm.robotcore.util.ElapsedTime;
@@ -17,6 +18,7 @@ import java.util.List;
 import java.util.Locale;
 
 @TeleOp(name = "[Vex] Ball Shooting Recorder", group = "VexTest")
+@Disabled
 public class VexBallShootingRecorder extends LinearOpMode {
     // --- Data Class ---
     private static class RpmDataPoint {

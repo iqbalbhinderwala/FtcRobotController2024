@@ -1,5 +1,6 @@
 package org.firstinspires.ftc.teamcode.Vex.Calibration;
 
+import com.qualcomm.robotcore.eventloop.opmode.Disabled;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 import com.qualcomm.robotcore.util.ElapsedTime;
@@ -20,6 +21,7 @@ import org.firstinspires.ftc.teamcode.Vex.Hardware.VexOdometryDriveTrain;
  * 7. You can press 'A' to run the test again.
  */
 @TeleOp(name="[Vex] Odometry Calibration", group="VexTest")
+@Disabled
 public class VexOdometryCalibration extends LinearOpMode {
 
     // Instantiate the drive train, which also handles odometry

@@ -18,7 +18,7 @@ import java.util.List;
 import java.util.Locale;
 
 @TeleOp(name = "[Vex] Shooter Step Response Recorder", group = "VexTest")
-//@Disabled
+@Disabled
 public class VexShooterStepResponseRecorder extends LinearOpMode {
 
     // Data class for high-frequency time sampling

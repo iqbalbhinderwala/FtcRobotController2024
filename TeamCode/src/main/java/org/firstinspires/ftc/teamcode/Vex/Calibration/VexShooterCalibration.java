@@ -1,5 +1,6 @@
 package org.firstinspires.ftc.teamcode.Vex.Calibration;
 
+import com.qualcomm.robotcore.eventloop.opmode.Disabled;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 import com.qualcomm.robotcore.util.ElapsedTime;
@@ -16,6 +17,7 @@ import org.firstinspires.ftc.teamcode.Vex.Hardware.VexVision;
 import org.firstinspires.ftc.vision.apriltag.AprilTagDetection;
 
 @TeleOp(name="[Vex] Shooter Calibration", group="VexTest")
+@Disabled
 public class VexShooterCalibration extends LinearOpMode {
 
     private VexActuators actuators = new VexActuators(this);

@@ -1,6 +1,7 @@
 package org.firstinspires.ftc.teamcode.Vex.Auto;
 
 import com.qualcomm.robotcore.eventloop.opmode.Autonomous;
+import com.qualcomm.robotcore.eventloop.opmode.Disabled;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.util.ElapsedTime;
 import com.qualcomm.robotcore.util.Range;
@@ -12,6 +13,7 @@ import org.firstinspires.ftc.teamcode.Vex.Hardware.VexOdometryDriveTrain;
 // Simple program to test driving to coordinates and turning to a heading.
 
 @Autonomous(name="[Vex] Odometry Test", group="VexTest")
+@Disabled
 public class VexAutoOdometryTest extends LinearOpMode
 {
     VexOdometryDriveTrain robot = new VexOdometryDriveTrain(this);

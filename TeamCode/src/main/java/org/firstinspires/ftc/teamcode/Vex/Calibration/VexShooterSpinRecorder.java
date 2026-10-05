@@ -18,7 +18,7 @@ import java.util.List;
 import java.util.Locale;
 
 @TeleOp(name = "[Vex] Shooter Spin Recorder", group = "VexTest")
-//@Disabled
+@Disabled
 public class VexShooterSpinRecorder extends LinearOpMode {
 
     // Using a simple data class to hold our measurements
