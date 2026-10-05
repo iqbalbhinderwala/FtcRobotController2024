@@ -1,6 +1,7 @@
 package org.firstinspires.ftc.teamcode.Vex.Main;
 
 import android.util.Log;
+import com.qualcomm.robotcore.eventloop.opmode.Disabled;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 import com.qualcomm.robotcore.util.ElapsedTime;
@@ -40,6 +41,7 @@ import org.firstinspires.ftc.vision.apriltag.AprilTagSingleDetection;
  * - D-Pad Left/Right: Resets the shooter power adjustment to zero.
  */
 @TeleOp(name = "[Vex] Main TeleOp", group = "Vex")
+@Disabled
 public class VexMainTeleop extends LinearOpMode {
     private static final String TAG = "VEX::MainTele";
 

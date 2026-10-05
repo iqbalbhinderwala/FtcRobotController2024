@@ -3,6 +3,7 @@ package org.firstinspires.ftc.teamcode.Vex.Main;
 import android.util.Log;
 
 import com.qualcomm.robotcore.eventloop.opmode.Autonomous;
+import com.qualcomm.robotcore.eventloop.opmode.Disabled;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.util.ElapsedTime;
 
@@ -20,6 +21,7 @@ import org.firstinspires.ftc.teamcode.Vex.Hardware.VexOdometryDriveTrain;
  * scenarios: starting near the Audience Wall or the Obelisk Wall.
  */
 @Autonomous(name = "[Vex] Auto Main", group = "Vex")
+@Disabled
 public class VexMainAuto extends LinearOpMode {
 
     // Hardware and helper classes

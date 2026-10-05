@@ -29,6 +29,7 @@
 
 package org.firstinspires.ftc.teamcode.Vex.Test;
 
+import com.qualcomm.robotcore.eventloop.opmode.Disabled;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 import com.qualcomm.robotcore.hardware.DcMotor;
@@ -37,7 +38,7 @@ import com.qualcomm.robotcore.hardware.Servo;
 import com.qualcomm.robotcore.util.ElapsedTime;
 
 @TeleOp(name="[Vex] Actuators Hardware Test", group="VexTest")
-//@Disabled
+@Disabled
 public class VexActuatorsHWTest extends LinearOpMode {
 
     // Declare OpMode members.

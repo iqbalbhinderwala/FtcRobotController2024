@@ -29,6 +29,7 @@
 
 package org.firstinspires.ftc.teamcode.Vex.Test;
 
+import com.qualcomm.robotcore.eventloop.opmode.Disabled;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 import com.qualcomm.robotcore.hardware.DcMotor;
@@ -67,7 +68,7 @@ import java.util.Arrays;
  */
 
 @TeleOp(name="[Vex] Wheels Hardware Test", group="VexTest")
-//@Disabled
+@Disabled
 public class VexWheelsHWTest extends LinearOpMode {
 
     // Declare OpMode members for each of the 4 motors.

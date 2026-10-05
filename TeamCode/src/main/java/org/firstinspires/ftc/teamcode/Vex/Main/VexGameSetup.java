@@ -1,5 +1,6 @@
 package org.firstinspires.ftc.teamcode.Vex.Main;
 
+import com.qualcomm.robotcore.eventloop.opmode.Disabled;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 import org.firstinspires.ftc.teamcode.Vex.Hardware.DecodeField;
@@ -17,6 +18,7 @@ import java.util.Locale;
  * The selection is stored on the blackboard for other OpModes to read.
  */
 @TeleOp(name = "[Vex] Game Setup", group = "Vex")
+@Disabled
 public class VexGameSetup extends LinearOpMode {
 
     private enum SetupState {

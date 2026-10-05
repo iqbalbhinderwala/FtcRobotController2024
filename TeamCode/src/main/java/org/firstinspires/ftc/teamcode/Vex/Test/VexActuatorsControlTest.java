@@ -29,6 +29,7 @@
 
 package org.firstinspires.ftc.teamcode.Vex.Test;
 
+import com.qualcomm.robotcore.eventloop.opmode.Disabled;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 import com.qualcomm.robotcore.util.ElapsedTime;
@@ -37,6 +38,7 @@ import org.firstinspires.ftc.teamcode.Vex.Hardware.VexActuators;
 import org.firstinspires.ftc.teamcode.Vex.Hardware.VexOdometryDriveTrain;
 
 @TeleOp(name="[Vex] Actuators Control Test", group="VexTest")
+@Disabled
 public class VexActuatorsControlTest extends LinearOpMode {
 
     private VexActuators actuators = new VexActuators(this);
