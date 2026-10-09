@@ -39,9 +39,19 @@ public class Drawing {
     public static String GRID_TEXT_FONT = "2px sans-serif"; // Coordinate text font
     public static double GRID_TEXT_ROTATION_DEG = 0.0; // Text rotation in degrees
 
+    public static boolean USE_ROBOT_IMAGE = true;
+    public static String ROBOT_IMAGE_PATH = "/images/robot.png";
+    public static double ROBOT_IMAGE_OFFSET_ROTATION_DEG = 0.0; // Adjustment angle if robot image is rotated
+    public static boolean DRAW_ROBOT_OUTLINE = true;            // Draw outline and heading line on top of image
+    public static double ROBOT_ALPHA = 1.0;
+
     public static double ROBOT_WIDTH = 18.0;
     public static double ROBOT_LENGTH = 17.0;
     public static double AXIS_LENGTH = 40.0;
+
+    public static int ROBOT_OUTLINE_STROKE_WIDTH = 1;  // Stroke width for robot body outline
+    public static int ROBOT_HEADING_STROKE_WIDTH = 2;  // Stroke width for heading vector line
+    public static int AXIS_STROKE_WIDTH = 1;           // Stroke width for coordinate axes
 
     public static String ROBOT_BODY_COLOR = "white";
     public static String ROBOT_HEADING_COLOR = "orange";
@@ -65,9 +75,11 @@ public class Drawing {
             drawFieldInternal(fieldOverlay, CONVENTION);
         }
 
-        // Draw robot body and heading line
+        // Draw robot body, image, and heading line
         if (pose != null) {
+            fieldOverlay.setAlpha(ROBOT_ALPHA);
             drawRobotInternal(fieldOverlay, pose, ROBOT_WIDTH, ROBOT_LENGTH, ROBOT_BODY_COLOR, ROBOT_HEADING_COLOR, CONVENTION);
+            fieldOverlay.setAlpha(1.0);
         }
 
         // Draw coordinate axes if enabled
@@ -159,11 +171,11 @@ public class Drawing {
         applyFieldTransform(fieldOverlay, convention);
 
         fieldOverlay.setStroke(X_AXIS_COLOR);
-        fieldOverlay.setStrokeWidth(1);
+        fieldOverlay.setStrokeWidth(AXIS_STROKE_WIDTH);
         fieldOverlay.strokeLine(0, 0, length, 0);
 
         fieldOverlay.setStroke(Y_AXIS_COLOR);
-        fieldOverlay.setStrokeWidth(1);
+        fieldOverlay.setStrokeWidth(AXIS_STROKE_WIDTH);
         fieldOverlay.strokeLine(0, 0, 0, length);
     }
 
@@ -174,32 +186,53 @@ public class Drawing {
         double y = pose.y();
         double heading = pose.heading();
 
-        double halfWidth = width / 2.0;
-        double halfLength = length / 2.0;
+        // Draw custom robot PNG image if enabled
+        if (USE_ROBOT_IMAGE && ROBOT_IMAGE_PATH != null && !ROBOT_IMAGE_PATH.isEmpty()) {
+            double imgW = length;
+            double imgH = width;
+            double anchorX = imgW / 2.0;
+            double anchorY = imgH / 2.0;
+            double imgRotation = heading + Math.toRadians(ROBOT_IMAGE_OFFSET_ROTATION_DEG);
 
-        double[] xCorners = {halfLength, halfLength, -halfLength, -halfLength};
-        double[] yCorners = {halfWidth, -halfWidth, -halfWidth, halfWidth};
-
-        double[] xRotated = new double[4];
-        double[] yRotated = new double[4];
-
-        double cos = Math.cos(heading);
-        double sin = Math.sin(heading);
-
-        for (int i = 0; i < 4; i++) {
-            xRotated[i] = x + (xCorners[i] * cos - yCorners[i] * sin);
-            yRotated[i] = y + (xCorners[i] * sin + yCorners[i] * cos);
+            fieldOverlay.drawImage(
+                    ROBOT_IMAGE_PATH,
+                    x, y,
+                    imgW, imgH,
+                    -imgRotation,
+                    anchorX, anchorY,
+                    false
+            );
         }
 
-        fieldOverlay.setStroke(bodyColor);
-        fieldOverlay.setStrokeWidth(2);
-        fieldOverlay.strokePolygon(xRotated, yRotated);
+        // Draw robot polygon outline & heading vector line if enabled
+        if (!USE_ROBOT_IMAGE || DRAW_ROBOT_OUTLINE) {
+            double halfWidth = width / 2.0;
+            double halfLength = length / 2.0;
 
-        double headX = x + (halfLength + 6.0) * cos;
-        double headY = y + (halfLength + 6.0) * sin;
+            double[] xCorners = {halfLength, halfLength, -halfLength, -halfLength};
+            double[] yCorners = {halfWidth, -halfWidth, -halfWidth, halfWidth};
 
-        fieldOverlay.setStroke(headingColor);
-        fieldOverlay.setStrokeWidth(3);
-        fieldOverlay.strokeLine(x, y, headX, headY);
+            double[] xRotated = new double[4];
+            double[] yRotated = new double[4];
+
+            double cos = Math.cos(heading);
+            double sin = Math.sin(heading);
+
+            for (int i = 0; i < 4; i++) {
+                xRotated[i] = x + (xCorners[i] * cos - yCorners[i] * sin);
+                yRotated[i] = y + (xCorners[i] * sin + yCorners[i] * cos);
+            }
+
+            fieldOverlay.setStroke(bodyColor);
+            fieldOverlay.setStrokeWidth(ROBOT_OUTLINE_STROKE_WIDTH);
+            fieldOverlay.strokePolygon(xRotated, yRotated);
+
+            double headX = x + (halfLength + 6.0) * cos;
+            double headY = y + (halfLength + 6.0) * sin;
+
+            fieldOverlay.setStroke(headingColor);
+            fieldOverlay.setStrokeWidth(ROBOT_HEADING_STROKE_WIDTH);
+            fieldOverlay.strokeLine(x, y, headX, headY);
+        }
     }
 }
