@@ -106,24 +106,27 @@ public class LimelightAprilTagTest extends LinearOpMode {
 
                 telemetry.addLine("\n--- AprilTags in View (" + tags.size() + ") ---");
 
+                // Telemetry keys must be unique, so each tag gets its own "Tag <id>" entry
                 for (LLResultTypes.FiducialResult tag : tags) {
-                    telemetry.addLine("Tag ID: " + tag.getFiducialId());
-                    telemetry.addData(" > Target (deg)", "X:%.2f, Y:%.2f", tag.getTargetXDegrees(), tag.getTargetYDegrees());
-
-                    // Calculate distance to tag (if pose is available)
                     Pose3D tagPose = tag.getTargetPoseCameraSpace();
-                    if (tagPose != null) {
-                        double tx = tagPose.getPosition().x;
-                        double ty = tagPose.getPosition().y;
-                        double tz = tagPose.getPosition().z;
-
-                        // Total Euclidean Distance
-                        double distMeters = Math.sqrt(tx*tx + ty*ty + tz*tz);
-                        double distInches = distMeters * 39.3701;
-
-                        telemetry.addData(" > Rel Pose (m)", "X:%.2f, Y:%.2f, Z:%.2f", tx, ty, tz);
-                        telemetry.addData(" > Distance", "%.2f m (%.1f in)", distMeters, distInches);
+                    if (tagPose == null) {
+                        telemetry.addData("Tag " + tag.getFiducialId(), "no pose");
+                        continue;
                     }
+
+                    double tx = tagPose.getPosition().x;
+                    double ty = tagPose.getPosition().y;
+                    double tz = tagPose.getPosition().z;
+                    double distInches = Math.sqrt(tx*tx + ty*ty + tz*tz) * 39.3701;
+
+                    telemetry.addData("Tag " + tag.getFiducialId(),
+                            "pos(m) X:%+5.2f Y:%+5.2f Z:%+5.2f | rot(deg) P:%+6.1f R:%+6.1f Y:%+6.1f | %5.1f in | tx:%+6.1f ty:%+6.1f",
+                            tx, ty, tz,
+                            tagPose.getOrientation().getPitch(AngleUnit.DEGREES),
+                            tagPose.getOrientation().getRoll(AngleUnit.DEGREES),
+                            tagPose.getOrientation().getYaw(AngleUnit.DEGREES),
+                            distInches,
+                            tag.getTargetXDegrees(), tag.getTargetYDegrees());
                 }
 
                 // 3. PERFORMANCE DATA
