@@ -16,7 +16,8 @@ import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 
 import org.firstinspires.ftc.teamcode.Barry.Pedro.Constants;
 
-@Autonomous(name = "SampleAutoPath", group = "Autonomous")
+// https://ftc-docs.firstinspires.org/en/latest/programming_resources/shared/auto_load_opmode/auto-load-opmode.html
+@Autonomous(name = "[Barry] SampleAutoPath", group = "Autonomous", preselectTeleOp = "[Barry] Mecanum Drive")
 public class SampleAutoPath extends LinearOpMode {
 
     private Follower follower;

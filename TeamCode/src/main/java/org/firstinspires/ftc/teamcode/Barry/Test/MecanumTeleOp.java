@@ -19,7 +19,7 @@ import org.firstinspires.ftc.teamcode.Barry.Dashboard.Drawing;
  * Pressing START on gamepad1 commands Pedro Pathing to hold the target starting pose.
  */
 @Config
-@TeleOp(name = "Mecanum Drive", group = "BarryTest")
+@TeleOp(name = "[Barry] Mecanum Drive", group = "BarryTest")
 public class MecanumTeleOp extends LinearOpMode {
 
     // Configurable starting pose parameters (Heading in degrees)
