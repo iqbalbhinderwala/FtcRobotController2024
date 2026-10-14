@@ -103,6 +103,47 @@ public class Drawing {
         drawRobot(fieldOverlay, pose);
     }
 
+    /**
+     * Draws an AprilTag cluster: a line along the sticker with a dot at each of its 4 tags.
+     * Tag offsets from the cluster center are from Competition Manual Figure 9-15.
+     *
+     * @param x      cluster center X in inches (Pedro frame)
+     * @param y      cluster center Y in inches (Pedro frame)
+     * @param dirX   unit vector along the sticker, X component (Pedro frame)
+     * @param dirY   unit vector along the sticker, Y component (Pedro frame)
+     * @param color  Dashboard color string
+     * @param label  text drawn next to the center
+     */
+    public static void drawCluster(Canvas fieldOverlay, double x, double y, double dirX, double dirY,
+                                   String color, String label) {
+        if (fieldOverlay == null) {
+            return;
+        }
+        applyFieldTransform(fieldOverlay, CONVENTION);
+
+        final double[] tagOffsets = {-6.50, -2.75, 2.75, 6.50};
+        final double halfLength = 6.50 + 3.25 / 2.0;
+
+        fieldOverlay.setStroke(color);
+        fieldOverlay.setStrokeWidth(2);
+        fieldOverlay.strokeLine(x - dirX * halfLength, y - dirY * halfLength,
+                x + dirX * halfLength, y + dirY * halfLength);
+
+        fieldOverlay.setFill(color);
+        for (double offset : tagOffsets) {
+            fieldOverlay.fillCircle(x + dirX * offset, y + dirY * offset, 1.0);
+        }
+
+        fieldOverlay.setStroke("white");
+        fieldOverlay.setStrokeWidth(1);
+        fieldOverlay.strokeCircle(x, y, 1.5);
+
+        if (label != null && !label.isEmpty()) {
+            fieldOverlay.setFill(color);
+            fieldOverlay.fillText(label, x + 2.0, y + 2.0, GRID_TEXT_FONT, 0.0, false);
+        }
+    }
+
     // =========================================================================
     // Internal Drawing Helpers
     // =========================================================================
