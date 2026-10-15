@@ -20,6 +20,12 @@ public class Drawing {
 
     // Configurable Dashboard Settings
     public static CoordinateConvention CONVENTION = CoordinateConvention.PEDRO;
+    /**
+     * Reflects the whole canvas (image, axes, robot, overlays) through the field center, i.e. turns
+     * the view 180 degrees: the blue side shows where the red side was. Display only; coordinates
+     * are unchanged.
+     */
+    public static boolean BLUE_PERSPECTIVE = false;
 
     public static boolean DRAW_FIELD = true;
     public static boolean DRAW_AXES = true;
@@ -29,6 +35,8 @@ public class Drawing {
     public static String FIELD_IMAGE_PATH = "/images/BIOBUZZ_field_2026.webp";
     public static double FIELD_IMAGE_WIDTH = 144.0;
     public static double FIELD_IMAGE_HEIGHT = 144.0;
+    /** Rotates only the field background image about its center, degrees counter-clockwise on screen. */
+    public static double FIELD_IMAGE_ROTATION_DEG = 0.0;
 
     public static double GRID_STEP = 24.0;             // Grid step in inches
     public static double GRID_DOT_RADIUS = 0.2;        // Radius of lattice dots in inches
@@ -197,49 +205,68 @@ public class Drawing {
     // Internal Drawing Helpers
     // =========================================================================
 
+    /** Canvas rotation of a convention, without BLUE_PERSPECTIVE (radians). */
+    private static double conventionRotation(CoordinateConvention convention) {
+        return convention == CoordinateConvention.PEDRO ? Math.toRadians(-90.0) : Math.toRadians(180.0);
+    }
+
+    /** Canvas rotation of a convention, including BLUE_PERSPECTIVE (radians). */
+    private static double totalRotation(CoordinateConvention convention) {
+        return conventionRotation(convention) + (BLUE_PERSPECTIVE ? Math.PI : 0.0);
+    }
+
     /**
      * Maps the convention's coordinates onto the Dashboard canvas. Both conventions put the field
      * image in the same place on screen; only the axes differ. FTC = Pedro rotated 90 degrees:
      * ftcX = 72 - pedroY, ftcY = pedroX - 72, which on the canvas is a 180 degree rotation.
+     * BLUE_PERSPECTIVE then reflects everything through the field center (canvas origin).
      */
     private static void applyFieldTransform(Canvas fieldOverlay, CoordinateConvention convention) {
-        if (convention == CoordinateConvention.PEDRO) {
-            fieldOverlay
-                    .setRotation(Math.toRadians(-90.0))
-                    .setTranslation(-72.0, 72.0);
-        } else {
-            fieldOverlay
-                    .setRotation(Math.toRadians(180.0))
-                    .setTranslation(0.0, 0.0);
+        double tx = (convention == CoordinateConvention.PEDRO) ? -72.0 : 0.0;
+        double ty = (convention == CoordinateConvention.PEDRO) ? 72.0 : 0.0;
+        if (BLUE_PERSPECTIVE) {
+            tx = -tx;
+            ty = -ty;
         }
+        fieldOverlay
+                .setRotation(totalRotation(convention))
+                .setTranslation(tx, ty);
     }
 
     /**
      * A point moved by (right, up) inches on screen, in the convention's coordinates. Keeps labels
-     * at the same place next to what they label whatever the convention.
-     * Pedro: screen right = +X, up = +Y. FTC: screen right = +Y, up = -X.
+     * at the same place next to what they label whatever the convention and perspective.
      */
     private static double[] screenOffset(CoordinateConvention convention, double x, double y,
                                          double right, double up) {
-        return convention == CoordinateConvention.FTC
-                ? new double[]{x - up, y + right}
-                : new double[]{x + right, y + up};
+        // On the canvas (before our transform) screen up = +X and screen right = -Y
+        double cx = up;
+        double cy = -right;
+        // Undo the convention's total rotation to express that vector in its coordinates
+        double a = -totalRotation(convention);
+        return new double[]{
+                x + cx * Math.cos(a) - cy * Math.sin(a),
+                y + cx * Math.sin(a) + cy * Math.cos(a)};
     }
 
-    /** Text angle that keeps labels upright on screen whatever the convention's canvas rotation. */
+    /** Text angle that keeps labels upright on screen whatever the convention and perspective. */
     private static double textTheta(CoordinateConvention convention, double theta) {
-        return convention == CoordinateConvention.FTC ? theta - Math.PI / 2.0 : theta;
+        // Labels are upright in Pedro from the red perspective; compensate for any extra canvas rotation
+        return theta + totalRotation(convention) - conventionRotation(CoordinateConvention.PEDRO);
     }
 
     private static void drawFieldInternal(Canvas fieldOverlay, CoordinateConvention convention) {
         // The image is laid out in the Pedro frame; draw it the same way for every convention so it
         // never moves on screen when switching conventions.
+        // Anchored at the image center so FIELD_IMAGE_ROTATION_DEG turns it in place. The image is drawn
+        // with a flipped Y, so a positive canvas angle turns it clockwise on screen; negate for CCW.
         applyFieldTransform(fieldOverlay, CoordinateConvention.PEDRO);
         fieldOverlay.drawImage(
                 FIELD_IMAGE_PATH,
-                0.0, 144.0,
+                FIELD_IMAGE_WIDTH / 2.0, 144.0 - FIELD_IMAGE_HEIGHT / 2.0,
                 FIELD_IMAGE_WIDTH, FIELD_IMAGE_HEIGHT,
-                0.0, 0, 0, false
+                -Math.toRadians(FIELD_IMAGE_ROTATION_DEG),
+                FIELD_IMAGE_WIDTH / 2.0, FIELD_IMAGE_HEIGHT / 2.0, false
         );
         applyFieldTransform(fieldOverlay, convention);
     }
