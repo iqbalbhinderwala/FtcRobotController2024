@@ -14,8 +14,8 @@ import java.util.Locale;
 public class Drawing {
 
     public enum CoordinateConvention {
-        FTC,    // Center origin (0,0), +X UP, +Y LEFT
-        PEDRO   // Bottom-left origin (0,0), +X RIGHT, +Y UP (0 to 144)
+        FTC,    // Origin at the field center, +X toward the audience wall, +Y toward the blue side
+        PEDRO   // Origin at the red / audience wall corner, +X toward the blue side, +Y away from the audience wall (0 to 144)
     }
 
     // Configurable Dashboard Settings
@@ -140,7 +140,8 @@ public class Drawing {
 
         if (label != null && !label.isEmpty()) {
             fieldOverlay.setFill(color);
-            fieldOverlay.fillText(label, x + 2.0, y + 2.0, GRID_TEXT_FONT, 0.0, false);
+            double[] at = screenOffset(CONVENTION, x, y, 2.0, 2.0);
+            fieldOverlay.fillText(label, at[0], at[1], GRID_TEXT_FONT, textTheta(CONVENTION, 0.0), false);
         }
     }
 
@@ -187,7 +188,8 @@ public class Drawing {
 
         if (label != null && !label.isEmpty()) {
             fieldOverlay.setFill("white");
-            fieldOverlay.fillText(label, x - 1.0, y + hh + 1.5, GRID_TEXT_FONT, 0.0, false);
+            double[] at = screenOffset(CONVENTION, x, y, -1.0, hh + 1.5);
+            fieldOverlay.fillText(label, at[0], at[1], GRID_TEXT_FONT, textTheta(CONVENTION, 0.0), false);
         }
     }
 
@@ -195,6 +197,11 @@ public class Drawing {
     // Internal Drawing Helpers
     // =========================================================================
 
+    /**
+     * Maps the convention's coordinates onto the Dashboard canvas. Both conventions put the field
+     * image in the same place on screen; only the axes differ. FTC = Pedro rotated 90 degrees:
+     * ftcX = 72 - pedroY, ftcY = pedroX - 72, which on the canvas is a 180 degree rotation.
+     */
     private static void applyFieldTransform(Canvas fieldOverlay, CoordinateConvention convention) {
         if (convention == CoordinateConvention.PEDRO) {
             fieldOverlay
@@ -202,29 +209,39 @@ public class Drawing {
                     .setTranslation(-72.0, 72.0);
         } else {
             fieldOverlay
-                    .setRotation(0.0)
+                    .setRotation(Math.toRadians(180.0))
                     .setTranslation(0.0, 0.0);
         }
     }
 
-    private static void drawFieldInternal(Canvas fieldOverlay, CoordinateConvention convention) {
-        applyFieldTransform(fieldOverlay, convention);
+    /**
+     * A point moved by (right, up) inches on screen, in the convention's coordinates. Keeps labels
+     * at the same place next to what they label whatever the convention.
+     * Pedro: screen right = +X, up = +Y. FTC: screen right = +Y, up = -X.
+     */
+    private static double[] screenOffset(CoordinateConvention convention, double x, double y,
+                                         double right, double up) {
+        return convention == CoordinateConvention.FTC
+                ? new double[]{x - up, y + right}
+                : new double[]{x + right, y + up};
+    }
 
-        if (convention == CoordinateConvention.PEDRO) {
-            fieldOverlay.drawImage(
-                    FIELD_IMAGE_PATH,
-                    0.0, 144.0,
-                    FIELD_IMAGE_WIDTH, FIELD_IMAGE_HEIGHT,
-                    0.0, 0, 0, false
-            );
-        } else {
-            fieldOverlay.drawImage(
-                    FIELD_IMAGE_PATH,
-                    -72.0, 72.0,
-                    FIELD_IMAGE_WIDTH, FIELD_IMAGE_HEIGHT,
-                    0.0, 0, 0, false
-            );
-        }
+    /** Text angle that keeps labels upright on screen whatever the convention's canvas rotation. */
+    private static double textTheta(CoordinateConvention convention, double theta) {
+        return convention == CoordinateConvention.FTC ? theta - Math.PI / 2.0 : theta;
+    }
+
+    private static void drawFieldInternal(Canvas fieldOverlay, CoordinateConvention convention) {
+        // The image is laid out in the Pedro frame; draw it the same way for every convention so it
+        // never moves on screen when switching conventions.
+        applyFieldTransform(fieldOverlay, CoordinateConvention.PEDRO);
+        fieldOverlay.drawImage(
+                FIELD_IMAGE_PATH,
+                0.0, 144.0,
+                FIELD_IMAGE_WIDTH, FIELD_IMAGE_HEIGHT,
+                0.0, 0, 0, false
+        );
+        applyFieldTransform(fieldOverlay, convention);
     }
 
     private static void drawGridPointsInternal(Canvas fieldOverlay, CoordinateConvention convention) {
@@ -249,7 +266,9 @@ public class Drawing {
                     String label = String.format(Locale.US, "(%d,%d)", Math.round(x), Math.round(y));
                     fieldOverlay
                             .setFill(GRID_TEXT_COLOR)
-                            .fillText(label, x + 1.5, y + 1.5, GRID_TEXT_FONT, Math.toRadians(GRID_TEXT_ROTATION_DEG), false);
+                            .fillText(label, screenOffset(convention, x, y, 1.5, 1.5)[0],
+                                    screenOffset(convention, x, y, 1.5, 1.5)[1], GRID_TEXT_FONT,
+                                    textTheta(convention, Math.toRadians(GRID_TEXT_ROTATION_DEG)), false);
                 }
             }
         }

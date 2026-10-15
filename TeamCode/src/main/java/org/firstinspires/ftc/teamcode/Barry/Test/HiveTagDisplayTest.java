@@ -137,8 +137,9 @@ public class HiveTagDisplayTest extends LinearOpMode {
         telemetry.addData(name + " HIVE tilt", "%+.1f deg", tiltDeg);
         double[] a = toConvention(audience.x, audience.y, true);
         double[] f = toConvention(far.x, far.y, true);
-        telemetry.addData("  audience cluster", "x:%.1f y:%.1f z:%.1f in", a[0], a[1], audience.z);
-        telemetry.addData("  far cluster", "x:%.1f y:%.1f z:%.1f in", f[0], f[1], far.z);
+        // Keys must be unique per HIVE, or blue's lines replace red's
+        telemetry.addData(name + " audience cluster", "x:%.1f y:%.1f z:%.1f in", a[0], a[1], audience.z);
+        telemetry.addData(name + " far cluster", "x:%.1f y:%.1f z:%.1f in", f[0], f[1], far.z);
     }
 
     /**
