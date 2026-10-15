@@ -144,6 +144,53 @@ public class Drawing {
         }
     }
 
+    /**
+     * Draws a single AprilTag as a filled rectangle with a label (top-down view).
+     *
+     * @param x       tag center X in inches (Pedro frame)
+     * @param y       tag center Y in inches (Pedro frame)
+     * @param dirX    unit vector along the tag width, X component (Pedro frame)
+     * @param dirY    unit vector along the tag width, Y component (Pedro frame)
+     * @param width   extent along the direction, inches (3.25 for a tag seen face-on)
+     * @param height  extent perpendicular to the direction, inches (foreshortened when the tag is tilted)
+     * @param color   Dashboard color string
+     * @param label   text drawn next to the tag (null for none)
+     */
+    public static void drawTag(Canvas fieldOverlay, double x, double y, double dirX, double dirY,
+                               double width, double height, String color, String label) {
+        if (fieldOverlay == null) {
+            return;
+        }
+        applyFieldTransform(fieldOverlay, CONVENTION);
+
+        double hw = width / 2.0;
+        double hh = height / 2.0;
+        double perpX = -dirY;
+        double perpY = dirX;
+
+        double[] xs = {
+                x + dirX * hw + perpX * hh,
+                x + dirX * hw - perpX * hh,
+                x - dirX * hw - perpX * hh,
+                x - dirX * hw + perpX * hh};
+        double[] ys = {
+                y + dirY * hw + perpY * hh,
+                y + dirY * hw - perpY * hh,
+                y - dirY * hw - perpY * hh,
+                y - dirY * hw + perpY * hh};
+
+        fieldOverlay.setFill(color);
+        fieldOverlay.fillPolygon(xs, ys);
+        fieldOverlay.setStroke("white");
+        fieldOverlay.setStrokeWidth(1);
+        fieldOverlay.strokePolygon(xs, ys);
+
+        if (label != null && !label.isEmpty()) {
+            fieldOverlay.setFill("white");
+            fieldOverlay.fillText(label, x - 1.0, y + hh + 1.5, GRID_TEXT_FONT, 0.0, false);
+        }
+    }
+
     // =========================================================================
     // Internal Drawing Helpers
     // =========================================================================
