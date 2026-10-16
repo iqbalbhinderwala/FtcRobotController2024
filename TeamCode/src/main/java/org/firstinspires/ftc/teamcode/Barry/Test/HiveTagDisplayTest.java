@@ -11,6 +11,7 @@ import com.qualcomm.robotcore.util.ElapsedTime;
 
 import org.firstinspires.ftc.teamcode.Barry.Dashboard.Drawing;
 import org.firstinspires.ftc.teamcode.Barry.Field.HiveTagGeometry;
+import org.firstinspires.ftc.teamcode.Barry.Pedro.FtcToPedro;
 
 /**
  * Draws the nominal BIOBUZZ HIVE tag locations on the FTC Dashboard field (top-down) and optionally
@@ -150,9 +151,6 @@ public class HiveTagDisplayTest extends LinearOpMode {
         if (Drawing.CONVENTION == Drawing.CoordinateConvention.FTC) {
             return new double[]{fieldX, fieldY};
         }
-        if (isPoint) {
-            return new double[]{HiveTagGeometry.toPedroX(fieldY), HiveTagGeometry.toPedroY(fieldX)};
-        }
-        return new double[]{fieldY, -fieldX};
+        return isPoint ? FtcToPedro.point(fieldX, fieldY) : FtcToPedro.direction(fieldX, fieldY);
     }
 }

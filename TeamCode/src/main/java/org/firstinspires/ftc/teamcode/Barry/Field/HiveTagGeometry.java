@@ -6,9 +6,8 @@ package org.firstinspires.ftc.teamcode.Barry.Field;
  * Source: Competition Manual TU04, sections 9.6 / 9.9, Figs 9-9, 9-10, 9-11, 9-15, 9-17.
  * All manual dimensions are nominal (+/- 1 in).
  *
- * Field frame (official FTC, same as Drawing.CoordinateConvention.FTC): origin at field center
- * on the tile top surface, +X toward the audience, +Y toward blue (away from the Red Wall), +Z up.
- * Inches. Pedro is this frame rotated 90 degrees with its origin at a corner: use toPedroX / toPedroY.
+ * Field frame (official FTC): origin at field center on the tile top surface,
+ *   +X toward the audience, +Y toward blue (away from the Red Wall), +Z up. Inches.
  *
  * Tag / cluster frame, expressed in field coordinates (right-handed):
  *   origin : tag center (or cluster center for a cluster)
@@ -101,16 +100,6 @@ public final class HiveTagGeometry {
     }
 
     private HiveTagGeometry() {}
-
-    /** Field-frame Y (toward blue) to Pedro X (origin at the left edge, 144 in field). */
-    public static double toPedroX(double fieldY) {
-        return 72.0 + fieldY;
-    }
-
-    /** Field-frame X (toward the audience) to Pedro Y (audience wall at Y = 0). */
-    public static double toPedroY(double fieldX) {
-        return 72.0 - fieldX;
-    }
 
     /**
      * Pose of HIVE tag {@code id} (30..45) when its HIVE is tilted {@code tiltDeg}
