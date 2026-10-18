@@ -16,11 +16,12 @@ public class CameraMount {
     /** Lens position relative to the robot center (inches). */
     public static double FORWARD_IN = 0.0;
     public static double LEFT_IN = 7.5;
-    public static double HEIGHT_IN = 14.0;
+    // public static double HEIGHT_IN = 14.0;  // intended mount
+    public static double HEIGHT_IN = 70.0 / 25.4;  // TEST: current mount, 70 mm (2.76 in)
     /** Direction the camera looks, counter-clockwise from robot forward (90 = out the left side). */
     public static double YAW_DEG = 90.0;
     /** Upward tilt of the camera from horizontal. */
-    public static double PITCH_DEG = 35.0;
+    public static double PITCH_DEG = 39.0;
 
     private static final double METERS_TO_INCHES = 39.3701;
 
@@ -44,6 +45,17 @@ public class CameraMount {
         double robotLeft = levelForward * Math.sin(yaw) + left * Math.cos(yaw);
 
         return new double[]{robotForward + FORWARD_IN, robotLeft + LEFT_IN, levelUp + HEIGHT_IN};
+    }
+
+    /** Limelight camera-space direction -> Pedro field direction {x, y} (horizontal part, not normalized). */
+    public static double[] directionToField(double dx, double dy, double dz, Pose robot) {
+        double[] tip = toRobot(dx, dy, dz);
+        double forward = tip[0] - FORWARD_IN;
+        double left = tip[1] - LEFT_IN;
+        double h = robot.heading();
+        return new double[]{
+                forward * Math.cos(h) - left * Math.sin(h),
+                forward * Math.sin(h) + left * Math.cos(h)};
     }
 
     /** Limelight camera-space point (meters) -> Pedro field {x, y, z} (inches). */

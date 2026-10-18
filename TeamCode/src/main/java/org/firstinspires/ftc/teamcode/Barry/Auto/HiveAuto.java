@@ -42,11 +42,12 @@ import java.util.List;
  * BIOBUZZ Auto. All positions are written for RED in the Pedro frame; BLUE is the same plan
  * reflected through the field center (x -> 144 - x, y -> 144 - y, heading + 180, tag id + 8).
  *
- * 1. INIT (robot still): pick the alliance (gamepad1 B = red, X = blue) and detect the start tile
- *    from where the audience-side cluster (red 34-37) appears: about straight ahead = C1, off to
- *    the side or not seen = B1 (dpad right / left forces C1 / B1, dpad up = detect again).
- *    Right side flush on the audience wall, camera/shooter out the left.
- * 2. C1: step STEP_OFF_WALL off the wall. B1: turn up to SEARCH_TURN_DEG clockwise while sliding
+ * 1. INIT (robot still): pick the alliance (gamepad1 B = red, X = blue). Right side flush on the
+ *    audience wall, camera/shooter out the left. If the audience-side cluster (red 34-37) is seen,
+ *    the start position along the wall comes from the camera (any spot, e.g. between B1 and C1);
+ *    otherwise B1 is assumed. dpad right / left forces C1 / B1, dpad up goes back to the camera.
+ * 2. Cluster seen (or C1 forced): step straight off the wall just far enough to turn to the aim
+ *    heading without scraping. Not seen: from B1, turn up to SEARCH_TURN_DEG clockwise while sliding
  *    diagonally off the wall, until the cluster is seen.
  * 3. Aim (turn in place) at the cluster center and shoot 4.
  * 4. Back flush on the audience wall, drive to the A1 corner with the back intake on (GARDEN).
@@ -79,8 +80,10 @@ public class HiveAuto extends LinearOpMode {
     public static double B1_X = 36.0;
     /** Gap kept from the wall when driving along it. */
     public static double WALL_GAP = 0.5;
-    /** C1: step this far off the audience wall before aiming, so the robot can turn without scraping. */
+    /** Minimum step off the audience wall before the first aim. */
     public static double STEP_OFF_WALL = 1.0;
+    /** Extra room kept between the turning robot's corner and the wall. */
+    public static double TURN_CLEARANCE_MARGIN = 0.5;
     /** B1 search: diagonal move (toward the midline, off the wall) while turning clockwise. */
     public static double SEARCH_DX = 5.0;
     public static double SEARCH_DY = 5.0;
@@ -99,8 +102,6 @@ public class HiveAuto extends LinearOpMode {
     public static double PARK_HEADING_DEG = 180.0;
 
     // ---- Decisions and timing ----
-    /** Cluster within this many degrees of the camera axis during INIT means we are on C1. */
-    public static double START_C1_MAX_BEARING_DEG = 12.0;
     public static double AIM_TOLERANCE_DEG = 2.0;
     public static double AIM_TIMEOUT_MS = 1500;
     /** Time to look at the HIVE before deciding which CELL is up. */
@@ -110,9 +111,13 @@ public class HiveAuto extends LinearOpMode {
      * about 49.9 in high, down about 35.6 in; the pivot is in between. Lower it for bench tests with
      * a cluster near the floor.
      */
-    public static double CELL_UP_MIN_Z_IN = HiveTagGeometry.PIVOT_Z;
+    // public static double CELL_UP_MIN_Z_IN = HiveTagGeometry.PIVOT_Z;  // real HIVE
+    public static double CELL_UP_MIN_Z_IN = 0.0;  // TEST: vertical cluster about 4 in off the floor
     /** Start parking at this match time no matter what (AUTO is 30 s, PARK is judged at its end). */
     public static double PARK_DEADLINE_S = 25.0;
+    /** Step mode for testing: wait for gamepad1 Y before each stage; the park deadline is off. */
+    // public static boolean STEP_MODE = false;  // match
+    public static boolean STEP_MODE = true;      // TEST: press Y to start each stage
 
     // Red cluster first tag IDs (blue = +8)
     private static final int AUDIENCE_CLUSTER = 34;
@@ -126,11 +131,19 @@ public class HiveAuto extends LinearOpMode {
 
     private Alliance alliance = Alliance.RED;
     private StartTile startTile = StartTile.B1;
-    /** Driver override of the detected start tile, null = use the camera. */
+    /** Driver override of the start tile, null = use the camera. */
     private StartTile startOverride = null;
+    /** Start position along the audience wall, red frame (Pedro x). */
+    private double startRedX = 36.0;
+    private String startSource = "assumed B1";
+    /** Pose from the last loop; used for logging (the localizer reads 0 once the OpMode stops). */
+    private Pose lastPose = new Pose(0, 0, 0);
     private List<ClusterDetection> clusters = new ArrayList<>();
     private boolean audienceCellUp = true;
     private String step = "init";
+    /** Set by a press of gamepad1 Y, consumed by the next stage gate (step mode). */
+    private boolean advance = false;
+    private boolean lastY = false;
     private final ElapsedTime matchTimer = new ElapsedTime();
     private final ElapsedTime opModeTimer = new ElapsedTime();
     private CsvLog log;
@@ -161,14 +174,25 @@ public class HiveAuto extends LinearOpMode {
             if (gamepad1.dpad_up) startOverride = null;
             clusters = detector.detect(limelight.getLatestResult());
             ClusterDetection audience = cluster(AUDIENCE_CLUSTER);
-            StartTile detected = (audience != null && Math.abs(audience.bearingDeg()) <= START_C1_MAX_BEARING_DEG)
-                    ? StartTile.C1 : StartTile.B1;
-            startTile = startOverride != null ? startOverride : detected;
+            if (startOverride != null) {
+                startTile = startOverride;
+                startRedX = startTile == StartTile.C1 ? C1_X : B1_X;
+                startSource = "forced " + startTile;
+            } else if (audience != null) {
+                startRedX = StartPosition.redXFromCamera(audience);
+                startTile = startRedX >= 48.0 ? StartTile.C1 : StartTile.B1;
+                startSource = "camera";
+            } else {
+                startTile = StartTile.B1;
+                startRedX = B1_X;
+                startSource = "assumed B1";
+            }
             follower.setPose(startPose());
+            lastPose = follower.pose();
 
             telemetry.addData("Alliance (B red / X blue)", alliance);
-            telemetry.addData("Start tile", "%s (%s; dpad right C1 / left B1 / up detect)",
-                    startTile, startOverride != null ? "forced" : "detected");
+            telemetry.addData("Start", "x %.1f on the wall, tile %s (%s; dpad right C1 / left B1 / up camera)",
+                    startRedX, startTile, startSource);
             telemetry.addData("Audience cluster", audience == null ? "not seen"
                     : String.format("bearing %.1f deg, %d tags", audience.bearingDeg(), audience.tagCount));
             telemetry.addData("Log", log.error().isEmpty() ? log.fileName() : "ERROR " + log.error());
@@ -184,21 +208,33 @@ public class HiveAuto extends LinearOpMode {
 
         matchTimer.reset();
         follower.setPose(startPose());
-        logEvent(String.format("start: %s %s at %s (%s)", alliance, startTile, fmt(follower.pose()),
-                startOverride != null ? "forced" : "detected"));
+        lastPose = follower.pose();
+        logEvent(String.format("start: %s %s at %s (%s)", alliance, startTile, fmt(lastPose), startSource));
         Scheduler.reset();
         Scheduler.schedule(sequential(
-                race(mainRoutine(), waitUntil(() -> matchTimer.seconds() >= PARK_DEADLINE_S)),
+                race(mainRoutine(), waitUntil(() -> !STEP_MODE && matchTimer.seconds() >= PARK_DEADLINE_S)),
                 instant(() -> { shooter.stop(); intake.off(); logEvent("parking"); }),
+                label("park"),
                 lazy(this::park)));
 
         while (opModeIsActive()) {
+            boolean y = gamepad1.y;
+            if (y && !lastY) {
+                advance = true;
+                logEvent("Y pressed");
+            }
+            lastY = y;
+
             clusters = detector.detect(limelight.getLatestResult());
             follower.update();
+            lastPose = follower.pose();
             Scheduler.execute();
 
             telemetry.addData("Time", "%.1f s", matchTimer.seconds());
             telemetry.addData("Step", step);
+            if (STEP_MODE) {
+                telemetry.addData("Step mode", "press Y to start the next stage");
+            }
             telemetry.addData("Alliance / start", "%s / %s", alliance, startTile);
             telemetry.addData("Pose", "x:%.1f y:%.1f h:%.1f", follower.pose().x(), follower.pose().y(),
                     Math.toDegrees(follower.pose().heading()));
@@ -211,7 +247,7 @@ public class HiveAuto extends LinearOpMode {
             logRow("auto", "");
         }
 
-        logEvent("stop: " + fmt(follower.pose()));
+        logEvent("stop: " + fmt(lastPose));
         log.close();
         limelight.stop();
     }
@@ -231,16 +267,23 @@ public class HiveAuto extends LinearOpMode {
     }
 
     /**
-     * C1: step straight off the wall. B1: turn clockwise while sliding off the wall until the cluster
-     * is seen, then stop there. Either way the robot ends clear of the wall and can turn to aim.
+     * Cluster seen (or C1 forced): step straight off the wall just far enough to turn to the aim
+     * heading without the corner scraping. Not seen on B1: turn clockwise while sliding off the wall
+     * until the cluster is seen, then stop there. Either way the robot can then turn to aim.
      */
     private Command leaveWall() {
         Pose start = follower.pose();
-        if (startTile == StartTile.C1) {
-            Pose off = field(C1_X, ROBOT_HALF_WIDTH + STEP_OFF_WALL, 0);
+        boolean seen = cluster(AUDIENCE_CLUSTER) != null;
+        if (seen || startTile == StartTile.C1) {
+            double[] target = clusterFieldXY(AUDIENCE_CLUSTER, start);
+            double turn = Math.abs(CameraMount.normalize(
+                    CameraMount.headingToLookAt(start, target[0], target[1]) - start.heading()));
+            double step = Math.max(STEP_OFF_WALL, turnClearance(turn) + TURN_CLEARANCE_MARGIN);
+            Pose off = field(redX(start.x()), ROBOT_HALF_WIDTH + step, 0);
+            logEvent(String.format("step off wall %.1f in for a %.1f deg turn", step, Math.toDegrees(turn)));
             return sequential(label("step off wall"), follow(follower, line(start, off).constant(start.heading())));
         }
-        Pose end = field(B1_X + SEARCH_DX, ROBOT_HALF_WIDTH + SEARCH_DY, -SEARCH_TURN_DEG);
+        Pose end = field(redX(start.x()) + SEARCH_DX, ROBOT_HALF_WIDTH + SEARCH_DY, -SEARCH_TURN_DEG);
         return sequential(
                 label("search B1"),
                 race(follow(follower, line(start, end).linear(start, end)),
@@ -344,11 +387,29 @@ public class HiveAuto extends LinearOpMode {
     // Helpers
     // =========================================================================
 
+    /** Marks the start of a stage. In step mode it first waits for a press of gamepad1 Y. */
     private Command label(String name) {
-        return instant(() -> {
-            step = name;
-            logEvent("step " + name);
-        });
+        return sequential(
+                instant(() -> {
+                    advance = false;
+                    if (STEP_MODE) {
+                        step = "press Y: " + name;
+                        logEvent("waiting for Y: " + name);
+                    }
+                }),
+                waitUntil(() -> !STEP_MODE || consumeAdvance()),
+                instant(() -> {
+                    step = name;
+                    logEvent("step " + name);
+                }));
+    }
+
+    private boolean consumeAdvance() {
+        if (advance) {
+            advance = false;
+            return true;
+        }
+        return false;
     }
 
     private int allianceId(int redFirstId) {
@@ -357,7 +418,7 @@ public class HiveAuto extends LinearOpMode {
 
     /** One log row: pose, step and both of our clusters as currently seen. */
     private void logRow(String phase, String event) {
-        Pose pose = follower.pose();
+        Pose pose = lastPose;
         Object[] aud = clusterColumns(cluster(AUDIENCE_CLUSTER), pose);
         Object[] far = clusterColumns(cluster(FAR_CLUSTER), pose);
         log.row(opModeTimer.seconds(), phase.equals("init") ? null : matchTimer.seconds(), phase, step,
@@ -384,7 +445,16 @@ public class HiveAuto extends LinearOpMode {
     }
 
     private Pose startPose() {
-        return field(startTile == StartTile.C1 ? C1_X : B1_X, ROBOT_HALF_WIDTH, 0);
+        return StartPosition.pose(startRedX, alliance == Alliance.BLUE);
+    }
+
+    /**
+     * How far the robot's wall-side corner moves toward the wall while turning in place by up to
+     * {@code turn} radians from flush (heading 0). It grows until about 43 degrees, then shrinks.
+     */
+    private static double turnClearance(double turn) {
+        double worst = Math.min(turn, Math.atan2(ROBOT_HALF_LENGTH, ROBOT_HALF_WIDTH));
+        return ROBOT_HALF_LENGTH * Math.sin(worst) + ROBOT_HALF_WIDTH * Math.cos(worst) - ROBOT_HALF_WIDTH;
     }
 
     /** Red pose (Pedro, degrees) -> the pose for the current alliance. */
