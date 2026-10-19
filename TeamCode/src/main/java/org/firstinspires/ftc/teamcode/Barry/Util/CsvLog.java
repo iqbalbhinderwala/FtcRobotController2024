@@ -9,16 +9,24 @@ import java.io.IOException;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.Locale;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
- * Small CSV logger for reviewing runs offline. Writes to /sdcard/FIRST/barry_logs/<name>_<time>.csv
- * on the Control Hub; copy with:  adb pull /sdcard/FIRST/barry_logs
+ * Small CSV logger for reviewing runs offline. Writes to
+ * /sdcard/FIRST/barry_logs/r<run>_<name>_<time>.csv on the Control Hub; copy with:
+ *   adb pull /sdcard/FIRST/barry_logs
+ *
+ * The Control Hub has no battery-backed clock: its time restarts at 1969-12-31 on every boot, so
+ * times repeat across boots. The run number does not: it is one more than the highest run number
+ * already in the folder, so sorting the file names puts the runs in order and the last is the latest.
  *
  * Logging never throws: if the file cannot be written, the OpMode keeps running and error() says why.
  */
 public class CsvLog {
 
     private static final int FLUSH_EVERY_ROWS = 25;
+    private static final Pattern RUN_NUMBER = Pattern.compile("^r(\\d+)_");
 
     private BufferedWriter writer;
     private String fileName = "";
@@ -32,7 +40,7 @@ public class CsvLog {
                 throw new IOException("cannot create " + dir);
             }
             String stamp = new SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(new Date());
-            fileName = name + "_" + stamp + ".csv";
+            fileName = String.format(Locale.US, "r%04d_%s_%s.csv", nextRunNumber(dir), name, stamp);
             writer = new BufferedWriter(new FileWriter(new File(dir, fileName)));
             writer.write(header);
             writer.newLine();
@@ -40,6 +48,24 @@ public class CsvLog {
             writer = null;
             error = e.getMessage();
         }
+    }
+
+    /** One more than the highest run number among the files already in the folder (1 if none). */
+    private static int nextRunNumber(File dir) {
+        int max = 0;
+        String[] names = dir.list();
+        if (names != null) {
+            for (String n : names) {
+                Matcher m = RUN_NUMBER.matcher(n);
+                if (m.find()) {
+                    try {
+                        max = Math.max(max, Integer.parseInt(m.group(1)));
+                    } catch (NumberFormatException ignored) {
+                    }
+                }
+            }
+        }
+        return max + 1;
     }
 
     /** Writes one row; values are joined with commas (numbers use '.' decimals). */
