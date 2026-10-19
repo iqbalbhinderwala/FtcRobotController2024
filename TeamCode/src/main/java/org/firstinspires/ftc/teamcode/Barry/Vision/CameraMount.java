@@ -27,12 +27,15 @@ public class CameraMount {
 
     private CameraMount() {}
 
-    /** Limelight camera-space point (meters) -> robot frame {forward, left, up} (inches). */
-    public static double[] toRobot(double cx, double cy, double cz) {
+    /**
+     * Rotates a Limelight camera-space vector into the robot frame {forward, left, up}: undoes the
+     * camera tilt and yaw, no scaling and no mount offset. Use it for directions.
+     */
+    public static double[] directionToRobot(double dx, double dy, double dz) {
         // Camera-aligned axes: forward along the lens, left, up (before tilt)
-        double forward = cz * METERS_TO_INCHES;
-        double left = -cx * METERS_TO_INCHES;
-        double up = -cy * METERS_TO_INCHES;
+        double forward = dz;
+        double left = -dx;
+        double up = -dy;
 
         // Undo the upward tilt (rotation about the camera's left axis)
         double pitch = Math.toRadians(PITCH_DEG);
@@ -44,18 +47,25 @@ public class CameraMount {
         double robotForward = levelForward * Math.cos(yaw) - left * Math.sin(yaw);
         double robotLeft = levelForward * Math.sin(yaw) + left * Math.cos(yaw);
 
-        return new double[]{robotForward + FORWARD_IN, robotLeft + LEFT_IN, levelUp + HEIGHT_IN};
+        return new double[]{robotForward, robotLeft, levelUp};
+    }
+
+    /** Limelight camera-space point (meters) -> robot frame {forward, left, up} (inches). */
+    public static double[] toRobot(double cx, double cy, double cz) {
+        double[] r = directionToRobot(cx, cy, cz);
+        return new double[]{
+                r[0] * METERS_TO_INCHES + FORWARD_IN,
+                r[1] * METERS_TO_INCHES + LEFT_IN,
+                r[2] * METERS_TO_INCHES + HEIGHT_IN};
     }
 
     /** Limelight camera-space direction -> Pedro field direction {x, y} (horizontal part, not normalized). */
     public static double[] directionToField(double dx, double dy, double dz, Pose robot) {
-        double[] tip = toRobot(dx, dy, dz);
-        double forward = tip[0] - FORWARD_IN;
-        double left = tip[1] - LEFT_IN;
+        double[] r = directionToRobot(dx, dy, dz);
         double h = robot.heading();
         return new double[]{
-                forward * Math.cos(h) - left * Math.sin(h),
-                forward * Math.sin(h) + left * Math.cos(h)};
+                r[0] * Math.cos(h) - r[1] * Math.sin(h),
+                r[0] * Math.sin(h) + r[1] * Math.cos(h)};
     }
 
     /** Limelight camera-space point (meters) -> Pedro field {x, y, z} (inches). */

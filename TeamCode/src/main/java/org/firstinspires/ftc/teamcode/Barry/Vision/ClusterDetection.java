@@ -18,11 +18,16 @@ public class ClusterDetection {
     public final double x, y, z;
     /** Unit vector along the sticker (toward higher tag IDs) in Limelight camera space. */
     public final double dirX, dirY, dirZ;
+    /**
+     * Distance along the sticker between the outermost visible tags (inches): 0 with 1 tag, 3.75 for
+     * two neighbors, 13 for the two outer tags. The sticker direction is only as good as this span.
+     */
+    public final double spanIn;
     /** Camera pose in the cluster's own frame, or null when fewer than 2 tags are visible. */
     public final CameraPose cameraPose;
 
     public ClusterDetection(String name, int firstTagId, int tagCount, double x, double y, double z,
-                            double dirX, double dirY, double dirZ, CameraPose cameraPose) {
+                            double dirX, double dirY, double dirZ, double spanIn, CameraPose cameraPose) {
         this.name = name;
         this.firstTagId = firstTagId;
         this.tagCount = tagCount;
@@ -32,6 +37,7 @@ public class ClusterDetection {
         this.dirX = dirX;
         this.dirY = dirY;
         this.dirZ = dirZ;
+        this.spanIn = spanIn;
         this.cameraPose = cameraPose;
     }
 

@@ -201,6 +201,77 @@ public class Drawing {
         }
     }
 
+    /**
+     * Draws the robot footprint (ROBOT_LENGTH x ROBOT_WIDTH) at a pose as a colored outline with a
+     * heading line and an optional label; no robot image. Used for candidate poses next to the robot.
+     *
+     * @param pose  pose in the active convention (inches, radians)
+     * @param color Dashboard color string
+     * @param label text next to the outline (null for none)
+     */
+    public static void drawRobotOutline(Canvas fieldOverlay, Pose pose, String color, String label) {
+        if (fieldOverlay == null || pose == null) {
+            return;
+        }
+        applyFieldTransform(fieldOverlay, CONVENTION);
+        double x = pose.x();
+        double y = pose.y();
+        double cos = Math.cos(pose.heading());
+        double sin = Math.sin(pose.heading());
+        double halfLength = ROBOT_LENGTH / 2.0;
+        double halfWidth = ROBOT_WIDTH / 2.0;
+
+        double[] cornersX = {halfLength, halfLength, -halfLength, -halfLength};
+        double[] cornersY = {halfWidth, -halfWidth, -halfWidth, halfWidth};
+        double[] xs = new double[4];
+        double[] ys = new double[4];
+        for (int i = 0; i < 4; i++) {
+            xs[i] = x + cornersX[i] * cos - cornersY[i] * sin;
+            ys[i] = y + cornersX[i] * sin + cornersY[i] * cos;
+        }
+
+        fieldOverlay.setStroke(color);
+        fieldOverlay.setStrokeWidth(ROBOT_OUTLINE_STROKE_WIDTH);
+        fieldOverlay.strokePolygon(xs, ys);
+        fieldOverlay.setStrokeWidth(ROBOT_HEADING_STROKE_WIDTH);
+        fieldOverlay.strokeLine(x, y, x + (halfLength + 4.0) * cos, y + (halfLength + 4.0) * sin);
+
+        if (label != null && !label.isEmpty()) {
+            double[] at = screenOffset(CONVENTION, x, y, halfWidth + 1.0, halfWidth + 1.0);
+            fieldOverlay.setFill(color);
+            fieldOverlay.fillText(label, at[0], at[1], GRID_TEXT_FONT, textTheta(CONVENTION, 0.0), false);
+        }
+    }
+
+    /**
+     * Draws a pose as a circle with a heading line, e.g. a second estimate next to the robot.
+     *
+     * @param pose  pose in the active convention (inches, radians)
+     * @param color Dashboard color string
+     */
+    public static void drawPoseMarker(Canvas fieldOverlay, Pose pose, String color) {
+        drawPoseMarker(fieldOverlay, pose, color, null);
+    }
+
+    /** Same as drawPoseMarker, with a label next to the marker (null for none). */
+    public static void drawPoseMarker(Canvas fieldOverlay, Pose pose, String color, String label) {
+        if (fieldOverlay == null || pose == null) {
+            return;
+        }
+        applyFieldTransform(fieldOverlay, CONVENTION);
+        double x = pose.x();
+        double y = pose.y();
+        fieldOverlay.setStroke(color);
+        fieldOverlay.setStrokeWidth(2);
+        fieldOverlay.strokeCircle(x, y, 4.0);
+        fieldOverlay.strokeLine(x, y, x + 9.0 * Math.cos(pose.heading()), y + 9.0 * Math.sin(pose.heading()));
+        if (label != null && !label.isEmpty()) {
+            double[] at = screenOffset(CONVENTION, x, y, 4.5, 4.5);
+            fieldOverlay.setFill(color);
+            fieldOverlay.fillText(label, at[0], at[1], GRID_TEXT_FONT, textTheta(CONVENTION, 0.0), false);
+        }
+    }
+
     // =========================================================================
     // Internal Drawing Helpers
     // =========================================================================

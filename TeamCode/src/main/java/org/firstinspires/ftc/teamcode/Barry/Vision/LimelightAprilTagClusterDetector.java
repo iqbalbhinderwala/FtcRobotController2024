@@ -88,12 +88,16 @@ public class LimelightAprilTagClusterDetector {
     private ClusterDetection estimate(int cluster, double[][] slots) {
         int n = 0;
         double meanU = 0;
+        double minU = Double.POSITIVE_INFINITY;
+        double maxU = Double.NEGATIVE_INFINITY;
         double[] meanP = new double[3];
         double[] meanN = new double[3];
         for (int s = 0; s < TAGS_PER_CLUSTER; s++) {
             if (slots[s] == null) continue;
             n++;
             meanU += OFFSET_M[s];
+            minU = Math.min(minU, OFFSET_M[s]);
+            maxU = Math.max(maxU, OFFSET_M[s]);
             for (int k = 0; k < 3; k++) {
                 meanP[k] += slots[s][k];
                 meanN[k] += slots[s][3 + k];
@@ -131,6 +135,7 @@ public class LimelightAprilTagClusterDetector {
         return new ClusterDetection(NAMES[cluster], FIRST_ID + cluster * TAGS_PER_CLUSTER, n,
                 center[0], center[1], center[2],
                 dir[0], dir[1], dir[2],
+                (maxU - minU) / INCH,
                 n >= 2 ? cameraPose(d, meanN, center) : null);
     }
 
