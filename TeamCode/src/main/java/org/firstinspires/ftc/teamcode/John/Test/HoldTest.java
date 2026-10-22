@@ -11,17 +11,21 @@ import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 import com.qualcomm.robotcore.util.ElapsedTime;
 
-import org.firstinspires.ftc.teamcode.Barry.Dashboard.Drawing;
-import org.firstinspires.ftc.teamcode.Barry.Util.CsvLog;
+import org.firstinspires.ftc.teamcode.John.Dashboard.Drawing;
 import org.firstinspires.ftc.teamcode.John.Pedro.Constants;
 import org.firstinspires.ftc.teamcode.John.Pedro.JohnTuning;
 import org.firstinspires.ftc.teamcode.John.Pedro.OdometryWatchdog;
+import org.firstinspires.ftc.teamcode.John.Util.CsvLog;
 
 import java.util.ArrayDeque;
 import java.util.Arrays;
 
 /**
  * Hold test for tuning John's heading controller live from FTC Dashboard.
+ *
+ * Poses are FTC field coordinates (origin at the field center, +X toward the audience, +Y toward
+ * blue, inches). The robot is told it starts at START_X_IN / START_Y_IN / START_HEADING_DEG; that only
+ * places it on the Dashboard field, the hold itself is relative.
  *
  * START holds the current pose with Pedro. Edit JohnTuning (HEADING_KP / KS / BRAKE_A / B ...) on the
  * Dashboard: the controller is rebuilt and swapped in right away, while the robot keeps holding.
@@ -32,7 +36,7 @@ import java.util.Arrays;
  * Telemetry and the Dashboard graph show the heading / position error, plus the heading swing
  * (peak to peak) and its frequency over the last WINDOW_S: a steady swing that does not die down is
  * oscillation. OdometryWatchdog pauses the drive on bad Pinpoint reads and resumes by itself once they
- * are good again; if they stay bad (reboot, dead link) it stops for good (restart the OpMode). Logged to /sdcard/FIRST/barry_logs/r<run>_john_hold_test_<time>.csv.
+ * are good again; if they stay bad (reboot, dead link) it stops for good (restart the OpMode). Logged to /sdcard/FIRST/john_logs/r<run>_john_hold_test_<time>.csv.
  */
 @Config
 @TeleOp(name = "[John] Hold Test", group = "JohnTest")
@@ -41,6 +45,10 @@ public class HoldTest extends LinearOpMode {
     public static double STEP_DEG = 15.0;
     public static double STEP_IN = 6.0;
     public static double WINDOW_S = 2.0;
+    /** Start pose, FTC field coordinates (default: a tile center on the red, far-from-audience side). */
+    public static double START_X_IN = -36.0;
+    public static double START_Y_IN = -36.0;
+    public static double START_HEADING_DEG = 0.0;
 
     private static final String LOG_HEADER = "t_s,target_x,target_y,target_h_deg,x,y,h_deg,"
             + "heading_err_deg,position_err_in,swing_pp_deg,swing_hz,loop_ms,kp,brake_a,brake_b,ks,ks_deadband_deg,watchdog,pinpoint_status,pinpoint_loop_us,event";
@@ -53,7 +61,8 @@ public class HoldTest extends LinearOpMode {
 
         Follower follower = Constants.create(hardwareMap);
         OdometryWatchdog watchdog = new OdometryWatchdog(hardwareMap);
-        follower.setPose(new Pose(0, 0, 0));
+        follower.setPose(new Pose(START_X_IN, START_Y_IN, Math.toRadians(START_HEADING_DEG)));
+        watchdog.poseSet();
 
         telemetry.addData("Status", "Press START to hold. Tune JohnTuning on the Dashboard.");
         telemetry.addData("Log", log.error().isEmpty() ? log.fileName() : "ERROR " + log.error());
@@ -188,6 +197,7 @@ public class HoldTest extends LinearOpMode {
             }
             telemetry.addData("Pinpoint", "%s, loop %d us, %d glitch pause(s), last %.0f ms",
                     watchdog.status(), watchdog.pinpointLoopUs(), watchdog.pauses(), watchdog.lastPauseMs());
+            telemetry.addData("Pose (FTC)", Drawing.format(pose));
             telemetry.addData("Heading error", "%+.2f deg", headingErr);
             telemetry.addData("Position error", "%.2f in", positionErr);
             telemetry.addData("Heading swing", "%.2f deg peak-to-peak, ~%.1f Hz (last %.0f s)", swing, hz, WINDOW_S);
@@ -198,12 +208,13 @@ public class HoldTest extends LinearOpMode {
                     STEP_DEG, STEP_IN);
             telemetry.update();
 
-            TelemetryPacket packet = new TelemetryPacket(!Drawing.USE_CUSTOM_IMAGE);
+            TelemetryPacket packet = new TelemetryPacket(Drawing.drawDefaultField());
             packet.put("headingErrorDeg", headingErr);
             packet.put("positionErrorIn", positionErr);
             packet.put("headingSwingDeg", swing);
-            Drawing.drawRobot(packet.fieldOverlay(), pose);
+            Drawing.drawField(packet.fieldOverlay());
             Drawing.drawRobotOutline(packet.fieldOverlay(), target, "lime", "target");
+            Drawing.drawRobot(packet.fieldOverlay(), pose);
             dashboard.sendTelemetryPacket(packet);
 
             log.row(t, target.x(), target.y(), Math.toDegrees(target.heading()), pose.x(), pose.y(),
