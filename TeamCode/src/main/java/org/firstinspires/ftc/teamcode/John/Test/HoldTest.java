@@ -25,8 +25,9 @@ import java.util.Arrays;
  *
  * START holds the current pose with Pedro. Edit JohnTuning (HEADING_KP / KS / BRAKE_A / B ...) on the
  * Dashboard: the controller is rebuilt and swapped in right away, while the robot keeps holding.
- * gamepad1: dpad left / right turn the held heading by STEP_DEG, dpad up / down move the held point
- * forward / back by STEP_IN (step tests), A holds where the robot is now.
+ * gamepad1 (step tests): left / right bumper turn the held heading left / right by STEP_DEG, dpad
+ * up / down move the held point forward / back and dpad left / right strafe it left / right by
+ * STEP_IN, A holds where the robot is now.
  *
  * Telemetry and the Dashboard graph show the heading / position error, plus the heading swing
  * (peak to peak) and its frequency over the last WINDOW_S: a steady swing that does not die down is
@@ -71,6 +72,7 @@ public class HoldTest extends LinearOpMode {
 
         ArrayDeque<double[]> history = new ArrayDeque<>();   // {t, heading error deg}
         boolean lastLeft = false, lastRight = false, lastUp = false, lastDown = false, lastA = false;
+        boolean lastStrafeLeft = false, lastStrafeRight = false;
 
         while (opModeIsActive()) {
             // New tuning values from the Dashboard: rebuild the controller, keep holding the same target
@@ -85,8 +87,9 @@ public class HoldTest extends LinearOpMode {
             }
 
             // Step tests
-            boolean left = gamepad1.dpad_left, right = gamepad1.dpad_right;
+            boolean left = gamepad1.left_bumper, right = gamepad1.right_bumper;
             boolean up = gamepad1.dpad_up, down = gamepad1.dpad_down, a = gamepad1.a;
+            boolean strafeLeft = gamepad1.dpad_left, strafeRight = gamepad1.dpad_right;
             Pose newTarget = null;
             String step = null;
             if (left && !lastLeft) {
@@ -103,11 +106,21 @@ public class HoldTest extends LinearOpMode {
                 newTarget = new Pose(target.x() - STEP_IN * Math.cos(target.heading()),
                         target.y() - STEP_IN * Math.sin(target.heading()), target.heading());
                 step = "back " + STEP_IN;
+            } else if (strafeLeft && !lastStrafeLeft) {
+                // Left of the heading: +90 deg
+                newTarget = new Pose(target.x() - STEP_IN * Math.sin(target.heading()),
+                        target.y() + STEP_IN * Math.cos(target.heading()), target.heading());
+                step = "strafe left " + STEP_IN;
+            } else if (strafeRight && !lastStrafeRight) {
+                newTarget = new Pose(target.x() + STEP_IN * Math.sin(target.heading()),
+                        target.y() - STEP_IN * Math.cos(target.heading()), target.heading());
+                step = "strafe right " + STEP_IN;
             } else if (a && !lastA) {
                 newTarget = follower.pose();
                 step = "hold here";
             }
             lastLeft = left; lastRight = right; lastUp = up; lastDown = down; lastA = a;
+            lastStrafeLeft = strafeLeft; lastStrafeRight = strafeRight;
             if (newTarget != null && watchdog.ok()) {
                 target = newTarget;
                 follower.hold(target);
@@ -181,7 +194,8 @@ public class HoldTest extends LinearOpMode {
             telemetry.addData("Tuning", "KP %.3f  KS %.3f (deadband %.2f deg)  brake A %.4f  B %.5f",
                     applied[0], applied[3], applied[4], applied[1], applied[2]);
             telemetry.addData("Loop", "%.1f ms", loopMs);
-            telemetry.addData("Controls", "dpad L/R turn %.0f deg, U/D move %.0f in, A hold here", STEP_DEG, STEP_IN);
+            telemetry.addData("Controls", "bumpers turn %.0f deg, dpad move / strafe %.0f in, A hold here",
+                    STEP_DEG, STEP_IN);
             telemetry.update();
 
             TelemetryPacket packet = new TelemetryPacket(!Drawing.USE_CUSTOM_IMAGE);
