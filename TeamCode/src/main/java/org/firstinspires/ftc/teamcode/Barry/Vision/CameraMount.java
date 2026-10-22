@@ -22,6 +22,10 @@ public class CameraMount {
     public static double YAW_DEG = 90.0;
     /** Upward tilt of the camera from horizontal. */
     public static double PITCH_DEG = 39.0;
+    /** Rotation of the camera about its lens axis (clockwise as seen from behind the camera). */
+    public static double ROLL_DEG = 0.0;
+    /** Correction for the Limelight's distance estimates (true distance = measured x scale). */
+    public static double DISTANCE_SCALE = 1.0;
 
     private static final double METERS_TO_INCHES = 39.3701;
 
@@ -29,13 +33,18 @@ public class CameraMount {
 
     /**
      * Rotates a Limelight camera-space vector into the robot frame {forward, left, up}: undoes the
-     * camera tilt and yaw, no scaling and no mount offset. Use it for directions.
+     * camera roll, tilt and yaw, no scaling and no mount offset. Use it for directions.
      */
     public static double[] directionToRobot(double dx, double dy, double dz) {
-        // Camera-aligned axes: forward along the lens, left, up (before tilt)
+        // Camera-aligned axes: forward along the lens, left, up (before roll and tilt)
         double forward = dz;
-        double left = -dx;
-        double up = -dy;
+        double cameraLeft = -dx;
+        double cameraUp = -dy;
+
+        // Undo the roll (rotation about the lens axis)
+        double roll = Math.toRadians(ROLL_DEG);
+        double left = cameraLeft * Math.cos(roll) - cameraUp * Math.sin(roll);
+        double up = cameraLeft * Math.sin(roll) + cameraUp * Math.cos(roll);
 
         // Undo the upward tilt (rotation about the camera's left axis)
         double pitch = Math.toRadians(PITCH_DEG);
@@ -53,10 +62,11 @@ public class CameraMount {
     /** Limelight camera-space point (meters) -> robot frame {forward, left, up} (inches). */
     public static double[] toRobot(double cx, double cy, double cz) {
         double[] r = directionToRobot(cx, cy, cz);
+        double scale = METERS_TO_INCHES * DISTANCE_SCALE;
         return new double[]{
-                r[0] * METERS_TO_INCHES + FORWARD_IN,
-                r[1] * METERS_TO_INCHES + LEFT_IN,
-                r[2] * METERS_TO_INCHES + HEIGHT_IN};
+                r[0] * scale + FORWARD_IN,
+                r[1] * scale + LEFT_IN,
+                r[2] * scale + HEIGHT_IN};
     }
 
     /** Limelight camera-space direction -> Pedro field direction {x, y} (horizontal part, not normalized). */
