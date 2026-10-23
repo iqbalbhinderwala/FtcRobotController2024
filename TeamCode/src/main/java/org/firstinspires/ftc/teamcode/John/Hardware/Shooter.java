@@ -19,10 +19,20 @@ import com.pedropathing.ivy.Command;
 @Config("JohnShooter")
 public class Shooter {
 
+    /**
+     * Flywheel speed by start tile (shooting at the up CELL from the audience wall), measured
+     * 2026-10-23 with [John] Mechanism Test (encoder speed control).
+     */
+    public static double RPM_FROM_C1 = 2200;
+    public static double RPM_FROM_B1 = 2300;
+    public static double RPM_FROM_A1 = 2400;
+    /** 4 balls, plus 2 extra indexer steps in case a ball comes late. */
+    public static int INDEXER_STEPS_PER_VOLLEY = 6;
+
     /** Time to reach launch speed. */
     public static double SPIN_UP_MS = 800;
-    /** Time between two balls. */
-    public static double SHOT_INTERVAL_MS = 350;
+    /** Time between two balls (200-250 ms worked in the Mechanism Test; 150 ms missed 1 in 4). */
+    public static double SHOT_INTERVAL_MS = 250;
 
     private boolean spinning = false;
     private int shotsFired = 0;
