@@ -9,10 +9,10 @@ import org.firstinspires.ftc.teamcode.John.RobotGeometry;
 import java.util.Map;
 
 /**
- * Autonomous setup: alliance, start tile and start delay. It is chosen in [John] Game Setup (a
- * separate OpMode, run before the match) and kept in the SDK blackboard; [John] Auto only reads it,
- * so nothing can be changed by a stray button press while it waits in INIT, and it refuses to run
- * without it (isSaved). The blackboard lasts until the Robot Controller app restarts.
+ * Autonomous settings: alliance, start tile and start delay. They are chosen in [John] Game Setup
+ * (a separate OpMode, run before the match) and kept in the SDK blackboard; [John] Auto only reads
+ * them, so nothing can be changed by a stray button press while it waits in INIT, and it refuses to
+ * run without them (isSaved). The blackboard lasts until the Robot Controller app restarts.
  *
  * Game Setup: call update(gamepad1) and save(blackboard) every loop, addTelemetry(telemetry, true).
  * gamepad1:
@@ -27,7 +27,7 @@ import java.util.Map;
  * audience wall and the shooter (his left) facing away from it toward the HIVE, so the heading is
  * +90 degrees; blue is the same reflected through the field center.
  */
-public class AutoSetup {
+public class AutoSettings {
 
     public enum Alliance { RED, BLUE }
 
@@ -59,7 +59,7 @@ public class AutoSetup {
     private boolean firstUpdate = true;
 
     /** Starts from the last choice kept in the blackboard (red, C1, no delay if there is none). */
-    public AutoSetup(Map<String, Object> blackboard) {
+    public AutoSettings(Map<String, Object> blackboard) {
         try {
             Object a = blackboard.get(KEY_ALLIANCE);
             if (a instanceof String) alliance = Alliance.valueOf((String) a);
@@ -104,7 +104,7 @@ public class AutoSetup {
         if (pad.rightBumperWasPressed()) delayS = clampDelay(delayS + 1.0);
     }
 
-    /** Shows the setup; withControls adds the button hints (Game Setup). */
+    /** Shows the settings; withControls adds the button hints (Game Setup). */
     public void addTelemetry(Telemetry telemetry, boolean withControls) {
         Pose p = startPose();
         telemetry.addData("Alliance", withControls ? "%s   (B red, X blue)" : "%s", alliance);
