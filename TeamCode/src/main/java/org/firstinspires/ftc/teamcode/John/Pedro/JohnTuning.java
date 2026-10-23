@@ -14,7 +14,7 @@ import com.acmerobotics.dashboard.config.Config;
 public class JohnTuning {
 
     /** Proportional heading feedback. */
-    public static double HEADING_KP = 8.339117699516335;
+    public static double HEADING_KP = 8.213497192073243;
     /**
      * Static friction feedforward added to the heading output: KS * sign(error) while the error is
      * larger than HEADING_KS_DEADBAND_DEG. Lets the robot finish a turn instead of stopping short.
@@ -22,8 +22,8 @@ public class JohnTuning {
     public static double HEADING_KS = 0.0;
     public static double HEADING_KS_DEADBAND_DEG = 0.25;
     /** Heading brake coefficients (Vector2D.cartesian(A, B) in Pedro's ForesightConfig). */
-    public static double HEADING_BRAKE_A = 0.08733815312460257;
-    public static double HEADING_BRAKE_B = 0.007607279654884796;
+    public static double HEADING_BRAKE_A = 0.09861967506750287;
+    public static double HEADING_BRAKE_B = 0.004613531083625517;
 
     private JohnTuning() {}
 }
