@@ -4,6 +4,8 @@ import com.acmerobotics.dashboard.canvas.Canvas;
 import com.acmerobotics.dashboard.config.Config;
 import com.pedropathing.math.Pose;
 
+import org.firstinspires.ftc.teamcode.John.RobotGeometry;
+
 import java.util.Locale;
 
 /**
@@ -38,8 +40,11 @@ public class Drawing {
     public static String GRID_DOT_COLOR = "white";
 
     /** John's frame, inches (length along the heading). */
-    public static double ROBOT_LENGTH = 17.0;
-    public static double ROBOT_WIDTH = 17.25;
+    public static double ROBOT_LENGTH = RobotGeometry.LENGTH_IN;
+    public static double ROBOT_WIDTH = RobotGeometry.WIDTH_IN;
+    /** A short line out of the shooter side, so the robot's orientation is clear on the field. */
+    public static boolean DRAW_SHOOTER = true;
+    public static String SHOOTER_COLOR = "red";
     public static String ROBOT_COLOR = "white";
     public static String HEADING_COLOR = "orange";
     public static int OUTLINE_STROKE_WIDTH = 1;
@@ -78,9 +83,17 @@ public class Drawing {
         }
     }
 
-    /** The robot at a pose: footprint, heading line. */
+    /** The robot at a pose: footprint, heading line, shooter side. */
     public static void drawRobot(Canvas canvas, Pose pose) {
         drawFootprint(canvas, pose, ROBOT_COLOR, HEADING_COLOR, null);
+        if (DRAW_SHOOTER && canvas != null && pose != null) {
+            double dir = RobotGeometry.shooterDirection(pose.heading());
+            double from = ROBOT_WIDTH / 2.0;
+            canvas.setStroke(SHOOTER_COLOR);
+            canvas.setStrokeWidth(HEADING_STROKE_WIDTH);
+            canvas.strokeLine(pose.x() + from * Math.cos(dir), pose.y() + from * Math.sin(dir),
+                    pose.x() + (from + 4.0) * Math.cos(dir), pose.y() + (from + 4.0) * Math.sin(dir));
+        }
     }
 
     /** Another pose (e.g. a target) as a footprint in one color, with an optional label. */
