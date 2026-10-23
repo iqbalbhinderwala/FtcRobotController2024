@@ -77,6 +77,7 @@ public class HoldTest extends LinearOpMode {
         telemetry.addData("Log", log.error().isEmpty() ? log.fileName() : "ERROR " + log.error());
         telemetry.update();
         waitForStart();
+        gamepad1.resetEdgeDetection();   // ignore presses made during INIT
 
         ElapsedTime clock = new ElapsedTime();
         ElapsedTime loopTimer = new ElapsedTime();
@@ -90,8 +91,6 @@ public class HoldTest extends LinearOpMode {
                 motors[0].getPower(), motors[1].getPower(), motors[2].getPower(), motors[3].getPower(), "start holding: " + JohnGains.current().summary());
 
         ArrayDeque<double[]> history = new ArrayDeque<>();   // {t, heading error deg}
-        boolean lastLeft = false, lastRight = false, lastUp = false, lastDown = false, lastA = false;
-        boolean lastStrafeLeft = false, lastStrafeRight = false;
 
         while (opModeIsActive()) {
             // New tuning values from the Dashboard: rebuild the controller, keep holding the same target
@@ -108,41 +107,39 @@ public class HoldTest extends LinearOpMode {
                         motors[0].getPower(), motors[1].getPower(), motors[2].getPower(), motors[3].getPower(), "new tuning applied: " + JohnGains.current().summary());
             }
 
-            // Step tests
-            boolean left = gamepad1.left_bumper, right = gamepad1.right_bumper;
-            boolean up = gamepad1.dpad_up, down = gamepad1.dpad_down, a = gamepad1.a;
-            boolean strafeLeft = gamepad1.dpad_left, strafeRight = gamepad1.dpad_right;
+            // Step tests (one per press; every button is read each loop)
+            boolean left = gamepad1.leftBumperWasPressed(), right = gamepad1.rightBumperWasPressed();
+            boolean up = gamepad1.dpadUpWasPressed(), down = gamepad1.dpadDownWasPressed(), a = gamepad1.aWasPressed();
+            boolean strafeLeft = gamepad1.dpadLeftWasPressed(), strafeRight = gamepad1.dpadRightWasPressed();
             Pose newTarget = null;
             String step = null;
-            if (left && !lastLeft) {
+            if (left) {
                 newTarget = target.withHeading(target.heading() + Math.toRadians(STEP_DEG));
                 step = "turn +" + STEP_DEG;
-            } else if (right && !lastRight) {
+            } else if (right) {
                 newTarget = target.withHeading(target.heading() - Math.toRadians(STEP_DEG));
                 step = "turn -" + STEP_DEG;
-            } else if (up && !lastUp) {
+            } else if (up) {
                 newTarget = new Pose(target.x() + STEP_IN * Math.cos(target.heading()),
                         target.y() + STEP_IN * Math.sin(target.heading()), target.heading());
                 step = "forward " + STEP_IN;
-            } else if (down && !lastDown) {
+            } else if (down) {
                 newTarget = new Pose(target.x() - STEP_IN * Math.cos(target.heading()),
                         target.y() - STEP_IN * Math.sin(target.heading()), target.heading());
                 step = "back " + STEP_IN;
-            } else if (strafeLeft && !lastStrafeLeft) {
+            } else if (strafeLeft) {
                 // Left of the heading: +90 deg
                 newTarget = new Pose(target.x() - STEP_IN * Math.sin(target.heading()),
                         target.y() + STEP_IN * Math.cos(target.heading()), target.heading());
                 step = "strafe left " + STEP_IN;
-            } else if (strafeRight && !lastStrafeRight) {
+            } else if (strafeRight) {
                 newTarget = new Pose(target.x() + STEP_IN * Math.sin(target.heading()),
                         target.y() - STEP_IN * Math.cos(target.heading()), target.heading());
                 step = "strafe right " + STEP_IN;
-            } else if (a && !lastA) {
+            } else if (a) {
                 newTarget = follower.pose();
                 step = "hold here";
             }
-            lastLeft = left; lastRight = right; lastUp = up; lastDown = down; lastA = a;
-            lastStrafeLeft = strafeLeft; lastStrafeRight = strafeRight;
             if (newTarget != null && watchdog.ok()) {
                 target = newTarget;
                 follower.hold(target);

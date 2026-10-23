@@ -295,10 +295,10 @@ public class DriveCalibration extends LinearOpMode {
 
         // Results: hold, show the rankings, X applies the best of each axis
         boolean applied = false;
-        boolean lastX = false;
+        gamepad1.resetEdgeDetection();   // ignore an X pressed during the sweep
         while (opModeIsActive()) {
-            boolean x = gamepad1.x;
-            if (x && !lastX && !watchdog.lost() && (!forwardRanked.isEmpty() || !strafeRanked.isEmpty())) {
+            boolean x = gamepad1.xWasPressed();
+            if (x && !watchdog.lost() && (!forwardRanked.isEmpty() || !strafeRanked.isEmpty())) {
                 JohnGains best = JohnGains.current();
                 if (!forwardRanked.isEmpty()) {
                     best.forwardPSmall = forwardRanked.get(0).pSmall;
@@ -313,7 +313,6 @@ public class DriveCalibration extends LinearOpMode {
                 follower.hold(target);
                 applied = true;
             }
-            lastX = x;
             follower.update();
             watchdog.check(follower);
 

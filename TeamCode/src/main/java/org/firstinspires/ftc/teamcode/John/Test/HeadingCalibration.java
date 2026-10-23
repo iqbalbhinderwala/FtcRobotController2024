@@ -285,10 +285,10 @@ public class HeadingCalibration extends LinearOpMode {
 
         // Results: hold, show the top of the ranking, X applies the best
         boolean applied = false;
-        boolean lastX = false;
+        gamepad1.resetEdgeDetection();   // ignore an X pressed during the sweep
         while (opModeIsActive()) {
-            boolean x = gamepad1.x;
-            if (x && !lastX && !ranked.isEmpty() && !watchdog.lost()) {
+            boolean x = gamepad1.xWasPressed();
+            if (x && !ranked.isEmpty() && !watchdog.lost()) {
                 Combo best = ranked.get(0);
                 JohnTuning.HEADING_KP = best.kp;
                 JohnTuning.HEADING_KS = best.ks;
@@ -299,7 +299,6 @@ public class HeadingCalibration extends LinearOpMode {
                 follower.hold(target);
                 applied = true;
             }
-            lastX = x;
             follower.update();
             watchdog.check(follower);
 

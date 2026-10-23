@@ -23,11 +23,13 @@ import org.firstinspires.ftc.teamcode.John.Util.CsvLog;
  * ManualDrive.fieldCentric and ManualDrive.driveOrHold.
  *
  * Field-centric: pushing the left stick away from you drives the robot away from you, whichever way
- * it faces. Poses are FTC field coordinates (+X toward the audience, +Y toward blue), so a red
- * driver (red wall, -Y side) faces +Y and a blue driver faces -Y.
+ * it faces. The drivers stand at their alliance wall: poses are FTC field coordinates (+X toward
+ * the audience, +Y toward blue), so a red driver (red wall, -Y side) faces +Y and a blue driver
+ * (blue wall, +Y side) faces -Y.
  *
  * INIT: B = red, X = blue. Place the robot facing straight away from you, then START: the robot
- * starts at the alliance's start pose facing away from the driver.
+ * starts at the alliance's start pose facing away from the driver. (It does not take over the pose
+ * from [John] Auto yet.)
  *
  * gamepad1:
  *   left stick      drive (field- or robot-centric)
@@ -83,7 +85,8 @@ public class DriveTest extends LinearOpMode {
             } else if (gamepad1.x) {
                 ALLIANCE = Alliance.BLUE;
             }
-            telemetry.addData("Alliance", "%s   (B = red, X = blue)", ALLIANCE);
+            telemetry.addData("Alliance", "%s   (B = red, X = blue): drive from the %s alliance wall",
+                    ALLIANCE, ALLIANCE == Alliance.RED ? "red" : "blue");
             telemetry.addLine("Place the robot facing straight away from you, then START.");
             telemetry.addData("Log", log.error().isEmpty() ? log.fileName() : "ERROR " + log.error());
             telemetry.update();
@@ -100,7 +103,7 @@ public class DriveTest extends LinearOpMode {
 
         boolean fieldCentric = true;
         boolean holdMode = HOLD_WHEN_RELEASED;
-        boolean lastLeftBumper = false, lastY = false, lastA = false;
+        gamepad1.resetEdgeDetection();   // ignore presses made during INIT
         log.row(0.0, ALLIANCE, 1, holdMode ? 1 : 0, follower.mode(), null, null, null, null,
                 follower.pose().x(), follower.pose().y(), Math.toDegrees(follower.pose().heading()),
                 watchdog.state(), watchdog.status(), null, null, null, null, "start");
@@ -108,28 +111,25 @@ public class DriveTest extends LinearOpMode {
 
         while (opModeIsActive()) {
             String event = null;
-            boolean leftBumper = gamepad1.left_bumper, y = gamepad1.y, a = gamepad1.a;
-            if (leftBumper && !lastLeftBumper) {
+            boolean leftBumper = gamepad1.leftBumperWasPressed(), y = gamepad1.yWasPressed(), a = gamepad1.aWasPressed();
+            if (leftBumper) {
                 fieldCentric = !fieldCentric;
                 event = fieldCentric ? "field-centric" : "robot-centric";
             }
-            if (y && !lastY) {
+            if (y) {
                 Pose p = follower.pose();
                 follower.setPose(new Pose(p.x(), p.y(), driverFacing()));
                 watchdog.poseSet();
                 follower.manual(DrivePowers.zero());   // drop any hold of the old heading
                 event = "heading re-synced";
             }
-            if (a && !lastA) {
+            if (a) {
                 holdMode = !holdMode;
                 if (!holdMode) {
                     follower.manual(DrivePowers.zero());
                 }
                 event = holdMode ? "hold when released ON" : "hold when released OFF";
             }
-            lastLeftBumper = leftBumper;
-            lastY = y;
-            lastA = a;
 
             boolean slow = gamepad1.right_bumper;
             double scale = slow ? SLOW_SCALE : 1.0;
