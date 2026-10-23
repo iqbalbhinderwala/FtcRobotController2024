@@ -42,11 +42,19 @@ public class Drawing {
     /** John's frame, inches (length along the heading). */
     public static double ROBOT_LENGTH = RobotGeometry.LENGTH_IN;
     public static double ROBOT_WIDTH = RobotGeometry.WIDTH_IN;
+    /**
+     * The robot is drawn as a picture of a mecanum frame (the same as Barry's), which has a heading
+     * arrow in it. Without the picture it is an outline with a heading line.
+     */
+    public static boolean USE_ROBOT_IMAGE = true;
+    public static String ROBOT_IMAGE_PATH = "/images/robot.png";
+    /** Turns the picture if its arrow does not point along +X of the picture. */
+    public static double ROBOT_IMAGE_OFFSET_ROTATION_DEG = 0.0;
     /** A short line out of the shooter side, so the robot's orientation is clear on the field. */
     public static boolean DRAW_SHOOTER = true;
-    public static String SHOOTER_COLOR = "red";
+    public static String SHOOTER_COLOR = "cyan";
     public static String ROBOT_COLOR = "white";
-    public static String HEADING_COLOR = "orange";
+    public static String HEADING_COLOR = "pink";
     public static int OUTLINE_STROKE_WIDTH = 1;
     public static int HEADING_STROKE_WIDTH = 2;
     public static String TEXT_FONT = "3px sans-serif";
@@ -83,10 +91,21 @@ public class Drawing {
         }
     }
 
-    /** The robot at a pose: footprint, heading line, shooter side. */
+    /** The robot at a pose: the frame picture (or footprint and heading line), and the shooter side. */
     public static void drawRobot(Canvas canvas, Pose pose) {
-        drawFootprint(canvas, pose, ROBOT_COLOR, HEADING_COLOR, null);
-        if (DRAW_SHOOTER && canvas != null && pose != null) {
+        if (canvas == null || pose == null) {
+            return;
+        }
+        if (USE_ROBOT_IMAGE && ROBOT_IMAGE_PATH != null && !ROBOT_IMAGE_PATH.isEmpty()) {
+            applyFieldTransform(canvas);
+            // Images are drawn with a flipped Y, so the angle is negated (same as Barry's Drawing)
+            double rotation = pose.heading() + Math.toRadians(ROBOT_IMAGE_OFFSET_ROTATION_DEG);
+            canvas.drawImage(ROBOT_IMAGE_PATH, pose.x(), pose.y(), ROBOT_LENGTH, ROBOT_WIDTH, -rotation,
+                    ROBOT_LENGTH / 2.0, ROBOT_WIDTH / 2.0, false);
+        } else {
+            drawFootprint(canvas, pose, ROBOT_COLOR, HEADING_COLOR, null);
+        }
+        if (DRAW_SHOOTER) {
             double dir = RobotGeometry.shooterDirection(pose.heading());
             double from = ROBOT_WIDTH / 2.0;
             canvas.setStroke(SHOOTER_COLOR);
