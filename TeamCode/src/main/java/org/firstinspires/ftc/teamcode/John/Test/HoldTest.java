@@ -63,7 +63,7 @@ public class HoldTest extends LinearOpMode {
         CsvLog log = new CsvLog("john_hold_test", LOG_HEADER);
 
         Follower follower = Constants.create(hardwareMap);
-        OdometryWatchdog watchdog = new OdometryWatchdog(hardwareMap);
+        OdometryWatchdog watchdog = new OdometryWatchdog(hardwareMap, "hold_test");
         // Drive motor powers as commanded (for spotting wheels hunting back and forth near the target)
         DcMotor[] motors = {
                 hardwareMap.get(DcMotor.class, Constants.drivetrainConfig.frontLeftName.get()),
@@ -238,6 +238,7 @@ public class HoldTest extends LinearOpMode {
                         motors[0].getPower(), motors[1].getPower(), motors[2].getPower(), motors[3].getPower(), null);
         }
         log.close();
+        watchdog.close();
     }
 
     private static double[] tuning() {

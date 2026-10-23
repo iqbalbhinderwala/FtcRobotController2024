@@ -108,6 +108,19 @@ public class CsvLog {
         }
     }
 
+    /** Writes the buffered rows to storage now (for logs that must survive the app being killed). */
+    public void flush() {
+        if (writer == null) {
+            return;
+        }
+        try {
+            writer.flush();
+        } catch (IOException e) {
+            error = e.getMessage();
+            close();
+        }
+    }
+
     public void close() {
         if (writer == null) {
             return;

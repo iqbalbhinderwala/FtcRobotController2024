@@ -78,7 +78,7 @@ public class HeadingCalibration extends LinearOpMode {
     public static double START_HEADING_DEG = 180.0;
 
     private static final String SAMPLE_HEADER = "t_s,combo,turn,angle_deg,target_h_deg,h_deg,err_deg,"
-            + "watchdog,p_fl,p_fr,p_bl,p_br";
+            + "watchdog,pinpoint_status,pinpoint_loop_us,watchdog_reason,p_fl,p_fr,p_bl,p_br";
     private static final String TURN_HEADER = "t_s,combo,turn,kp,ks,ks_deadband_deg,brake_a,brake_b,angle_deg,"
             + "valid,t90_s,settle_s,settled,overshoot_deg,first_stop_deg,max_swing_deg,swings,final_deg,"
             + "peak_rate_dps,cost,voltage";
@@ -191,7 +191,7 @@ public class HeadingCalibration extends LinearOpMode {
         double estimateS = combos.size() * (COMBO_SETTLE_S + turnsPerCombo * TURN_WINDOW_S);
 
         follower = Constants.create(hardwareMap);
-        watchdog = new OdometryWatchdog(hardwareMap);
+        watchdog = new OdometryWatchdog(hardwareMap, "heading_cal");
         follower.setPose(new Pose(START_X_IN, START_Y_IN, Math.toRadians(START_HEADING_DEG)));
         watchdog.poseSet();
         motors = new DcMotor[]{
@@ -327,6 +327,7 @@ public class HeadingCalibration extends LinearOpMode {
             telemetry.addData("Logs", "john_logs/%s (+ _turns, _ranking)", samples.fileName());
             telemetry.update();
         }
+        watchdog.close();
     }
 
     /** Runs one turn for TURN_WINDOW_S and scores it. */
@@ -371,7 +372,8 @@ public class HeadingCalibration extends LinearOpMode {
                 trace.add(new double[]{t.seconds(), sign * err, Math.toDegrees(pose.heading())});
             }
             samples.row(clock.seconds(), comboIndex, turnIndex, currentAngle, Math.toDegrees(target.heading()),
-                    Math.toDegrees(pose.heading()), err, state, motors[0].getPower(), motors[1].getPower(),
+                    Math.toDegrees(pose.heading()), err, state, watchdog.status(), watchdog.pinpointLoopUs(),
+                    state == OdometryWatchdog.State.OK ? null : watchdog.reason(), motors[0].getPower(), motors[1].getPower(),
                     motors[2].getPower(), motors[3].getPower());
 
             telemetry.addData("Combination", "%d / %d: %s", comboIndex + 1, comboCount, combo.label());

@@ -86,7 +86,8 @@ public class DriveCalibration extends LinearOpMode {
     public static double START_HEADING_DEG = 180.0;
 
     private static final String SAMPLE_HEADER = "t_s,axis,combo,move,distance_in,target_x,target_y,x,y,h_deg,"
-            + "along_err_in,cross_err_in,heading_err_deg,watchdog,cmd_forward,cmd_strafe_left,cmd_turn";
+            + "along_err_in,cross_err_in,heading_err_deg,watchdog,pinpoint_status,pinpoint_loop_us,watchdog_reason,"
+            + "cmd_forward,cmd_strafe_left,cmd_turn";
     private static final String MOVE_HEADER = "t_s,axis,combo,move,p_small,ks,distance_in,valid,t90_s,settle_s,"
             + "settled,overshoot_in,first_stop_in,max_swing_in,swings,final_in,final_along_in,max_cross_in,"
             + "max_heading_err_deg,chatter_per_s,rest_command,peak_speed_ips,cost,voltage";
@@ -206,7 +207,7 @@ public class DriveCalibration extends LinearOpMode {
         }
 
         follower = Constants.create(hardwareMap);
-        watchdog = new OdometryWatchdog(hardwareMap);
+        watchdog = new OdometryWatchdog(hardwareMap, "drive_cal");
         follower.setPose(new Pose(START_X_IN, START_Y_IN, Math.toRadians(START_HEADING_DEG)));
         watchdog.poseSet();
         motors = new DcMotor[]{
@@ -327,6 +328,7 @@ public class DriveCalibration extends LinearOpMode {
             telemetry.addData("Logs", "john_logs/%s (+ _moves, _ranking)", samples.fileName());
             telemetry.update();
         }
+        watchdog.close();
     }
 
     private static List<Combo> rank(List<Combo> combos, boolean strafe) {
@@ -432,7 +434,8 @@ public class DriveCalibration extends LinearOpMode {
             }
             samples.row(clock.seconds(), combo.strafe ? "strafe" : "forward", comboIndex, moveIndex, currentDistance,
                     target.x(), target.y(), pose.x(), pose.y(), Math.toDegrees(pose.heading()), along, cross,
-                    headingErr, state, cmdForward, cmdStrafeLeft, cmdTurn);
+                    headingErr, state, watchdog.status(), watchdog.pinpointLoopUs(),
+                    state == OdometryWatchdog.State.OK ? null : watchdog.reason(), cmdForward, cmdStrafeLeft, cmdTurn);
 
             telemetry.addData("Combination", "%d / %d: %s", comboIndex + 1, comboCount, combo.label());
             telemetry.addData("Move", "%d: %+.0f in, error %+.2f in (cross %+.2f)", moveIndex + 1, currentDistance,

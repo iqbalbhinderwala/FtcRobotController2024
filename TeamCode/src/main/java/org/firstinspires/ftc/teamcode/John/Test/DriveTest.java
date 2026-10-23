@@ -71,7 +71,7 @@ public class DriveTest extends LinearOpMode {
         telemetry = new MultipleTelemetry(telemetry, dashboard.getTelemetry());
 
         Follower follower = Constants.create(hardwareMap);
-        OdometryWatchdog watchdog = new OdometryWatchdog(hardwareMap);
+        OdometryWatchdog watchdog = new OdometryWatchdog(hardwareMap, "drive_test");
         DcMotor[] motors = {
                 hardwareMap.get(DcMotor.class, Constants.drivetrainConfig.frontLeftName.get()),
                 hardwareMap.get(DcMotor.class, Constants.drivetrainConfig.frontRightName.get()),
@@ -179,6 +179,7 @@ public class DriveTest extends LinearOpMode {
                     motors[3].getPower(), event);
         }
         log.close();
+        watchdog.close();
     }
 
     /** Field direction the driver looks along (FTC, radians): red +90 deg, blue -90 deg, plus the offset. */

@@ -32,7 +32,7 @@ public class JohnAuto extends LinearOpMode {
         telemetry = new MultipleTelemetry(telemetry, dashboard.getTelemetry());
 
         Follower follower = Constants.create(hardwareMap);
-        OdometryWatchdog watchdog = new OdometryWatchdog(hardwareMap);
+        OdometryWatchdog watchdog = new OdometryWatchdog(hardwareMap, "auto");
         boolean haveSettings = AutoSettings.isSaved(blackboard);
         AutoSettings settings = new AutoSettings(blackboard);
 
@@ -95,5 +95,6 @@ public class JohnAuto extends LinearOpMode {
             Drawing.drawRobot(packet.fieldOverlay(), follower.pose());
             dashboard.sendTelemetryPacket(packet);
         }
+        watchdog.close();
     }
 }
