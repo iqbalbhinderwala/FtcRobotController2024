@@ -38,8 +38,8 @@ public class Drawing {
     public static String GRID_DOT_COLOR = "white";
 
     /** John's frame, inches (length along the heading). */
-    public static double ROBOT_LENGTH = 18.0;
-    public static double ROBOT_WIDTH = 18.0;
+    public static double ROBOT_LENGTH = 17.0;
+    public static double ROBOT_WIDTH = 17.25;
     public static String ROBOT_COLOR = "white";
     public static String HEADING_COLOR = "orange";
     public static int OUTLINE_STROKE_WIDTH = 1;

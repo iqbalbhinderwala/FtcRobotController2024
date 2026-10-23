@@ -9,6 +9,7 @@ import com.pedropathing.follower.Follower;
 import com.pedropathing.math.Pose;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
+import com.qualcomm.robotcore.hardware.DcMotor;
 import com.qualcomm.robotcore.util.ElapsedTime;
 
 import org.firstinspires.ftc.teamcode.John.Dashboard.Drawing;
@@ -45,13 +46,14 @@ public class HoldTest extends LinearOpMode {
     public static double STEP_DEG = 15.0;
     public static double STEP_IN = 6.0;
     public static double WINDOW_S = 2.0;
-    /** Start pose, FTC field coordinates (default: a tile center on the red, far-from-audience side). */
-    public static double START_X_IN = -36.0;
-    public static double START_Y_IN = -36.0;
-    public static double START_HEADING_DEG = 0.0;
+    /** Start pose, FTC field coordinates (default: a tile center on the blue side, toward the audience). */
+    public static double START_X_IN = 36.0;
+    public static double START_Y_IN = 36.0;
+    public static double START_HEADING_DEG = 180.0;
 
     private static final String LOG_HEADER = "t_s,target_x,target_y,target_h_deg,x,y,h_deg,"
-            + "heading_err_deg,position_err_in,swing_pp_deg,swing_hz,loop_ms,kp,brake_a,brake_b,ks,ks_deadband_deg,watchdog,pinpoint_status,pinpoint_loop_us,event";
+            + "heading_err_deg,position_err_in,swing_pp_deg,swing_hz,loop_ms,kp,brake_a,brake_b,ks,ks_deadband_deg,watchdog,pinpoint_status,pinpoint_loop_us,"
+            + "p_fl,p_fr,p_bl,p_br,event";
 
     @Override
     public void runOpMode() {
@@ -61,6 +63,12 @@ public class HoldTest extends LinearOpMode {
 
         Follower follower = Constants.create(hardwareMap);
         OdometryWatchdog watchdog = new OdometryWatchdog(hardwareMap);
+        // Drive motor powers as commanded (for spotting wheels hunting back and forth near the target)
+        DcMotor[] motors = {
+                hardwareMap.get(DcMotor.class, Constants.drivetrainConfig.frontLeftName.get()),
+                hardwareMap.get(DcMotor.class, Constants.drivetrainConfig.frontRightName.get()),
+                hardwareMap.get(DcMotor.class, Constants.drivetrainConfig.backLeftName.get()),
+                hardwareMap.get(DcMotor.class, Constants.drivetrainConfig.backRightName.get())};
         follower.setPose(new Pose(START_X_IN, START_Y_IN, Math.toRadians(START_HEADING_DEG)));
         watchdog.poseSet();
 
@@ -77,7 +85,7 @@ public class HoldTest extends LinearOpMode {
         double[] applied = tuning();
         log.row(clock.seconds(), null, null, null, null, null, null, null, null, null, null, null,
                 applied[0], applied[1], applied[2], applied[3], applied[4], watchdog.state(), watchdog.status(), watchdog.pinpointLoopUs(),
-                "start holding");
+                motors[0].getPower(), motors[1].getPower(), motors[2].getPower(), motors[3].getPower(), "start holding");
 
         ArrayDeque<double[]> history = new ArrayDeque<>();   // {t, heading error deg}
         boolean lastLeft = false, lastRight = false, lastUp = false, lastDown = false, lastA = false;
@@ -92,7 +100,8 @@ public class HoldTest extends LinearOpMode {
                 applied = now;
                 log.row(clock.seconds(), null, null, null, null, null, null, null, null, null, null, null,
                         applied[0], applied[1], applied[2], applied[3], applied[4], watchdog.state(), watchdog.status(),
-                        watchdog.pinpointLoopUs(), "new tuning applied");
+                        watchdog.pinpointLoopUs(),
+                        motors[0].getPower(), motors[1].getPower(), motors[2].getPower(), motors[3].getPower(), "new tuning applied");
             }
 
             // Step tests
@@ -135,7 +144,8 @@ public class HoldTest extends LinearOpMode {
                 follower.hold(target);
                 log.row(clock.seconds(), null, null, null, null, null, null, null, null, null, null, null,
                         applied[0], applied[1], applied[2], applied[3], applied[4], watchdog.state(), watchdog.status(),
-                        watchdog.pinpointLoopUs(), step);
+                        watchdog.pinpointLoopUs(),
+                        motors[0].getPower(), motors[1].getPower(), motors[2].getPower(), motors[3].getPower(), step);
             }
 
             follower.update();
@@ -161,7 +171,8 @@ public class HoldTest extends LinearOpMode {
                 }
                 log.row(clock.seconds(), null, null, null, null, null, null, null, null, null, null, null,
                         applied[0], applied[1], applied[2], applied[3], applied[4], watchdog.state(), watchdog.status(),
-                        watchdog.pinpointLoopUs(), change);
+                        watchdog.pinpointLoopUs(),
+                        motors[0].getPower(), motors[1].getPower(), motors[2].getPower(), motors[3].getPower(), change);
             }
 
             // Heading swing over the last WINDOW_S: peak to peak and zero-crossing frequency
@@ -220,7 +231,8 @@ public class HoldTest extends LinearOpMode {
             log.row(t, target.x(), target.y(), Math.toDegrees(target.heading()), pose.x(), pose.y(),
                     Math.toDegrees(pose.heading()), headingErr, positionErr, swing, hz, loopMs,
                     applied[0], applied[1], applied[2], applied[3], applied[4], watchdog.state(), watchdog.status(),
-                    watchdog.pinpointLoopUs(), null);
+                    watchdog.pinpointLoopUs(),
+                        motors[0].getPower(), motors[1].getPower(), motors[2].getPower(), motors[3].getPower(), null);
         }
         log.close();
     }

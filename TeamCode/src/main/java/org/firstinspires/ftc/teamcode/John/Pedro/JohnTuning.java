@@ -14,7 +14,7 @@ import com.acmerobotics.dashboard.config.Config;
 public class JohnTuning {
 
     /** Proportional heading feedback. */
-    public static double HEADING_KP = 8.213497192073243;
+    public static double HEADING_KP = 5.2; // 8.213497192073243;
     /**
      * Static friction feedforward added to the heading output: KS * sign(error) while the error is
      * larger than HEADING_KS_DEADBAND_DEG. Lets the robot finish a turn instead of stopping short.
