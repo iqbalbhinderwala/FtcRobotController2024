@@ -96,10 +96,18 @@ public class Constants {
     }
 
     public static Follower create(HardwareMap h) {
+        return create(h, foresightConfig());
+    }
+
+    /**
+     * With a given Foresight config, so the caller can keep it and change it per path, e.g.
+     * path.with(config.maxVelocityConstraint.at(12.0)) to drive one path slower.
+     */
+    public static Follower create(HardwareMap h, ForesightConfig config) {
         return new Follower(
                 new PinpointLocalizer(h, localizerConfig),
                 new Mecanum(h, drivetrainConfig),
-                new Foresight(foresightConfig())
+                new Foresight(config)
         );
     }
 }
