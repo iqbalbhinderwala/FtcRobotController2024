@@ -37,7 +37,12 @@ public class OdometryWatchdog {
 
     public static int BAD_READ_LOOPS = 5;
     public static int RESUME_LOOPS = 3;
-    public static double MAX_PAUSE_MS = 500.0;
+    /**
+     * Longest pause before LOST. Glitches seen so far lasted 0.15 s and 0.47 s. Longer pauses weaken
+     * the continuity check on the resumed pose (it allows MAX_SPEED_IN_S x the pause), so keep this
+     * around a second.
+     */
+    public static double MAX_PAUSE_MS = 1000.0;
     /** Pinpoint internal loop time considered sane (normally about 500-1100 us). */
     public static int MIN_LOOP_US = 200;
     public static int MAX_LOOP_US = 5000;
