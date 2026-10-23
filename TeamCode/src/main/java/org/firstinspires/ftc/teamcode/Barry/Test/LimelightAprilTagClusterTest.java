@@ -4,6 +4,7 @@ import com.acmerobotics.dashboard.FtcDashboard;
 import com.acmerobotics.dashboard.telemetry.MultipleTelemetry;
 import com.qualcomm.hardware.limelightvision.LLResult;
 import com.qualcomm.hardware.limelightvision.Limelight3A;
+import com.qualcomm.robotcore.eventloop.opmode.Disabled;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 
@@ -27,6 +28,7 @@ import java.util.List;
  *    stay about the same with 2, 3 or 4 tags visible.
  */
 @TeleOp(name = "Limelight AprilTag Cluster Test", group = "Teleop")
+@Disabled
 public class LimelightAprilTagClusterTest extends LinearOpMode {
 
     private static final double METERS_TO_INCHES = 39.3701;

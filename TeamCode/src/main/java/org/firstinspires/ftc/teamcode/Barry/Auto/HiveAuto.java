@@ -20,6 +20,7 @@ import com.pedropathing.ivy.Scheduler;
 import com.pedropathing.math.Pose;
 import com.pedropathing.paths.Path;
 import com.qualcomm.hardware.limelightvision.Limelight3A;
+import com.qualcomm.robotcore.eventloop.opmode.Disabled;
 import com.qualcomm.robotcore.eventloop.opmode.Autonomous;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.util.ElapsedTime;
@@ -65,6 +66,7 @@ import java.util.List;
  */
 @Config
 @Autonomous(name = "[Barry] Hive Auto", group = "Barry")
+@Disabled
 public class HiveAuto extends LinearOpMode {
 
     public enum Alliance { RED, BLUE }

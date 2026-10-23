@@ -8,6 +8,7 @@ import com.acmerobotics.dashboard.telemetry.TelemetryPacket;
 import com.pedropathing.follower.Follower;
 import com.pedropathing.math.Pose;
 import com.qualcomm.hardware.limelightvision.Limelight3A;
+import com.qualcomm.robotcore.eventloop.opmode.Disabled;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 import com.qualcomm.robotcore.util.ElapsedTime;
@@ -47,6 +48,7 @@ import java.util.Map;
  */
 @Config
 @TeleOp(name = "Init Localizer Test", group = "BarryTest")
+@Disabled
 public class InitLocalizerTest extends LinearOpMode {
 
     public static InitLocalizer.TiltMode TILT_MODE = InitLocalizer.TiltMode.SNAP;

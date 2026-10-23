@@ -6,6 +6,7 @@ import com.qualcomm.hardware.limelightvision.LLResult;
 import com.qualcomm.hardware.limelightvision.LLResultTypes;
 import com.qualcomm.hardware.limelightvision.LLStatus;
 import com.qualcomm.hardware.limelightvision.Limelight3A;
+import com.qualcomm.robotcore.eventloop.opmode.Disabled;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 
@@ -26,6 +27,7 @@ import java.util.List;
  * 3. Use the "Camera Stream" option on the Driver Station (3-dots menu) to see the actual video.
  */
 @TeleOp(name = "Limelight AprilTag Test", group = "Teleop")
+@Disabled
 public class LimelightAprilTagTest extends LinearOpMode {
 
     private Limelight3A limelight;

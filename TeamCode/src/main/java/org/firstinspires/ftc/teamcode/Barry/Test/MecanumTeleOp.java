@@ -7,6 +7,7 @@ import com.acmerobotics.dashboard.telemetry.TelemetryPacket;
 import com.pedropathing.api.PoseFactory;
 import com.pedropathing.follower.Follower;
 import com.pedropathing.math.Pose;
+import com.qualcomm.robotcore.eventloop.opmode.Disabled;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 
@@ -20,6 +21,7 @@ import org.firstinspires.ftc.teamcode.Barry.Dashboard.Drawing;
  */
 @Config
 @TeleOp(name = "[Barry] Mecanum Drive", group = "BarryTest")
+@Disabled
 public class MecanumTeleOp extends LinearOpMode {
 
     // Configurable starting pose parameters (Heading in degrees)

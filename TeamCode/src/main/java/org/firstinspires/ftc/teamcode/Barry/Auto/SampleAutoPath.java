@@ -11,6 +11,7 @@ import com.pedropathing.ivy.Scheduler;
 import static com.pedropathing.ivy.Scheduler.schedule;
 import static com.pedropathing.ivy.groups.Groups.sequential;
 import static com.pedropathing.ivy.pedro.PedroCommands.follow;
+import com.qualcomm.robotcore.eventloop.opmode.Disabled;
 import com.qualcomm.robotcore.eventloop.opmode.Autonomous;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 
@@ -18,6 +19,7 @@ import org.firstinspires.ftc.teamcode.Barry.Pedro.Constants;
 
 // https://ftc-docs.firstinspires.org/en/latest/programming_resources/shared/auto_load_opmode/auto-load-opmode.html
 @Autonomous(name = "[Barry] SampleAutoPath", group = "Autonomous", preselectTeleOp = "[Barry] Mecanum Drive")
+@Disabled
 public class SampleAutoPath extends LinearOpMode {
 
     private Follower follower;

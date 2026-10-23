@@ -9,6 +9,7 @@ import com.pedropathing.math.Pose;
 import com.qualcomm.hardware.limelightvision.LLResult;
 import com.qualcomm.hardware.limelightvision.LLResultTypes;
 import com.qualcomm.hardware.limelightvision.Limelight3A;
+import com.qualcomm.robotcore.eventloop.opmode.Disabled;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 import com.qualcomm.robotcore.util.ElapsedTime;
@@ -57,6 +58,7 @@ import java.util.Locale;
  */
 @Config
 @TeleOp(name = "Camera Calibration", group = "BarryTest")
+@Disabled
 public class CameraCalibration extends LinearOpMode {
 
     // ---- Pattern, relative to the start: along = robot forward, off = robot left (off the wall) ----
