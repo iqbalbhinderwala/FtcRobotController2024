@@ -14,6 +14,7 @@ import com.qualcomm.robotcore.util.ElapsedTime;
 
 import org.firstinspires.ftc.teamcode.John.Dashboard.Drawing;
 import org.firstinspires.ftc.teamcode.John.Pedro.Constants;
+import org.firstinspires.ftc.teamcode.John.Pedro.JohnGains;
 import org.firstinspires.ftc.teamcode.John.Pedro.JohnTuning;
 import org.firstinspires.ftc.teamcode.John.Pedro.OdometryWatchdog;
 import org.firstinspires.ftc.teamcode.John.Util.CsvLog;
@@ -28,7 +29,7 @@ import java.util.Arrays;
  * blue, inches). The robot is told it starts at START_X_IN / START_Y_IN / START_HEADING_DEG; that only
  * places it on the Dashboard field, the hold itself is relative.
  *
- * START holds the current pose with Pedro. Edit JohnTuning (HEADING_KP / KS / BRAKE_A / B ...) on the
+ * START holds the current pose with Pedro. Edit any JohnTuning value (heading, forward, strafe) on the
  * Dashboard: the controller is rebuilt and swapped in right away, while the robot keeps holding.
  * gamepad1 (step tests): left / right bumper turn the held heading left / right by STEP_DEG, dpad
  * up / down move the held point forward / back and dpad left / right strafe it left / right by
@@ -83,9 +84,10 @@ public class HoldTest extends LinearOpMode {
         Pose target = follower.pose();
         follower.hold(target);
         double[] applied = tuning();
+        double[] appliedAll = JohnGains.current().toArray();
         log.row(clock.seconds(), null, null, null, null, null, null, null, null, null, null, null,
                 applied[0], applied[1], applied[2], applied[3], applied[4], watchdog.state(), watchdog.status(), watchdog.pinpointLoopUs(),
-                motors[0].getPower(), motors[1].getPower(), motors[2].getPower(), motors[3].getPower(), "start holding");
+                motors[0].getPower(), motors[1].getPower(), motors[2].getPower(), motors[3].getPower(), "start holding: " + JohnGains.current().summary());
 
         ArrayDeque<double[]> history = new ArrayDeque<>();   // {t, heading error deg}
         boolean lastLeft = false, lastRight = false, lastUp = false, lastDown = false, lastA = false;
@@ -93,15 +95,17 @@ public class HoldTest extends LinearOpMode {
 
         while (opModeIsActive()) {
             // New tuning values from the Dashboard: rebuild the controller, keep holding the same target
-            double[] now = tuning();
-            if (watchdog.ok() && !Arrays.equals(now, applied)) {
+            double[] nowAll = JohnGains.current().toArray();
+            if (watchdog.ok() && !Arrays.equals(nowAll, appliedAll)) {
+                double[] now = tuning();
                 follower.setAlgorithm(new Foresight(Constants.foresightConfig()));
                 follower.hold(target);
                 applied = now;
+                appliedAll = nowAll;
                 log.row(clock.seconds(), null, null, null, null, null, null, null, null, null, null, null,
                         applied[0], applied[1], applied[2], applied[3], applied[4], watchdog.state(), watchdog.status(),
                         watchdog.pinpointLoopUs(),
-                        motors[0].getPower(), motors[1].getPower(), motors[2].getPower(), motors[3].getPower(), "new tuning applied");
+                        motors[0].getPower(), motors[1].getPower(), motors[2].getPower(), motors[3].getPower(), "new tuning applied: " + JohnGains.current().summary());
             }
 
             // Step tests
@@ -212,6 +216,8 @@ public class HoldTest extends LinearOpMode {
             telemetry.addData("Heading error", "%+.2f deg", headingErr);
             telemetry.addData("Position error", "%.2f in", positionErr);
             telemetry.addData("Heading swing", "%.2f deg peak-to-peak, ~%.1f Hz (last %.0f s)", swing, hz, WINDOW_S);
+            telemetry.addData("Forward / strafe", "P small %.3f / %.3f, KS %.3f / %.3f",
+                    JohnTuning.FORWARD_P_SMALL, JohnTuning.STRAFE_P_SMALL, JohnTuning.FORWARD_KS, JohnTuning.STRAFE_KS);
             telemetry.addData("Tuning", "KP %.3f  KS %.3f (deadband %.2f deg)  brake A %.4f  B %.5f",
                     applied[0], applied[3], applied[4], applied[1], applied[2]);
             telemetry.addData("Loop", "%.1f ms", loopMs);

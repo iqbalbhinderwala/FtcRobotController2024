@@ -15,6 +15,7 @@ import com.qualcomm.robotcore.util.ElapsedTime;
 
 import org.firstinspires.ftc.teamcode.John.Dashboard.Drawing;
 import org.firstinspires.ftc.teamcode.John.Pedro.Constants;
+import org.firstinspires.ftc.teamcode.John.Pedro.JohnGains;
 import org.firstinspires.ftc.teamcode.John.Pedro.JohnTuning;
 import org.firstinspires.ftc.teamcode.John.Pedro.OdometryWatchdog;
 import org.firstinspires.ftc.teamcode.John.Util.CsvLog;
@@ -225,8 +226,13 @@ public class HeadingCalibration extends LinearOpMode {
 
         for (comboIndex = 0; comboIndex < combos.size() && !aborted; comboIndex++) {
             Combo combo = combos.get(comboIndex);
-            follower.setAlgorithm(new Foresight(Constants.foresightConfig(
-                    combo.kp, combo.ks, KS_DEADBAND_DEG, combo.brakeA, combo.brakeB)));
+            JohnGains gains = JohnGains.current();
+            gains.headingKp = combo.kp;
+            gains.headingKs = combo.ks;
+            gains.headingKsDeadbandDeg = KS_DEADBAND_DEG;
+            gains.headingBrakeA = combo.brakeA;
+            gains.headingBrakeB = combo.brakeB;
+            follower.setAlgorithm(new Foresight(Constants.foresightConfig(gains)));
             follower.hold(target);
             currentAngle = 0;
             run(COMBO_SETTLE_S, null, combo, combos.size());

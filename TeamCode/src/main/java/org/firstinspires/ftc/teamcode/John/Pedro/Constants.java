@@ -44,34 +44,36 @@ public class Constants {
     });
 
     /**
-     * Built on each call so the heading values in JohnTuning (live-editable from FTC Dashboard) take
-     * effect for every new follower / algorithm.
+     * Built on each call so the values in JohnTuning (live-editable from FTC Dashboard) take effect
+     * for every new follower / algorithm.
      */
     public static ForesightConfig foresightConfig() {
-        return foresightConfig(JohnTuning.HEADING_KP, JohnTuning.HEADING_KS, JohnTuning.HEADING_KS_DEADBAND_DEG,
-                JohnTuning.HEADING_BRAKE_A, JohnTuning.HEADING_BRAKE_B);
+        return foresightConfig(JohnGains.current());
     }
 
-    /** Same, with explicit heading values (used by the heading calibration sweep). */
-    public static ForesightConfig foresightConfig(double headingKp, double headingKs, double headingKsDeadbandDeg,
-                                                  double headingBrakeA, double headingBrakeB) {
+    /** Same, with explicit values (used by the calibration sweeps). */
+    public static ForesightConfig foresightConfig(JohnGains g) {
         return new ForesightConfig(
             c -> {
-                Controller primaryTranslationalForward = Controller.proportional(0.41120344321980973);
-                Controller secondaryTranslationalForward = Controller.proportional(0.1519286847113561);
-                Controller primaryTranslationalLateral = Controller.proportional(0.676814632913156);
-                Controller secondaryTranslationalLateral = Controller.proportional(0.25006492204134684);
+                Controller primaryTranslationalForward = Controller.proportional(g.forwardPLarge);
+                Controller secondaryTranslationalForward = Controller.proportional(g.forwardPSmall);
+                Controller primaryTranslationalLateral = Controller.proportional(g.strafePLarge);
+                Controller secondaryTranslationalLateral = Controller.proportional(g.strafePSmall);
 
-                c.forwardTranslational.set(Controller.piecewise(secondaryTranslationalForward).put(2.5, primaryTranslationalForward));
-                c.strafeTranslational.set(Controller.piecewise(secondaryTranslationalLateral).put(2.5, primaryTranslationalLateral));
+                c.forwardTranslational.set(Controller.sum(
+                        Controller.piecewise(secondaryTranslationalForward).put(g.translationalThresholdIn, primaryTranslationalForward),
+                        staticFeedforward(g.forwardKs, g.translationalKsDeadbandIn)));
+                c.strafeTranslational.set(Controller.sum(
+                        Controller.piecewise(secondaryTranslationalLateral).put(g.translationalThresholdIn, primaryTranslationalLateral),
+                        staticFeedforward(g.strafeKs, g.translationalKsDeadbandIn)));
 
                 c.coast.set(Controller.proportionalFeedforward(0.010186903129938));
                 c.brake.set(Controller.proportionalFeedforward(0.0086588676604473));
 
                 c.headingFeedback.set(Controller.sum(
-                        Controller.proportional(headingKp),
-                        headingStaticFeedforward(headingKs, Math.toRadians(headingKsDeadbandDeg))));
-                c.headingBrakeCoefficients.set(Vector2D.cartesian(headingBrakeA, headingBrakeB));
+                        Controller.proportional(g.headingKp),
+                        staticFeedforward(g.headingKs, Math.toRadians(g.headingKsDeadbandDeg))));
+                c.headingBrakeCoefficients.set(Vector2D.cartesian(g.headingBrakeA, g.headingBrakeB));
 
                 c.linearBrakeCoefficients.set(Matrix.diag(0.15218656729826474, 0.11945174018596512));
                 c.quadraticBrakeCoefficients.set(Matrix.diag(0.0014714148194534546, 0.0012325337662412374));
@@ -85,11 +87,12 @@ public class Constants {
     }
 
     /**
-     * Static friction feedforward: ks * sign(error), but 0 within deadbandRad of the target so it
-     * does not chatter around zero error (Pedro's Controller.staticFeedforward has no deadband).
+     * Static friction feedforward: ks * sign(error), but 0 within deadband of the target so it does
+     * not chatter around zero error (Pedro's Controller.staticFeedforward has no deadband). The
+     * deadband is in the controller's error units (radians for heading, inches for translation).
      */
-    private static Controller headingStaticFeedforward(double ks, double deadbandRad) {
-        return (target, error) -> Math.abs(error) > deadbandRad ? ks * Math.signum(error) : 0.0;
+    private static Controller staticFeedforward(double ks, double deadband) {
+        return (target, error) -> Math.abs(error) > deadband ? ks * Math.signum(error) : 0.0;
     }
 
     public static Follower create(HardwareMap h) {
