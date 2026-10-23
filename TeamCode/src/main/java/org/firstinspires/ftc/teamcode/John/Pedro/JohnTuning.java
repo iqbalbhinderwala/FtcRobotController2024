@@ -22,8 +22,8 @@ public class JohnTuning {
     public static double HEADING_KS = 0.0;
     public static double HEADING_KS_DEADBAND_DEG = 0.25;
     /** Heading brake coefficients (Vector2D.cartesian(A, B) in Pedro's ForesightConfig). */
-    public static double HEADING_BRAKE_A = 0.09861967506750287;
-    public static double HEADING_BRAKE_B = 0.004613531083625517;
+    public static double HEADING_BRAKE_A = 0.05; // tuner: 0.09861967506750287
+    public static double HEADING_BRAKE_B = 0.006; // tuner: 0.004613531083625517
 
     private JohnTuning() {}
 }

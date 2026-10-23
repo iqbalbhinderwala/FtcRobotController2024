@@ -34,13 +34,18 @@ public class CsvLog {
     private int rows = 0;
 
     public CsvLog(String name, String header) {
+        this(name, header, nextRunNumber());
+    }
+
+    /** With a given run number, so several logs of one run share it (see nextRunNumber()). */
+    public CsvLog(String name, String header, int run) {
         try {
-            File dir = new File(AppUtil.FIRST_FOLDER, "john_logs");
+            File dir = logDir();
             if (!dir.exists() && !dir.mkdirs()) {
                 throw new IOException("cannot create " + dir);
             }
             String stamp = new SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(new Date());
-            fileName = String.format(Locale.US, "r%04d_%s_%s.csv", nextRunNumber(dir), name, stamp);
+            fileName = String.format(Locale.US, "r%04d_%s_%s.csv", run, name, stamp);
             writer = new BufferedWriter(new FileWriter(new File(dir, fileName)));
             writer.write(header);
             writer.newLine();
@@ -50,8 +55,13 @@ public class CsvLog {
         }
     }
 
-    /** One more than the highest run number among the files already in the folder (1 if none). */
-    private static int nextRunNumber(File dir) {
+    private static File logDir() {
+        return new File(AppUtil.FIRST_FOLDER, "john_logs");
+    }
+
+    /** One more than the highest run number among the files already in the log folder (1 if none). */
+    public static int nextRunNumber() {
+        File dir = logDir();
         int max = 0;
         String[] names = dir.list();
         if (names != null) {
@@ -78,7 +88,9 @@ public class CsvLog {
             if (i > 0) line.append(',');
             Object v = values[i];
             if (v instanceof Double) {
-                line.append(String.format(Locale.US, "%.3f", (Double) v));
+                // 3 decimals, but small values (gains, coefficients) keep 5 so they are not rounded away
+                double d = (Double) v;
+                line.append(String.format(Locale.US, d != 0 && Math.abs(d) < 0.1 ? "%.5f" : "%.3f", d));
             } else if (v != null) {
                 // Keep the CSV simple: no commas or newlines inside a value
                 line.append(v.toString().replace(',', ';').replace('\n', ' '));

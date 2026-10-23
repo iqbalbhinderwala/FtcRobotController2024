@@ -48,6 +48,13 @@ public class Constants {
      * effect for every new follower / algorithm.
      */
     public static ForesightConfig foresightConfig() {
+        return foresightConfig(JohnTuning.HEADING_KP, JohnTuning.HEADING_KS, JohnTuning.HEADING_KS_DEADBAND_DEG,
+                JohnTuning.HEADING_BRAKE_A, JohnTuning.HEADING_BRAKE_B);
+    }
+
+    /** Same, with explicit heading values (used by the heading calibration sweep). */
+    public static ForesightConfig foresightConfig(double headingKp, double headingKs, double headingKsDeadbandDeg,
+                                                  double headingBrakeA, double headingBrakeB) {
         return new ForesightConfig(
             c -> {
                 Controller primaryTranslationalForward = Controller.proportional(0.41120344321980973);
@@ -62,9 +69,9 @@ public class Constants {
                 c.brake.set(Controller.proportionalFeedforward(0.0086588676604473));
 
                 c.headingFeedback.set(Controller.sum(
-                        Controller.proportional(JohnTuning.HEADING_KP),
-                        headingStaticFeedforward(JohnTuning.HEADING_KS, Math.toRadians(JohnTuning.HEADING_KS_DEADBAND_DEG))));
-                c.headingBrakeCoefficients.set(Vector2D.cartesian(JohnTuning.HEADING_BRAKE_A, JohnTuning.HEADING_BRAKE_B));
+                        Controller.proportional(headingKp),
+                        headingStaticFeedforward(headingKs, Math.toRadians(headingKsDeadbandDeg))));
+                c.headingBrakeCoefficients.set(Vector2D.cartesian(headingBrakeA, headingBrakeB));
 
                 c.linearBrakeCoefficients.set(Matrix.diag(0.15218656729826474, 0.11945174018596512));
                 c.quadraticBrakeCoefficients.set(Matrix.diag(0.0014714148194534546, 0.0012325337662412374));
