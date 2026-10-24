@@ -28,6 +28,7 @@ import org.firstinspires.ftc.teamcode.John.Hardware.Indexer;
 import org.firstinspires.ftc.teamcode.John.Hardware.Shooter;
 import org.firstinspires.ftc.teamcode.John.Pedro.Constants;
 import org.firstinspires.ftc.teamcode.John.Pedro.OdometryWatchdog;
+import org.firstinspires.ftc.teamcode.John.Pedro.PathWatcher;
 import org.firstinspires.ftc.teamcode.John.RobotGeometry;
 import org.firstinspires.ftc.teamcode.John.ShootingZone;
 import org.firstinspires.ftc.teamcode.John.Util.CsvLog;
@@ -68,7 +69,8 @@ import java.util.Locale;
  *  - Outside the shooting zone (ShootingZone: closer than 43.6", or more than 45 deg to the side of
  *    the way the CELL opening faces), A first drives to the nearest spot inside it, around the HIVE
  *    frame if needed, turning on the way so it arrives at the shooting heading (MOVE_SPEED_IPS),
- *    then aims and shoots as above.
+ *    then aims and shoots as above. Blocked or pushed on the way (PathWatcher), it stops and
+ *    leaves it to the driver.
  *  - Moving a stick, A again, or B cancels.
  *
  * gamepad1:
@@ -160,6 +162,7 @@ public class JohnTeleOp extends LinearOpMode {
 
     private Follower follower;
     private ForesightConfig foresight;
+    private PathWatcher watcher;
     private OdometryWatchdog watchdog;
     private HiveCamera camera;
     private Flywheel flywheel;
@@ -194,6 +197,7 @@ public class JohnTeleOp extends LinearOpMode {
 
         foresight = Constants.foresightConfig();
         follower = Constants.create(hardwareMap, foresight);
+        watcher = new PathWatcher(follower, e -> { });
         watchdog = new OdometryWatchdog(hardwareMap, "teleop");
         camera = new HiveCamera(hardwareMap);
         flywheel = new Flywheel(hardwareMap);
@@ -580,6 +584,7 @@ public class JohnTeleOp extends LinearOpMode {
         spot = spot.withHeading(aimHeading(spot));   // with the trim
         List<double[]> route = ShootingZone.route(here, spot, red);
         follower.follow(routePath(here, route, spot));
+        watcher.start();
         moveGoal = spot;
         shot = Shot.MOVE;
         moveTimer.reset();
@@ -640,6 +645,10 @@ public class JohnTeleOp extends LinearOpMode {
                     moveGoal = null;
                     return String.format(Locale.US, "at the shooting spot (%.1f in from %s); %s",
                             Math.hypot(pose.x() - goal.x(), pose.y() - goal.y()), Drawing.format(goal), startAim());
+                }
+                if (watcher.check() != PathWatcher.Trip.NONE) {
+                    cancelShot("stopped: " + watcher.reason());
+                    return shotStatus;
                 }
                 if (moveTimer.milliseconds() > MOVE_TIMEOUT_MS) {
                     cancelShot("could not reach the shooting spot");

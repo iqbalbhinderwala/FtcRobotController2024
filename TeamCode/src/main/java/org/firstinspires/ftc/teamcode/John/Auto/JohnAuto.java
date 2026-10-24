@@ -8,7 +8,6 @@ import static com.pedropathing.ivy.commands.Commands.waitMs;
 import static com.pedropathing.ivy.commands.Commands.waitUntil;
 import static com.pedropathing.ivy.groups.Groups.race;
 import static com.pedropathing.ivy.groups.Groups.sequential;
-import static com.pedropathing.ivy.pedro.PedroCommands.follow;
 
 import com.acmerobotics.dashboard.FtcDashboard;
 import com.acmerobotics.dashboard.config.Config;
@@ -29,8 +28,13 @@ import org.firstinspires.ftc.teamcode.John.Hardware.Intake;
 import org.firstinspires.ftc.teamcode.John.Hardware.Shooter;
 import org.firstinspires.ftc.teamcode.John.Pedro.Constants;
 import org.firstinspires.ftc.teamcode.John.Pedro.OdometryWatchdog;
+import org.firstinspires.ftc.teamcode.John.Pedro.PathWatcher;
 import org.firstinspires.ftc.teamcode.John.RobotGeometry;
+import org.firstinspires.ftc.teamcode.John.ShootingZone;
 import org.firstinspires.ftc.teamcode.John.Util.CsvLog;
+
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * John's autonomous. The alliance, start tile and start delay come from [John] Game Setup (run it
@@ -51,6 +55,13 @@ import org.firstinspires.ftc.teamcode.John.Util.CsvLog;
  *     CELL and shoot.
  *  5. PARK in the LOADING ZONE, around the HIVE frame; the last stretch at PARK_SPEED_IPS.
  * At PARK_DEADLINE_S whatever is still running is dropped and the robot goes to park.
+ *
+ * Other robots: every drive goes through PathWatcher. When John is BLOCKED (not moving with path
+ * left) or PUSHED off the path, it stops pushing, waits, plans again from where it is and retries;
+ * after PathWatcher.RETRIES it gives up and the routine goes on with the next stage. Parking (the
+ * partner robot will likely park in the same LOADING ZONE): if the park is blocked, John stays if
+ * he is already partly in the LOADING ZONE (that scores), otherwise he tries spots PARK_ALT_OFFSET_IN
+ * to either side along it, the nearer one first.
  *
  * Slow stretches use Pedro's per-path modifier: path.with(config.maxVelocityConstraint.at(speed)).
  * Shooter and intake are stubs for now (John/Hardware). STEP_MODE (testing) waits for gamepad1 Y
@@ -86,9 +97,14 @@ public class JohnAuto extends LinearOpMode {
     /** Park: partly inside the red LOADING ZONE (X -48 to -24, Y -72 to -60.4), heading 90. */
     public static double PARK_X = -36.0;
     public static double PARK_HEADING_DEG = 90.0;
-    /** Waypoints to the park, keeping well clear of the HIVE frame (X -20 to 20, Y -25 to 25). */
-    public static double PARK_VIA_X = 14.0;
-    public static double PARK_VIA_Y = -50.0;
+    /** Other park spots along the LOADING ZONE, this far to either side of PARK_X, if the park is blocked. */
+    public static double PARK_ALT_OFFSET_IN = 10.0;
+    /** Red LOADING ZONE (FTC); PARK scores when the robot is partly inside (by at least PARK_OVERLAP_IN). */
+    public static double LOADING_ZONE_MIN_X = -48.0;
+    public static double LOADING_ZONE_MAX_X = -24.0;
+    public static double LOADING_ZONE_MAX_Y = -60.4;
+    public static double PARK_OVERLAP_IN = 1.0;
+    /** Before the last park stretch; the drive there goes around the HIVE frame (ShootingZone.route). */
     public static double PARK_APPROACH_X = -24.0;
     public static double PARK_APPROACH_Y = -56.0;
 
@@ -108,6 +124,7 @@ public class JohnAuto extends LinearOpMode {
     private Follower follower;
     private ForesightConfig foresight;
     private OdometryWatchdog watchdog;
+    private PathWatcher watcher;
     private final Shooter shooter = new Shooter();
     private final Intake intake = new Intake();
     private boolean blue;
@@ -124,6 +141,7 @@ public class JohnAuto extends LinearOpMode {
         foresight = Constants.foresightConfig();
         follower = Constants.create(hardwareMap, foresight);
         watchdog = new OdometryWatchdog(hardwareMap, "auto");
+        watcher = new PathWatcher(follower, this::logEvent);
         boolean haveSettings = AutoSettings.isSaved(blackboard);
         AutoSettings settings = new AutoSettings(blackboard);
         blue = settings.alliance() == AutoSettings.Alliance.BLUE;
@@ -200,6 +218,8 @@ public class JohnAuto extends LinearOpMode {
             telemetry.addData("Shooter", shooter.status());
             telemetry.addData("Intake", intake.status());
             telemetry.addData("Pinpoint", "%s, %s", state, watchdog.status());
+            telemetry.addData("Blocked / pushed", "%d%s", watcher.trips(),
+                    watcher.trips() > 0 ? ": last " + watcher.reason() : "");
             telemetry.update();
 
             TelemetryPacket packet = new TelemetryPacket(Drawing.drawDefaultField());
@@ -241,7 +261,7 @@ public class JohnAuto extends LinearOpMode {
         Pose off = new Pose(Math.min(start.x(), x), start.y(), start.heading());
         logEvent(String.format("step off the wall %.1f in to turn to %.1f deg", start.x() - off.x(),
                 Math.toDegrees(aim)));
-        return follow(follower, line(field(start), field(off)).constant(field(off)));
+        return watcher.follow("step off the wall", () -> toward(field(off), true, 0));
     }
 
     /** Turn in place so the shooter points at the CELL center; done when aligned or timed out. */
@@ -281,10 +301,10 @@ public class JohnAuto extends LinearOpMode {
                 race(waitUntil(() -> Math.abs(normalize(field(turned).heading() - follower.pose().heading()))
                                 <= Math.toRadians(AIM_TOLERANCE_DEG)),
                         waitMs(AIM_TIMEOUT_MS)),
-                follow(follower, line(field(turned), field(atWall)).constant(field(atWall))),
+                watcher.follow("garden: to the wall", () -> toward(field(atWall), true, 0)),
                 intake.start(Intake.Side.A),
-                follow(follower, line(field(atWall), field(slowStart)).constant(field(atWall))),
-                follow(follower, slow(line(field(slowStart), field(end)).constant(field(end)), COLLECT_SPEED_IPS)),
+                watcher.follow("garden: along the wall", () -> toward(field(slowStart), true, 0)),
+                watcher.follow("garden: collect", () -> toward(field(end), true, COLLECT_SPEED_IPS)),
                 waitMs(Intake.SETTLE_MS),
                 intake.stop());
     }
@@ -293,29 +313,102 @@ public class JohnAuto extends LinearOpMode {
     private Command toSecondShot() {
         Pose here = red(follower.pose());
         Pose spot = new Pose(SHOT2_X, SHOT2_Y, aimHeading(SHOT2_X, SHOT2_Y));
-        return follow(follower, line(field(here), field(spot)).linear(field(here), field(spot)));
+        return watcher.follow("to shot 2", () -> toward(field(spot), false, 0));
     }
 
-    /** Around the HIVE frame to the LOADING ZONE; the last stretch slow. */
+    /**
+     * Around the HIVE frame to the LOADING ZONE; the last stretch slow. If that is blocked: stay when
+     * already partly in the LOADING ZONE, else try the other spots along it.
+     */
     private Command park() {
-        Pose here = red(follower.pose());
         double heading = Math.toRadians(PARK_HEADING_DEG);
-        double parkY = RED_WALL_Y + RobotGeometry.LENGTH_IN / 2.0 + WALL_GAP;
-        Pose via = new Pose(PARK_VIA_X, PARK_VIA_Y, heading);
         Pose approach = new Pose(PARK_APPROACH_X, PARK_APPROACH_Y, heading);
-        Pose parkPose = new Pose(PARK_X, parkY, heading);
-        logEvent(String.format("park at (%.1f, %.1f) from %s", PARK_X, parkY, Drawing.format(follower.pose())));
-        Path route = path(
-                line(field(here), field(via)).linear(field(here), field(via)),
-                line(field(via), field(approach)).constant(field(via)));
+        Pose parkPose = new Pose(PARK_X, parkY(), heading);
+        logEvent(String.format("park at (%.1f, %.1f) from %s", PARK_X, parkY(), Drawing.format(follower.pose())));
         return sequential(
-                follow(follower, route),
-                follow(follower, slow(line(field(approach), field(parkPose)).constant(field(parkPose)), PARK_SPEED_IPS)));
+                watcher.follow("park: around the HIVE", () -> around(field(approach), 0)),
+                watcher.follow("park", () -> around(field(parkPose), PARK_SPEED_IPS)),
+                lazy(() -> {
+                    if (!watcher.gaveUp()) {
+                        return instant(() -> logEvent("parked at " + Drawing.format(follower.pose())));
+                    }
+                    List<Double> spots = new ArrayList<>();
+                    double x = red(follower.pose()).x();
+                    double a = PARK_X + PARK_ALT_OFFSET_IN;
+                    double b = PARK_X - PARK_ALT_OFFSET_IN;
+                    spots.add(Math.abs(a - x) <= Math.abs(b - x) ? a : b);
+                    spots.add(Math.abs(a - x) <= Math.abs(b - x) ? b : a);
+                    return parkElsewhere(spots);
+                }));
+    }
+
+    /** After a blocked park: stay if partly in the LOADING ZONE, else try the next spot along it. */
+    private Command parkElsewhere(List<Double> spots) {
+        if (inLoadingZone(red(follower.pose()))) {
+            return instant(() -> logEvent("park blocked, but already partly in the LOADING ZONE: staying at "
+                    + Drawing.format(follower.pose())));
+        }
+        if (spots.isEmpty()) {
+            return instant(() -> {
+                follower.manual(com.pedropathing.drivetrain.DrivePowers.zero());
+                logEvent("park: every spot blocked, NOT in the LOADING ZONE at " + Drawing.format(follower.pose()));
+            });
+        }
+        double x = spots.remove(0);
+        Pose spot = new Pose(x, parkY(), Math.toRadians(PARK_HEADING_DEG));
+        return sequential(
+                instant(() -> logEvent(String.format("park blocked: trying x %.1f", x))),
+                watcher.follow("park (other spot)", () -> around(field(spot), PARK_SPEED_IPS)),
+                lazy(() -> watcher.gaveUp() ? parkElsewhere(spots)
+                        : instant(() -> logEvent("parked at " + Drawing.format(follower.pose())))));
+    }
+
+    private static double parkY() {
+        return RED_WALL_Y + RobotGeometry.LENGTH_IN / 2.0 + WALL_GAP;
+    }
+
+    /** True when the robot (red frame) overlaps the red LOADING ZONE by at least PARK_OVERLAP_IN both ways. */
+    private static boolean inLoadingZone(Pose red) {
+        double c = Math.abs(Math.cos(red.heading()));
+        double s = Math.abs(Math.sin(red.heading()));
+        double halfX = RobotGeometry.LENGTH_IN / 2.0 * c + RobotGeometry.WIDTH_IN / 2.0 * s;
+        double halfY = RobotGeometry.LENGTH_IN / 2.0 * s + RobotGeometry.WIDTH_IN / 2.0 * c;
+        double overlapX = Math.min(red.x() + halfX, LOADING_ZONE_MAX_X) - Math.max(red.x() - halfX, LOADING_ZONE_MIN_X);
+        double overlapY = Math.min(red.y() + halfY, LOADING_ZONE_MAX_Y) - Math.max(red.y() - halfY, RED_WALL_Y);
+        return overlapX >= PARK_OVERLAP_IN && overlapY >= PARK_OVERLAP_IN;
     }
 
     // =========================================================================
     // Helpers
     // =========================================================================
+
+    /**
+     * A straight path from where the robot is now to {@code end} (field frame), keeping the end
+     * heading (constant) or turning to it on the way; no faster than {@code speed} in/s if > 0.
+     * Planned when the drive starts, and again from wherever the robot is on a PathWatcher retry.
+     */
+    private Path toward(Pose end, boolean constantHeading, double speed) {
+        Pose here = follower.pose();
+        Path p = constantHeading ? line(here, end).constant(end) : line(here, end).linear(here, end);
+        return speed > 0 ? slow(p, speed) : p;
+    }
+
+    /**
+     * From where the robot is now to {@code end} (field frame) around the HIVE frame
+     * (ShootingZone.route), turning to the end heading on the first leg.
+     */
+    private Path around(Pose end, double speed) {
+        Pose here = follower.pose();
+        List<double[]> route = ShootingZone.route(here, end, !blue);
+        Path[] legs = new Path[route.size() - 1];
+        for (int i = 0; i < legs.length; i++) {
+            Pose a = i == 0 ? here : new Pose(route.get(i)[0], route.get(i)[1], end.heading());
+            Pose b = new Pose(route.get(i + 1)[0], route.get(i + 1)[1], end.heading());
+            legs[i] = i == 0 ? line(a, b).linear(a, b) : line(a, b).constant(b);
+        }
+        Path p = legs.length == 1 ? legs[0] : path(legs);
+        return speed > 0 ? slow(p, speed) : p;
+    }
 
     /** A path driven no faster than {@code speed} in/s (Pedro reverts the limit after the path). */
     private Path slow(Path p, double speed) {
