@@ -74,11 +74,23 @@ import java.util.Locale;
  *  - After a volley (or a cancel) it waits for A to be let go before it starts again.
  * AIM ASSIST (right stick button held): you drive, the heading locks onto the CELL.
  *
+ * RE-LOCALIZE (X held RELOCALIZE_MS, standing still, the HIVE in view; letting go early cancels):
+ *  - against the audience wall (C1 / D1) or the far wall (C6 / D6), either alliance: drive there
+ *    and put the camera wall flush on it, shooter facing the field (within WALL_SNAP_IN of the wall
+ *    position and WALL_SNAP_DEG of its heading, by the odometry). X and heading from that wall, Y
+ *    from the tags of either HIVE (the INIT method; also fixes heading drift). A HIVE's tags face
+ *    the end that is up, so from a wall the camera reads the HIVE tilted toward it; if both are
+ *    tilted away, use the other wall;
+ *  - anywhere else: X and Y from the tags, the heading stays the Pinpoint's.
+ * Use it when distances or shooting-zone decisions look off (odometry drift). A shot that misses to
+ * one side although the camera sees the CELL is the aim trim or the camera mount, not the pose.
+ *
  * gamepad1:
  *   left stick             drive (field-centric)
  *   right stick X          turn;  right stick button (hold): aim assist
  *   A (hold)               shoot: move into range, aim, fire (let go: cancel)
  *   bumpers (hold)         intakes in;  B (hold): intakes reverse
+ *   X (hold 0.5 s)         re-localize: best with the camera wall flush on the audience or far wall
  *   dpad up / down         flywheel trim + / - TRIM_STEP_RPM;  dpad left / right: trim 0
  *
  * OdometryWatchdog stops the drive on bad Pinpoint reads. Logged to
@@ -109,6 +121,12 @@ public class JohnTeleOp extends LinearOpMode {
     public static int MIN_START_SAMPLES = 5;
     /** Warn when the tags' X differs from the wall X by more than this (not flush, or mount / tag size off). */
     public static double X_CHECK_WARN_IN = 4.0;
+    /** Re-localize: collect tags for this long while X is held and John stands still. */
+    public static double RELOCALIZE_MS = 500;
+    public static int MIN_RELOCALIZE_SAMPLES = 4;
+    /** Re-localize against the audience / far wall when this close to its position and heading. */
+    public static double WALL_SNAP_IN = 6.0;
+    public static double WALL_SNAP_DEG = 10.0;
     /** The up CELL counts as known this long after the camera (or the autonomous) said which. */
     public static double UP_CELL_TRUST_S = 15.0;
 
@@ -230,6 +248,11 @@ public class JohnTeleOp extends LinearOpMode {
         ElapsedTime clock = new ElapsedTime();
         boolean shotLatched = false;      // A must be let go before the next shot
         boolean upFromAuto = startFrom == Start.AUTO && autoUpAudience != null;
+        TagLocalizer relocalizer = new TagLocalizer(100);
+        boolean relocalizing = false;
+        boolean relocalizeDone = false;   // X must be let go before the next re-localize
+        Pose relocalizeWall = null;       // the wall pose when re-localizing against a wall
+        ElapsedTime relocalizeTimer = new ElapsedTime();
         boolean holdMode = HOLD_WHEN_RELEASED;
         log.row(0.0, shot, start.x(), start.y(), Math.toDegrees(start.heading()), null, null, null, null, null, null,
                 null, null, null, null, tracker.upCellName(), watchdog.state(),
@@ -241,6 +264,7 @@ public class JohnTeleOp extends LinearOpMode {
             String event = null;
             // Held buttons run the automated actions; pressed (edge) buttons toggle / step
             boolean shootHeld = gamepad1.a;
+            boolean relocalizeHeld = gamepad1.x;
             boolean assistHeld = gamepad1.right_stick_button;
             boolean trimUp = gamepad1.dpadUpWasPressed(), trimDown = gamepad1.dpadDownWasPressed();
             boolean trimReset = gamepad1.dpadLeftWasPressed() | gamepad1.dpadRightWasPressed();
@@ -254,7 +278,9 @@ public class JohnTeleOp extends LinearOpMode {
             // ---- Camera: the tracker uses only frames taken standing still ----
             Pose pose = follower.pose();
             HiveCamera.Frame frame = camera.poll();
-            tracker.update(frame, follower);
+            if (tracker.update(frame, follower) && relocalizing) {
+                relocalizer.add(frame, relocalizeWall != null ? relocalizeWall.heading() : pose.heading());
+            }
             if (tracker.event() != null) {
                 event = tracker.event();
                 if (shot == Shot.MOVE || shot == Shot.AIM) {
@@ -268,6 +294,25 @@ public class JohnTeleOp extends LinearOpMode {
             if (trimUp || trimDown || trimReset) {
                 shooter.setTrimRpm(trimReset ? 0.0 : shooter.trimRpm() + (trimUp ? TRIM_STEP_RPM : -TRIM_STEP_RPM));
                 event = String.format(Locale.US, "flywheel trim %+.0f RPM", shooter.trimRpm());
+            }
+            // Re-localize: runs while X is held, done after RELOCALIZE_MS
+            if (relocalizeHeld && !relocalizing && !relocalizeDone && shot == Shot.IDLE) {
+                relocalizing = true;
+                relocalizer.reset();
+                relocalizeTimer.reset();
+                Pose wall = backWallPose(pose);
+                boolean atWall = Math.abs(pose.x() - wall.x()) <= WALL_SNAP_IN
+                        && Math.abs(Math.toDegrees(normalize(pose.heading() - wall.heading()))) <= WALL_SNAP_DEG;
+                relocalizeWall = atWall ? wall : null;
+                event = atWall ? "re-localize against the " + (wall.x() > 0 ? "audience" : "far")
+                        + " wall: keep X held, stand still" : "re-localize from the tags: keep X held, stand still";
+            }
+            if (relocalizing && !relocalizeHeld) {
+                relocalizing = false;
+                event = "re-localize cancelled: X let go";
+            }
+            if (!relocalizeHeld) {
+                relocalizeDone = false;
             }
             // Shoot: runs while A is held; a new one only after letting go
             if (shootHeld && shot == Shot.IDLE && !shotLatched) {
@@ -294,6 +339,34 @@ public class JohnTeleOp extends LinearOpMode {
             if (shot != Shot.IDLE && watchdog.lost()) {
                 cancelShot("cancelled: odometry lost");
                 event = "shot cancelled: odometry lost";
+            }
+
+            // ---- Re-localize ----
+            if (relocalizing) {
+                if (sticksMoved) {
+                    relocalizing = false;
+                    event = "re-localize cancelled: moved";
+                } else if (relocalizeTimer.milliseconds() >= RELOCALIZE_MS) {
+                    relocalizing = false;
+                    relocalizeDone = true;   // once per hold
+                    if (relocalizer.count() >= MIN_RELOCALIZE_SAMPLES) {
+                        Pose before = follower.pose();
+                        Pose fixed = relocalizeWall != null
+                                ? relocalizer.alongWall(relocalizeWall, MIN_RELOCALIZE_SAMPLES, RobotGeometry.LENGTH_IN / 2.0)
+                                : new Pose(relocalizer.x(), relocalizer.y(), before.heading());
+                        follower.setPose(fixed);
+                        watchdog.poseSet();
+                        follower.manual(DrivePowers.zero());   // drop a hold in the old coordinates
+                        event = String.format(Locale.US, "re-localized (%s, %d tag readings): %s -> %s",
+                                relocalizeWall != null ? (relocalizeWall.x() > 0 ? "audience wall" : "far wall") : "tags",
+                                relocalizer.count(),
+                                Drawing.format(before), Drawing.format(fixed));
+                    } else {
+                        event = "re-localize failed: " + relocalizer.count() + " tag readings (standing still? "
+                                + (relocalizeWall != null ? "both HIVEs may be tilted away from this wall: try the other wall)"
+                                        : "HIVE in view?)");
+                    }
+                }
             }
 
             // ---- Aim and shoot ----
@@ -350,9 +423,14 @@ public class JohnTeleOp extends LinearOpMode {
                             ShootingZone.offAxisDeg(pose.x(), pose.y(), target[0], target[1], tracker.upAudience()))
                     : zone + ": the shot drives into range first");
             telemetry.addData("Pose (FTC)", Drawing.format(pose));
+            if (relocalizing) {
+                telemetry.addData("Re-localizing", "%s, %d tag readings",
+                        relocalizeWall != null ? (relocalizeWall.x() > 0 ? "audience wall" : "far wall") : "tags",
+                        relocalizer.count());
+            }
             telemetry.addData("Camera", camera.status());
             telemetry.addData("Pinpoint", "%s, %s", state, watchdog.status());
-            telemetry.addLine("HOLD: A shoot, RS button aim assist, bumpers intake, B reverse. Dpad: trim");
+            telemetry.addLine("HOLD: A shoot, RS button aim assist, X re-localize, bumpers intake, B reverse. Dpad: trim");
             telemetry.update();
 
             Pose aimPose = shot == Shot.AIM || shot == Shot.FIRE ? aimer.aimPose() : null;
@@ -384,6 +462,16 @@ public class JohnTeleOp extends LinearOpMode {
     // =========================================================================
     // Start position
     // =========================================================================
+
+    /**
+     * The pose against the audience wall (X > 0) or the far wall, whichever half John is in: camera
+     * wall flush on it, shooter facing the field (audience: heading +90; far: -90); Y kept.
+     */
+    private static Pose backWallPose(Pose pose) {
+        boolean audience = pose.x() >= 0;
+        double x = (72.0 - RobotGeometry.WIDTH_IN / 2.0) * (audience ? 1.0 : -1.0);
+        return new Pose(x, pose.y(), Math.toRadians(audience ? 90.0 : -90.0));
+    }
 
     /** Start pose for the alliance with the Game Setup tile (or C1): X and heading are the wall's. */
     private Pose wallPose(AutoSettings settings) {
@@ -532,5 +620,9 @@ public class JohnTeleOp extends LinearOpMode {
 
     private static double deadband(double v) {
         return Math.abs(v) < STICK_DEADBAND ? 0.0 : v;
+    }
+
+    private static double normalize(double angle) {
+        return Math.atan2(Math.sin(angle), Math.cos(angle));
     }
 }
