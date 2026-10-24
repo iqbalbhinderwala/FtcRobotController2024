@@ -128,7 +128,8 @@ public class JohnTeleOp extends LinearOpMode {
     public static String RPM_VALUES = "2200,2300,2400";
     /** Flywheel without its encoder (open-loop): wait this long after switching it on. */
     public static double OPEN_LOOP_SPIN_UP_MS = 1500;
-    public static double STEP_TIMEOUT_MS = 1000;
+    /** Long enough for the indexer's jam recovery (see Indexer); a STUCK indexer ends the volley. */
+    public static double STEP_TIMEOUT_MS = 4000;
 
     // ---- Intakes (as in the Mechanism Test) ----
     public static double INTAKE_POWER = 1.0;
@@ -386,6 +387,9 @@ public class JohnTeleOp extends LinearOpMode {
                 event = flywheel.event();
             }
             indexer.update();
+            if (indexer.event() != null) {
+                event = event == null ? indexer.event() : event + "; " + indexer.event();
+            }
             double intake = gamepad1.right_trigger > 0.2 ? INTAKE_POWER : gamepad1.left_trigger > 0.2 ? -INTAKE_POWER : 0.0;
             intakeA.setDirection(INTAKE_A_REVERSED ? DcMotorSimple.Direction.REVERSE : DcMotorSimple.Direction.FORWARD);
             intakeB.setDirection(INTAKE_B_REVERSED ? DcMotorSimple.Direction.REVERSE : DcMotorSimple.Direction.FORWARD);
@@ -622,6 +626,10 @@ public class JohnTeleOp extends LinearOpMode {
                 }
                 return null;
             case STEP:
+                if (indexer.stuck()) {
+                    cancelShot("indexer stuck: clear the ball, then A again");
+                    return "volley stopped: indexer stuck";
+                }
                 // busy() needs a moment to come on after a new target
                 if ((feedTimer.milliseconds() > 50 && !indexer.busy()) || feedTimer.milliseconds() > STEP_TIMEOUT_MS) {
                     stepsDone++;

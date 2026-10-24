@@ -58,8 +58,11 @@ public class MechanismTest extends LinearOpMode {
     public static double SHOT_INTERVAL_MS = 250;
     /** Open-loop: time after switching the flywheel on before the first ball. */
     public static double SPIN_UP_MS = 1500;
-    /** Give up waiting for an indexer step after this long. */
-    public static double STEP_TIMEOUT_MS = 1000;
+    /**
+     * Give up waiting for an indexer step after this long. Long enough for the indexer's own jam
+     * recovery (back off, retry: about 0.75 s per try, see Indexer); a STUCK indexer ends the volley.
+     */
+    public static double STEP_TIMEOUT_MS = 4000;
 
     private enum IntakeState { OFF, IN, REVERSE }
 
@@ -68,7 +71,7 @@ public class MechanismTest extends LinearOpMode {
     private static final String LOG_HEADER = "t_s,intakes,intake_a_amps,intake_b_amps,"
             + "flywheel_on,flywheel_mode,flywheel_target_rpm,flywheel_rpm,flywheel_ticks,flywheel_power,flywheel_amps,voltage,"
             + "indexer_step,indexer_target_deg,"
-            + "indexer_deg,indexer_busy,indexer_amps,event";
+            + "indexer_deg,indexer_busy,indexer_amps,indexer_state,indexer_jams,event";
 
     @Override
     public void runOpMode() {
@@ -173,6 +176,11 @@ public class MechanismTest extends LinearOpMode {
                     }
                     break;
                 case STEP:
+                    if (indexer.stuck()) {
+                        shootPhase = ShootPhase.IDLE;
+                        event = "shoot stopped: indexer stuck, clear the ball";
+                        break;
+                    }
                     // busy() needs a moment to come on after a new target
                     if ((shootTimer.milliseconds() > 50 && !indexer.busy())
                             || shootTimer.milliseconds() > STEP_TIMEOUT_MS) {
@@ -199,6 +207,9 @@ public class MechanismTest extends LinearOpMode {
             }
 
             indexer.update();
+            if (indexer.event() != null) {
+                event = event == null ? indexer.event() : event + "; " + indexer.event();
+            }
 
             double ampsA = intakeA.getCurrent(CurrentUnit.AMPS);
             double ampsB = intakeB.getCurrent(CurrentUnit.AMPS);
@@ -223,9 +234,12 @@ public class MechanismTest extends LinearOpMode {
             } else if (!Flywheel.USE_ENCODER && Math.abs(flywheel.rpm()) > 1.0) {
                 telemetry.addData("Flywheel encoder", "%.0f RPM: it works, USE_ENCODER can be on", flywheel.rpm());
             }
-            telemetry.addData("Indexer (RB + / LB -)", "step %d, target %.0f deg, at %.1f deg%s, %.1f A",
+            telemetry.addData("Indexer (RB + / LB -)", "step %d, target %.0f deg, at %.1f deg%s, %.1f A, %s, %d jams",
                     indexer.stepCount(), indexer.targetDegrees(), indexer.degrees(), indexer.busy() ? " (moving)" : "",
-                    ampsIdx);
+                    ampsIdx, indexer.state(), indexer.jams());
+            if (indexer.stuck()) {
+                telemetry.addLine("INDEXER STUCK: clear the ball, then RB / X to go on.");
+            }
             telemetry.addData("Shoot (X)", shootPhase == ShootPhase.IDLE
                     ? String.format("ready: %d balls, %.0f ms apart", SHOOT_COUNT, SHOT_INTERVAL_MS)
                     : String.format("%s, %d / %d shot", shootPhase, shotsDone, SHOOT_COUNT));
@@ -242,7 +256,7 @@ public class MechanismTest extends LinearOpMode {
             log.row(clock.seconds(), intakes, ampsA, ampsB, flywheel.isOn() ? 1 : 0, flywheel.mode(),
                     flywheel.isOn() ? flywheel.targetRpm() : 0.0, flywheel.rpm(), flywheelTicks, flywheel.power(),
                     ampsFly, flywheel.voltage(), indexer.stepCount(), indexer.targetDegrees(),
-                    indexer.degrees(), indexer.busy() ? 1 : 0, ampsIdx, event);
+                    indexer.degrees(), indexer.busy() ? 1 : 0, ampsIdx, indexer.state(), indexer.jams(), event);
         }
         intakeA.setPower(0);
         intakeB.setPower(0);
