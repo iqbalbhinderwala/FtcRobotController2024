@@ -120,6 +120,20 @@ public class Drawing {
         drawFootprint(canvas, pose, color, color, label);
     }
 
+    /** A target point (e.g. the CELL being aimed at) as a small circle, with a line from {@code from} if given. */
+    public static void drawTarget(Canvas canvas, Pose from, double x, double y, String color) {
+        if (canvas == null) {
+            return;
+        }
+        applyFieldTransform(canvas);
+        canvas.setStroke(color);
+        canvas.setStrokeWidth(OUTLINE_STROKE_WIDTH);
+        canvas.strokeCircle(x, y, 2.0);
+        if (from != null) {
+            canvas.strokeLine(from.x(), from.y(), x, y);
+        }
+    }
+
     private static void drawFootprint(Canvas canvas, Pose pose, String bodyColor, String headingColor, String label) {
         if (canvas == null || pose == null) {
             return;
