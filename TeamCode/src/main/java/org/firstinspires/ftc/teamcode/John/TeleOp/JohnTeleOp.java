@@ -1,14 +1,19 @@
 package org.firstinspires.ftc.teamcode.John.TeleOp;
 
+import static com.pedropathing.api.Paths.line;
+import static com.pedropathing.api.Paths.path;
+
 import com.acmerobotics.dashboard.FtcDashboard;
 import com.acmerobotics.dashboard.config.Config;
 import com.acmerobotics.dashboard.telemetry.MultipleTelemetry;
 import com.acmerobotics.dashboard.telemetry.TelemetryPacket;
+import com.pedropathing.algorithm.ForesightConfig;
 import com.pedropathing.drivetrain.DrivePowers;
 import com.pedropathing.follower.Follower;
 import com.pedropathing.follower.ManualDrive;
 import com.pedropathing.math.Pose;
 import com.pedropathing.math.Velocity;
+import com.pedropathing.paths.Path;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 import com.qualcomm.robotcore.hardware.DcMotor;
@@ -24,12 +29,14 @@ import org.firstinspires.ftc.teamcode.John.Hardware.Shooter;
 import org.firstinspires.ftc.teamcode.John.Pedro.Constants;
 import org.firstinspires.ftc.teamcode.John.Pedro.OdometryWatchdog;
 import org.firstinspires.ftc.teamcode.John.RobotGeometry;
+import org.firstinspires.ftc.teamcode.John.ShootingZone;
 import org.firstinspires.ftc.teamcode.John.Util.CsvLog;
 import org.firstinspires.ftc.teamcode.John.Vision.HiveCamera;
 import org.firstinspires.ftc.teamcode.John.Vision.HiveTags;
 import org.firstinspires.ftc.teamcode.John.Vision.TagLocalizer;
 
 import java.util.ArrayDeque;
+import java.util.List;
 import java.util.Locale;
 
 /**
@@ -58,6 +65,10 @@ import java.util.Locale;
  *    audience / blue far CELL. Dpad down switches it by hand (the camera wins when it sees tags).
  *  - Flywheel speed from the distance to the CELL (RPM_DISTANCES_IN / RPM_VALUES, from the
  *    2026-10-23 tests at C1 / B1 / A1); clamped outside that range.
+ *  - Outside the shooting zone (ShootingZone: closer than 43.6", or more than 45 deg to the side of
+ *    the way the CELL opening faces), A first drives to the nearest spot inside it, around the HIVE
+ *    frame if needed, turning on the way so it arrives at the shooting heading (MOVE_SPEED_IPS),
+ *    then aims and shoots as above.
  *  - Moving a stick, A again, or B cancels.
  *
  * gamepad1:
@@ -131,12 +142,16 @@ public class JohnTeleOp extends LinearOpMode {
     /** Long enough for the indexer's jam recovery (see Indexer); a STUCK indexer ends the volley. */
     public static double STEP_TIMEOUT_MS = 4000;
 
+    // ---- Driving into the shooting zone ----
+    public static double MOVE_SPEED_IPS = 40.0;
+    public static double MOVE_TIMEOUT_MS = 6000;
+
     // ---- Intakes (as in the Mechanism Test) ----
     public static double INTAKE_POWER = 1.0;
     public static boolean INTAKE_A_REVERSED = false;
     public static boolean INTAKE_B_REVERSED = false;
 
-    private enum Shot { IDLE, AIM, FIRE }
+    private enum Shot { IDLE, MOVE, AIM, FIRE }
 
     private enum Feed { SPIN_UP, STEP, INTERVAL }
 
@@ -144,6 +159,7 @@ public class JohnTeleOp extends LinearOpMode {
             + "distance,rpm_target,rpm,flywheel_mode,indexer_step,tags,up_cell,watchdog,event";
 
     private Follower follower;
+    private ForesightConfig foresight;
     private OdometryWatchdog watchdog;
     private HiveCamera camera;
     private Flywheel flywheel;
@@ -162,6 +178,8 @@ public class JohnTeleOp extends LinearOpMode {
     private Shot shot = Shot.IDLE;
     private Feed feed = Feed.SPIN_UP;
     private Pose aimPose;
+    private Pose moveGoal;
+    private final ElapsedTime moveTimer = new ElapsedTime();
     private int refines;
     private int stepsDone;
     private final ElapsedTime aimTimer = new ElapsedTime();
@@ -174,7 +192,8 @@ public class JohnTeleOp extends LinearOpMode {
         FtcDashboard dashboard = FtcDashboard.getInstance();
         telemetry = new MultipleTelemetry(telemetry, dashboard.getTelemetry());
 
-        follower = Constants.create(hardwareMap);
+        foresight = Constants.foresightConfig();
+        follower = Constants.create(hardwareMap, foresight);
         watchdog = new OdometryWatchdog(hardwareMap, "teleop");
         camera = new HiveCamera(hardwareMap);
         flywheel = new Flywheel(hardwareMap);
@@ -319,7 +338,7 @@ public class JohnTeleOp extends LinearOpMode {
                     shotStatus = "can't aim: odometry " + watchdog.state();
                     event = shotStatus;
                 } else {
-                    event = startAim();
+                    event = requestShot();
                 }
             }
             if (shot != Shot.IDLE && sticksMoved) {
@@ -408,6 +427,11 @@ public class JohnTeleOp extends LinearOpMode {
             telemetry.addData("Flywheel (Y pre-spin)", "%s, %.0f / %.0f RPM%s%s", flywheel.isOn() ? "ON" : "off",
                     flywheel.rpm(), flywheel.targetRpm(), flywheel.atSpeed() ? " AT SPEED" : "",
                     rpmInRange(distance) ? "" : " (distance outside the tested range)");
+            String zone = ShootingZone.problem(pose.x(), pose.y(), target[0], target[1], targetAudience);
+            telemetry.addData("Shooting zone", zone == null
+                    ? String.format(Locale.US, "IN RANGE (%.0f deg off the CELL axis)",
+                            ShootingZone.offAxisDeg(pose.x(), pose.y(), target[0], target[1], targetAudience))
+                    : zone + ": A drives into range first");
             telemetry.addData("Pose (FTC)", Drawing.format(pose));
             if (relocalizing) {
                 telemetry.addData("Re-localizing", "%d tag readings", relocalizer.count());
@@ -423,6 +447,9 @@ public class JohnTeleOp extends LinearOpMode {
             Drawing.drawTarget(packet.fieldOverlay(), shot != Shot.IDLE ? pose : null, target[0], target[1], "orange");
             if (aimPose != null && shot != Shot.IDLE) {
                 Drawing.drawRobotOutline(packet.fieldOverlay(), aimPose, "orange", null);
+            }
+            if (moveGoal != null && shot == Shot.MOVE) {
+                Drawing.drawRobotOutline(packet.fieldOverlay(), moveGoal, "orange", "shoot here");
             }
             dashboard.sendTelemetryPacket(packet);
 
@@ -537,6 +564,50 @@ public class JohnTeleOp extends LinearOpMode {
         return normalize(RobotGeometry.headingToShoot(bearing) + Math.toRadians(AIM_TRIM_DEG));
     }
 
+    /** A: aim and shoot from here if in the shooting zone, else drive into it first. */
+    private String requestShot() {
+        Pose here = follower.pose();
+        double[] t = target();
+        String problem = ShootingZone.problem(here.x(), here.y(), t[0], t[1], targetAudience);
+        if (problem == null) {
+            return startAim();
+        }
+        Pose spot = ShootingZone.nearestSpot(here, t[0], t[1], targetAudience, red);
+        if (spot == null) {
+            shotStatus = problem + ", and no spot in range on the field";
+            return "no shot: " + shotStatus;
+        }
+        spot = spot.withHeading(aimHeading(spot));   // with the trim
+        List<double[]> route = ShootingZone.route(here, spot, red);
+        follower.follow(routePath(here, route, spot));
+        moveGoal = spot;
+        shot = Shot.MOVE;
+        moveTimer.reset();
+        double length = 0;
+        for (int i = 1; i < route.size(); i++) {
+            length += Math.hypot(route.get(i)[0] - route.get(i - 1)[0], route.get(i)[1] - route.get(i - 1)[1]);
+        }
+        shotStatus = String.format(Locale.US, "%s: driving %.0f in to %s%s", problem, length, Drawing.format(spot),
+                route.size() > 2 ? " around the HIVE" : "");
+        return "move to shoot: " + shotStatus;
+    }
+
+    /**
+     * The route as one path at MOVE_SPEED_IPS: the heading stays until the last leg, which turns
+     * from the start heading to the shooting heading.
+     */
+    private Path routePath(Pose start, List<double[]> route, Pose goal) {
+        Path[] legs = new Path[route.size() - 1];
+        for (int i = 0; i < legs.length; i++) {
+            boolean last = i == legs.length - 1;
+            Pose a = new Pose(route.get(i)[0], route.get(i)[1], start.heading());
+            Pose b = last ? goal : new Pose(route.get(i + 1)[0], route.get(i + 1)[1], start.heading());
+            legs[i] = last ? line(a, b).linear(a, b) : line(a, b).constant(a);
+        }
+        Path p = legs.length == 1 ? legs[0] : path(legs);
+        return p.with(foresight.maxVelocityConstraint.at(MOVE_SPEED_IPS));
+    }
+
     private String startAim() {
         Pose here = follower.pose();
         aimPose = new Pose(here.x(), here.y(), aimHeading(here));
@@ -555,6 +626,7 @@ public class JohnTeleOp extends LinearOpMode {
         }
         shot = Shot.IDLE;
         aimPose = null;
+        moveGoal = null;
         shotStatus = why;
     }
 
@@ -562,6 +634,18 @@ public class JohnTeleOp extends LinearOpMode {
     private String updateShot() {
         Pose pose = follower.pose();
         switch (shot) {
+            case MOVE:
+                if (moveTimer.milliseconds() > 100 && !follower.following()) {
+                    Pose goal = moveGoal;
+                    moveGoal = null;
+                    return String.format(Locale.US, "at the shooting spot (%.1f in from %s); %s",
+                            Math.hypot(pose.x() - goal.x(), pose.y() - goal.y()), Drawing.format(goal), startAim());
+                }
+                if (moveTimer.milliseconds() > MOVE_TIMEOUT_MS) {
+                    cancelShot("could not reach the shooting spot");
+                    return shotStatus;
+                }
+                return null;
             case AIM: {
                 double error = Math.abs(normalize(aimPose.heading() - pose.heading()));
                 boolean aligned = error <= Math.toRadians(AIM_TOLERANCE_DEG) && still;
