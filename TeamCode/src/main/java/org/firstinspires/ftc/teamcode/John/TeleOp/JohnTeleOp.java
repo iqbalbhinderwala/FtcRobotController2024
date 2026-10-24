@@ -8,6 +8,7 @@ import com.acmerobotics.dashboard.config.Config;
 import com.acmerobotics.dashboard.telemetry.MultipleTelemetry;
 import com.acmerobotics.dashboard.telemetry.TelemetryPacket;
 import com.pedropathing.algorithm.ForesightConfig;
+import com.pedropathing.controllers.Controller;
 import com.pedropathing.drivetrain.DrivePowers;
 import com.pedropathing.follower.Follower;
 import com.pedropathing.follower.ManualDrive;
@@ -30,6 +31,7 @@ import org.firstinspires.ftc.teamcode.John.ShootingZone;
 import org.firstinspires.ftc.teamcode.John.Util.CsvLog;
 import org.firstinspires.ftc.teamcode.John.Vision.CellTracker;
 import org.firstinspires.ftc.teamcode.John.Vision.HiveCamera;
+import org.firstinspires.ftc.teamcode.John.Vision.HiveTags;
 import org.firstinspires.ftc.teamcode.John.Vision.TagLocalizer;
 
 import java.util.List;
@@ -52,30 +54,32 @@ import java.util.Locale;
  * away from you drives away from you, whatever way John faces. Pedro's ManualDrive.driveOrHold
  * holds the pose when the sticks are released (HOLD_WHEN_RELEASED).
  *
- * AIM AND SHOOT (A), the same parts as the autonomous:
+ * HOLD TO RUN (as on Vex): every automated action runs only while its button is held, step by
+ * step; letting go cancels it and gives the robot back to the sticks. Moving a stick also cancels.
+ *
+ * SHOOT (A held), the same parts as the autonomous:
  *  - Target: our HIVE's up CELL (CellTracker: which one from the tag heights, where from camera
- *    sightings while standing still, else its nominal place). Dpad down switches the CELL by hand
- *    (the camera wins when it sees tags).
+ *    sightings while standing still, else its nominal place). When nobody knows it recently (no
+ *    camera confirmation in UP_CELL_TRUST_S, nor the autonomous' at the start), the closest CELL of
+ *    our HIVE. If the camera finds the other CELL up while moving or aiming, the shot starts over
+ *    for that one (while A is held).
  *  - Outside the shooting zone (ShootingZone: closer than 43.6", or more than 45 deg to the side of
- *    the way the CELL opening faces), A first drives to the nearest spot inside it, around the HIVE
- *    frame if needed, turning on the way (MOVE_SPEED_IPS). Blocked or pushed on the way
- *    (PathWatcher), it stops and leaves it to the driver.
- *  - On the way the shooter keeps turning toward the CELL (Aimer.facingTarget); then Aimer
- *    refines with the camera, and Shooter fires a volley at the speed for the distance, with the
- *    indexer's jam handling. Knocked off aim during the volley, it holds fire until back on aim;
- *    pushed away, it aims again from there (Aimer.keepAim).
- *  - Moving a stick, A again, or B cancels.
+ *    the way the CELL opening faces), it first drives to the nearest spot inside it, around the
+ *    HIVE frame if needed (MOVE_SPEED_IPS), the shooter turning toward the CELL on the way
+ *    (Aimer.facingTarget). Blocked or pushed on the way (PathWatcher), it stops.
+ *    The flywheel spins up when the shot starts.
+ *  - Aimer refines with the camera, then Shooter fires a volley at the speed for the distance (plus
+ *    the dpad trim), with the indexer's jam handling. Knocked off aim during the volley, it holds
+ *    fire until back on aim; pushed away, it aims again from there (Aimer.keepAim).
+ *  - After a volley (or a cancel) it waits for A to be let go before it starts again.
+ * AIM ASSIST (right stick button held): you drive, the heading locks onto the CELL.
  *
  * gamepad1:
- *   left stick         drive (field-centric)
- *   right stick X      turn
- *   right bumper       slow (hold)
- *   A                  aim and shoot (again: cancel)
- *   Y                  flywheel pre-spin on/off (at the speed for the current distance)
- *   right / left trigger   intakes in / reverse (hold)
- *   dpad up            re-localize from the HIVE tags (stand still; uses the Pinpoint heading)
- *   dpad down          switch the target CELL (audience / far)
- *   B                  stop: cancel the shot, flywheel and pre-spin off
+ *   left stick             drive (field-centric)
+ *   right stick X          turn;  right stick button (hold): aim assist
+ *   A (hold)               shoot: move into range, aim, fire (let go: cancel)
+ *   bumpers (hold)         intakes in;  B (hold): intakes reverse
+ *   dpad up / down         flywheel trim + / - TRIM_STEP_RPM;  dpad left / right: trim 0
  *
  * OdometryWatchdog stops the drive on bad Pinpoint reads. Logged to
  * /sdcard/FIRST/john_logs/r<run>_john_teleop_<time>.csv.
@@ -87,11 +91,14 @@ public class JohnTeleOp extends LinearOpMode {
     // ---- Driving ----
     public static double DRIVE_SCALE = 1.0;
     public static double TURN_SCALE = 0.8;
-    public static double SLOW_SCALE = 0.35;
     public static double STICK_DEADBAND = 0.05;
     public static boolean HOLD_WHEN_RELEASED = true;
     /** A stick moved this far cancels an aim / volley. */
     public static double CANCEL_STICK = 0.3;
+    /** Aim assist: turn power per radian of heading error, at most AIM_ASSIST_MAX_TURN. */
+    public static double AIM_ASSIST_KP = 1.5;
+    public static double AIM_ASSIST_MAX_TURN = 0.6;
+    public static double TRIM_STEP_RPM = 50;
 
     // ---- Start position and re-localizing ----
     /** Start from the autonomous' last pose when it is younger than this (at INIT). */
@@ -102,9 +109,8 @@ public class JohnTeleOp extends LinearOpMode {
     public static int MIN_START_SAMPLES = 5;
     /** Warn when the tags' X differs from the wall X by more than this (not flush, or mount / tag size off). */
     public static double X_CHECK_WARN_IN = 4.0;
-    /** Re-localize: collect tags for this long while standing still. */
-    public static double RELOCALIZE_MS = 500;
-    public static int MIN_RELOCALIZE_SAMPLES = 4;
+    /** The up CELL counts as known this long after the camera (or the autonomous) said which. */
+    public static double UP_CELL_TRUST_S = 15.0;
 
     // ---- Driving into the shooting zone ----
     public static double MOVE_SPEED_IPS = 40.0;
@@ -222,11 +228,9 @@ public class JohnTeleOp extends LinearOpMode {
         aimer = new Aimer(follower, tracker, camera.available());
         gamepad1.resetEdgeDetection();
         ElapsedTime clock = new ElapsedTime();
-        boolean prespin = false;
+        boolean shotLatched = false;      // A must be let go before the next shot
+        boolean upFromAuto = startFrom == Start.AUTO && autoUpAudience != null;
         boolean holdMode = HOLD_WHEN_RELEASED;
-        TagLocalizer relocalizer = new TagLocalizer(100);
-        boolean relocalizing = false;
-        ElapsedTime relocalizeTimer = new ElapsedTime();
         log.row(0.0, shot, start.x(), start.y(), Math.toDegrees(start.heading()), null, null, null, null, null, null,
                 null, null, null, null, tracker.upCellName(), watchdog.state(),
                 String.format(Locale.US, "start %s at %s (%s)", red ? "red" : "blue", Drawing.format(start),
@@ -235,9 +239,11 @@ public class JohnTeleOp extends LinearOpMode {
 
         while (opModeIsActive()) {
             String event = null;
-            boolean shootPressed = gamepad1.aWasPressed(), spinPressed = gamepad1.yWasPressed();
-            boolean stopPressed = gamepad1.bWasPressed();
-            boolean relocalizePressed = gamepad1.dpadUpWasPressed(), switchPressed = gamepad1.dpadDownWasPressed();
+            // Held buttons run the automated actions; pressed (edge) buttons toggle / step
+            boolean shootHeld = gamepad1.a;
+            boolean assistHeld = gamepad1.right_stick_button;
+            boolean trimUp = gamepad1.dpadUpWasPressed(), trimDown = gamepad1.dpadDownWasPressed();
+            boolean trimReset = gamepad1.dpadLeftWasPressed() | gamepad1.dpadRightWasPressed();
 
             double stickFwd = deadband(-gamepad1.left_stick_y);
             double stickLeft = deadband(-gamepad1.left_stick_x);
@@ -248,44 +254,38 @@ public class JohnTeleOp extends LinearOpMode {
             // ---- Camera: the tracker uses only frames taken standing still ----
             Pose pose = follower.pose();
             HiveCamera.Frame frame = camera.poll();
-            if (tracker.update(frame, follower) && relocalizing) {
-                relocalizer.add(frame, pose.heading());
-            }
+            tracker.update(frame, follower);
             if (tracker.event() != null) {
                 event = tracker.event();
+                if (shot == Shot.MOVE || shot == Shot.AIM) {
+                    // The other CELL is up: start the shot over for it (A is still held)
+                    cancelShot("the " + tracker.upCellName() + " CELL is up");
+                    event = event + "; " + requestShot();
+                }
             }
 
             // ---- Buttons ----
-            if (stopPressed) {
-                cancelShot("stop");
-                prespin = false;
-                relocalizing = false;
-                event = "stop";
+            if (trimUp || trimDown || trimReset) {
+                shooter.setTrimRpm(trimReset ? 0.0 : shooter.trimRpm() + (trimUp ? TRIM_STEP_RPM : -TRIM_STEP_RPM));
+                event = String.format(Locale.US, "flywheel trim %+.0f RPM", shooter.trimRpm());
             }
-            if (spinPressed) {
-                prespin = !prespin;
-                event = prespin ? "pre-spin on" : "pre-spin off";
-            }
-            if (switchPressed) {
-                tracker.setUpAudience(!tracker.upAudience());
-                event = "target switched to the " + tracker.upCellName() + " CELL";
-            }
-            if (relocalizePressed && shot == Shot.IDLE && !relocalizing) {
-                relocalizing = true;
-                relocalizer.reset();
-                relocalizeTimer.reset();
-                event = "re-localize: stand still";
-            }
-            if (shootPressed) {
-                if (shot != Shot.IDLE) {
-                    cancelShot("cancelled (A)");
-                    event = "shot cancelled";
-                } else if (!watchdog.ok()) {
+            // Shoot: runs while A is held; a new one only after letting go
+            if (shootHeld && shot == Shot.IDLE && !shotLatched) {
+                shotLatched = true;
+                if (!watchdog.ok()) {
                     shotStatus = "can't aim: odometry " + watchdog.state();
                     event = shotStatus;
                 } else {
-                    event = requestShot();
+                    String pick = pickCellIfUnknown(upFromAuto, clock.seconds());
+                    event = (pick == null ? "" : pick + "; ") + requestShot();
                 }
+            }
+            if (!shootHeld) {
+                if (shot != Shot.IDLE) {
+                    cancelShot("cancelled: A let go");
+                    event = "shot cancelled: A let go";
+                }
+                shotLatched = false;
             }
             if (shot != Shot.IDLE && sticksMoved) {
                 cancelShot("cancelled: driver took over");
@@ -296,27 +296,6 @@ public class JohnTeleOp extends LinearOpMode {
                 event = "shot cancelled: odometry lost";
             }
 
-            // ---- Re-localize ----
-            if (relocalizing) {
-                if (sticksMoved) {
-                    relocalizing = false;
-                    event = "re-localize cancelled: moved";
-                } else if (relocalizeTimer.milliseconds() >= RELOCALIZE_MS) {
-                    relocalizing = false;
-                    if (relocalizer.count() >= MIN_RELOCALIZE_SAMPLES) {
-                        Pose before = follower.pose();
-                        Pose fixed = new Pose(relocalizer.x(), relocalizer.y(), before.heading());
-                        follower.setPose(fixed);
-                        watchdog.poseSet();
-                        follower.manual(DrivePowers.zero());   // drop a hold in the old coordinates
-                        event = String.format(Locale.US, "re-localized from %d tag readings: %s -> %s",
-                                relocalizer.count(), Drawing.format(before), Drawing.format(fixed));
-                    } else {
-                        event = "re-localize failed: " + relocalizer.count() + " tag readings (HIVE in view? standing still?)";
-                    }
-                }
-            }
-
             // ---- Aim and shoot ----
             String shotEvent = updateShot();
             if (shotEvent != null) {
@@ -324,13 +303,17 @@ public class JohnTeleOp extends LinearOpMode {
             }
 
             // ---- Drive (while moving / aiming / shooting the follower drives itself) ----
-            boolean slow = gamepad1.right_bumper;
             if (shot == Shot.IDLE) {
-                double scale = slow ? SLOW_SCALE : 1.0;
-                DrivePowers powers = ManualDrive.fieldCentric(stickFwd * DRIVE_SCALE * scale,
-                        stickLeft * DRIVE_SCALE * scale, stickTurn * TURN_SCALE * scale,
+                DrivePowers powers = ManualDrive.fieldCentric(stickFwd * DRIVE_SCALE,
+                        stickLeft * DRIVE_SCALE, stickTurn * TURN_SCALE,
                         pose.heading(), -driverFacing());   // Pedro turns the sticks by -(heading + offset)
-                if (holdMode) {
+                if (assistHeld) {
+                    // Aim assist: the driver drives, the heading locks onto the CELL
+                    DrivePowers locked = ManualDrive.headingLock(follower,
+                            Controller.proportional(AIM_ASSIST_KP), powers, aimer.aimHeading(pose));
+                    double turn = Math.max(-AIM_ASSIST_MAX_TURN, Math.min(AIM_ASSIST_MAX_TURN, locked.turn()));
+                    follower.manual(new DrivePowers(locked.forward(), locked.strafe(), turn));
+                } else if (holdMode) {
                     ManualDrive.driveOrHold(follower, powers);
                 } else {
                     follower.manual(powers);
@@ -344,12 +327,12 @@ public class JohnTeleOp extends LinearOpMode {
             double[] target = tracker.target();
             double distance = Math.hypot(target[0] - pose.x(), target[1] - pose.y());
             shooter.setDistance(distance);
-            shooter.setSpin(shot != Shot.IDLE || prespin);
+            shooter.setSpin(shot != Shot.IDLE);
             String shooterEvent = shooter.update();
             if (shooterEvent != null) {
                 event = event == null ? shooterEvent : event + "; " + shooterEvent;
             }
-            intake.set(gamepad1.right_trigger > 0.2 ? Intake.POWER : gamepad1.left_trigger > 0.2 ? -Intake.POWER : 0.0);
+            intake.set(gamepad1.left_bumper || gamepad1.right_bumper ? Intake.POWER : gamepad1.b ? -Intake.POWER : 0.0);
 
             // ---- Telemetry, Dashboard, log ----
             if (watchdog.lost()) {
@@ -357,22 +340,19 @@ public class JohnTeleOp extends LinearOpMode {
             } else if (!watchdog.ok()) {
                 telemetry.addLine("ODOMETRY PAUSED: " + watchdog.reason());
             }
-            telemetry.addData("Shot (A)", "%s%s", shot, shotStatus.isEmpty() ? "" : ": " + shotStatus);
+            telemetry.addData("Shot (hold A)", "%s%s", shot, shotStatus.isEmpty() ? "" : ": " + shotStatus);
             telemetry.addData("Target", "%s %s CELL at (%.1f, %.1f), %.1f in away (%s)", red ? "red" : "blue",
                     tracker.upCellName(), target[0], target[1], distance, tracker.source());
-            telemetry.addData("Shooter (Y pre-spin)", shooter.status());
+            telemetry.addData("Shooter", "%s, trim %+.0f (dpad)", shooter.status(), shooter.trimRpm());
             String zone = ShootingZone.problem(pose.x(), pose.y(), target[0], target[1], tracker.upAudience());
             telemetry.addData("Shooting zone", zone == null
                     ? String.format(Locale.US, "IN RANGE (%.0f deg off the CELL axis)",
                             ShootingZone.offAxisDeg(pose.x(), pose.y(), target[0], target[1], tracker.upAudience()))
-                    : zone + ": A drives into range first");
+                    : zone + ": the shot drives into range first");
             telemetry.addData("Pose (FTC)", Drawing.format(pose));
-            if (relocalizing) {
-                telemetry.addData("Re-localizing", "%d tag readings", relocalizer.count());
-            }
             telemetry.addData("Camera", camera.status());
             telemetry.addData("Pinpoint", "%s, %s", state, watchdog.status());
-            telemetry.addLine("A aim+shoot, Y pre-spin, B stop, RT/LT intakes, RB slow, dpad up re-localize, dpad down switch CELL");
+            telemetry.addLine("HOLD: A shoot, RS button aim assist, bumpers intake, B reverse. Dpad: trim");
             telemetry.update();
 
             Pose aimPose = shot == Shot.AIM || shot == Shot.FIRE ? aimer.aimPose() : null;
@@ -414,7 +394,25 @@ public class JohnTeleOp extends LinearOpMode {
     // Aim and shoot
     // =========================================================================
 
-    /** A: aim and shoot from here if in the shooting zone, else drive into it first. */
+    /**
+     * If nobody knows which CELL is up (no camera confirmation in UP_CELL_TRUST_S, nor the
+     * autonomous' at the start), target the closest CELL of our HIVE. Returns what it did, or null.
+     */
+    private String pickCellIfUnknown(boolean upFromAuto, double seconds) {
+        boolean known = tracker.msSinceConfirmed() <= UP_CELL_TRUST_S * 1000.0
+                || (upFromAuto && seconds <= UP_CELL_TRUST_S);
+        if (known) {
+            return null;
+        }
+        Pose here = follower.pose();
+        double y = HiveTags.hiveY(red);
+        double toAudience = Math.hypot(HiveTags.cellX(true, true) - here.x(), y - here.y());
+        double toFar = Math.hypot(HiveTags.cellX(false, true) - here.x(), y - here.y());
+        tracker.setUpAudience(toAudience <= toFar);
+        return "up CELL not known recently: the closest, the " + tracker.upCellName() + " CELL";
+    }
+
+    /** Aim and shoot from here if in the shooting zone, else drive into it first. */
     private String requestShot() {
         Pose here = follower.pose();
         double[] t = tracker.target();

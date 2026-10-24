@@ -52,6 +52,7 @@ public class Shooter {
     private int volleys;
     private boolean stuck;
     private double distance = Double.NaN;
+    private double trimRpm;
     private String status = "idle";
     private String event;
 
@@ -65,12 +66,21 @@ public class Shooter {
         spin = on;
     }
 
-    /** Distance to the CELL (inches): sets the flywheel speed, except during the feeding. */
+    /** Distance to the CELL (inches): sets the flywheel speed (plus the trim), except during the feeding. */
     public void setDistance(double inches) {
         distance = inches;
         if (feed == Feed.IDLE || feed == Feed.SPIN_UP) {
-            flywheel.setTargetRpm(rpmFor(inches));
+            flywheel.setTargetRpm(rpmFor(inches) + trimRpm);
         }
+    }
+
+    /** Driver's correction added to the table speed (e.g. for the battery). */
+    public void setTrimRpm(double rpm) {
+        trimRpm = rpm;
+    }
+
+    public double trimRpm() {
+        return trimRpm;
     }
 
     public void startVolley() {
