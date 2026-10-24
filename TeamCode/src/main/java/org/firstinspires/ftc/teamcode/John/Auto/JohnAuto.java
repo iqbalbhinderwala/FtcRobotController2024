@@ -40,7 +40,7 @@ import org.firstinspires.ftc.teamcode.John.Util.CsvLog;
  *
  * Routine (all positions written for RED in FTC field coordinates, inches; BLUE is the same plan
  * reflected through the field center):
- *  1. Start (B1: ramp side flush on the audience wall, shooter facing the field). Step straight off
+ *  1. Start (B1: camera wall flush on the audience wall, shooter facing the field). Step straight off
  *     the wall just far enough for the corner to clear the wall while turning.
  *  2. Aim: turn in place so the shooter points at the center of the up CELL (CELL_X, CELL_Y), and
  *     shoot the 4 preloaded balls.

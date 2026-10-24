@@ -23,7 +23,7 @@ import java.util.Map;
  * The final pose of the autonomous can be handed to a following TeleOp (savePose / loadPose).
  *
  * Poses are FTC field coordinates (origin at the field center, +X toward the audience, +Y toward
- * blue, inches, heading counter-clockwise from +X). Red starts with John's ramp side flush on the
+ * blue, inches, heading counter-clockwise from +X). Red starts with John's camera wall flush on the
  * audience wall and the shooter (his left) facing away from it toward the HIVE, so the heading is
  * +90 degrees; blue is the same reflected through the field center.
  */
@@ -111,7 +111,7 @@ public class AutoSettings {
         telemetry.addData("Start tile", withControls ? "%s   (dpad left / right)" : "%s", tile);
         telemetry.addData("Start delay", withControls ? "%.0f s   (bumpers - / +)" : "%.0f s", delayS);
         telemetry.addData("Start pose (FTC)", "(%.1f, %.1f) in, %.0f deg", p.x(), p.y(), Math.toDegrees(p.heading()));
-        telemetry.addLine("Place John with the ramp side flush on the audience wall, shooter facing the field.");
+        telemetry.addLine("Place John with the camera wall flush on the audience wall, shooter facing the field.");
     }
 
     /** Start pose for the current choice (FTC coordinates). */
@@ -120,7 +120,7 @@ public class AutoSettings {
     }
 
     public static Pose startPose(Alliance alliance, StartTile tile) {
-        // Ramp side flush on the audience wall (X = 72): the robot's width is along field X
+        // Camera wall flush on the audience wall (X = 72): the robot's width is along field X
         double x = 72.0 - RobotGeometry.WIDTH_IN / 2.0;
         double heading = Math.toRadians(90.0);   // shooter (left side) faces away from the wall
         return alliance == Alliance.RED
