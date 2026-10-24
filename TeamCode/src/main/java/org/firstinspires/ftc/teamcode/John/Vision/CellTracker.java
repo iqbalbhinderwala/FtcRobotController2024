@@ -2,6 +2,7 @@ package org.firstinspires.ftc.teamcode.John.Vision;
 
 import com.acmerobotics.dashboard.config.Config;
 import com.pedropathing.follower.Follower;
+import com.pedropathing.math.Pose;
 import com.pedropathing.math.Velocity;
 import com.qualcomm.robotcore.util.ElapsedTime;
 
@@ -64,9 +65,18 @@ public class CellTracker {
      * taken standing still (and so was used).
      */
     public boolean update(HiveCamera.Frame frame, Follower follower) {
-        event = null;
         Velocity v = follower.velocity();
         boolean nowStill = Math.hypot(v.vx, v.vy) < STILL_SPEED_IPS && Math.abs(v.omega) < Math.toRadians(STILL_TURN_DPS);
+        return update(frame, follower.pose(), nowStill);
+    }
+
+    /**
+     * The same with the pose and "standing still" given (e.g. without odometry: the IMU heading, and
+     * still = not turning and the sticks released). Which CELL is up and the heights do not depend on
+     * the pose; the sightings' positions do.
+     */
+    public boolean update(HiveCamera.Frame frame, Pose pose, boolean nowStill) {
+        event = null;
         if (nowStill && !still) {
             stillFor.reset();
         }
@@ -75,7 +85,7 @@ public class CellTracker {
             return false;
         }
         measureUpHeight(frame);
-        TagLocalizer.UpCell cell = TagLocalizer.upCell(frame, follower.pose(), red);
+        TagLocalizer.UpCell cell = TagLocalizer.upCell(frame, pose, red);
         if (cell == null) {
             return true;
         }

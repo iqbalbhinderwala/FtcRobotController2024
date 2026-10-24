@@ -21,6 +21,7 @@ import com.qualcomm.robotcore.util.ElapsedTime;
 import org.firstinspires.ftc.teamcode.John.Aimer;
 import org.firstinspires.ftc.teamcode.John.Auto.AutoSettings;
 import org.firstinspires.ftc.teamcode.John.Dashboard.Drawing;
+import org.firstinspires.ftc.teamcode.John.Hardware.FallbackDrive;
 import org.firstinspires.ftc.teamcode.John.Hardware.Intake;
 import org.firstinspires.ftc.teamcode.John.Hardware.Shooter;
 import org.firstinspires.ftc.teamcode.John.Pedro.Constants;
@@ -33,6 +34,7 @@ import org.firstinspires.ftc.teamcode.John.Vision.CellTracker;
 import org.firstinspires.ftc.teamcode.John.Vision.HiveCamera;
 import org.firstinspires.ftc.teamcode.John.Vision.HiveTags;
 import org.firstinspires.ftc.teamcode.John.Vision.TagLocalizer;
+import org.firstinspires.ftc.teamcode.John.Vision.VisionAim;
 
 import java.util.List;
 import java.util.Locale;
@@ -93,7 +95,17 @@ import java.util.Locale;
  *   X (hold 0.5 s)         re-localize: best with the camera wall flush on the audience or far wall
  *   dpad up / down         flywheel trim + / - TRIM_STEP_RPM;  dpad left / right: trim 0
  *
- * OdometryWatchdog stops the drive on bad Pinpoint reads. Logged to
+ * WITHOUT ODOMETRY (OdometryWatchdog PAUSED or LOST): the sticks drive the motors directly,
+ * field-centric on the Control Hub IMU (FallbackDrive, kept aligned with the Pinpoint heading while
+ * that is good), so John stays drivable. While only PAUSED a running shot waits for it as before.
+ * LOST (for the rest of the OpMode): A held is a VISION SHOT: the camera's view of the up CELL
+ * (VisionAim) gives the turn (made on the IMU), the distance (flywheel speed) and the zone check;
+ * you drive (hints in telemetry: back up / move toward the middle), the heading locks onto the CELL,
+ * and it fires when in range, on aim and the sticks are still. No drive into range (that needs the
+ * position). The right stick button locks the heading onto the CELL the same way. X held against a
+ * back wall re-aligns the IMU heading to it.
+ *
+ * OdometryWatchdog stops Pedro's drive on bad Pinpoint reads. Logged to
  * /sdcard/FIRST/john_logs/r<run>_john_teleop_<time>.csv.
  */
 @Config("JohnTeleOp")
@@ -111,6 +123,15 @@ public class JohnTeleOp extends LinearOpMode {
     public static double AIM_ASSIST_KP = 1.5;
     public static double AIM_ASSIST_MAX_TURN = 0.6;
     public static double TRIM_STEP_RPM = 50;
+
+    // ---- Without odometry (vision shot) ----
+    /** Heading lock on the IMU: turn power per radian, at most FALLBACK_MAX_TURN. */
+    public static double FALLBACK_KP = 1.5;
+    public static double FALLBACK_MAX_TURN = 0.6;
+    /** A camera solution older than this is not used. */
+    public static double VISION_MAX_AGE_MS = 500;
+    /** Update the aim from the camera only when turning slower than this (frames lag). */
+    public static double VISION_STILL_TURN_DPS = 10.0;
 
     // ---- Start position and re-localizing ----
     /** Start from the autonomous' last pose when it is younger than this (at INIT). */
@@ -169,6 +190,7 @@ public class JohnTeleOp extends LinearOpMode {
         camera = new HiveCamera(hardwareMap);
         shooter = new Shooter(hardwareMap);
         Intake intake = new Intake(hardwareMap);
+        FallbackDrive fallback = new FallbackDrive(hardwareMap);
 
         AutoSettings settings = new AutoSettings(blackboard);
         boolean haveSetup = AutoSettings.isSaved(blackboard);
@@ -254,6 +276,13 @@ public class JohnTeleOp extends LinearOpMode {
         Pose relocalizeWall = null;       // the wall pose when re-localizing against a wall
         ElapsedTime relocalizeTimer = new ElapsedTime();
         boolean holdMode = HOLD_WHEN_RELEASED;
+        // Without odometry
+        boolean visionShot = false;
+        boolean visionVolleyDone = false;
+        boolean wasFiring = false;
+        VisionAim lastAim = null;
+        double lastAimMs = -1e9;
+        double visionTarget = Double.NaN;   // field heading to hold (IMU), from the camera
         log.row(0.0, shot, start.x(), start.y(), Math.toDegrees(start.heading()), null, null, null, null, null, null,
                 null, null, null, null, tracker.upCellName(), watchdog.state(),
                 String.format(Locale.US, "start %s at %s (%s)", red ? "red" : "blue", Drawing.format(start),
@@ -275,10 +304,21 @@ public class JohnTeleOp extends LinearOpMode {
             boolean sticksMoved = Math.max(Math.abs(stickFwd), Math.max(Math.abs(stickLeft), Math.abs(stickTurn)))
                     > CANCEL_STICK;
 
+            // ---- Odometry state (from the last loop's check) ----
+            boolean lost = watchdog.lost();
+            boolean degraded = lost || (!watchdog.ok() && shot == Shot.IDLE);
+            fallback.update();
+
             // ---- Camera: the tracker uses only frames taken standing still ----
             Pose pose = follower.pose();
             HiveCamera.Frame frame = camera.poll();
-            if (tracker.update(frame, follower) && relocalizing) {
+            boolean imuStill = Math.abs(fallback.turnRate()) < Math.toRadians(VISION_STILL_TURN_DPS);
+            boolean usable = lost
+                    ? tracker.update(frame, new Pose(lastAim == null ? 0.0 : lastAim.robotX,
+                            lastAim == null ? 0.0 : lastAim.robotY, fallback.heading()),
+                            imuStill && Math.abs(stickFwd) + Math.abs(stickLeft) < 0.05)
+                    : tracker.update(frame, follower);
+            if (usable && relocalizing && !lost) {
                 relocalizer.add(frame, relocalizeWall != null ? relocalizeWall.heading() : pose.heading());
             }
             if (tracker.event() != null) {
@@ -296,7 +336,18 @@ public class JohnTeleOp extends LinearOpMode {
                 event = String.format(Locale.US, "flywheel trim %+.0f RPM", shooter.trimRpm());
             }
             // Re-localize: runs while X is held, done after RELOCALIZE_MS
-            if (relocalizeHeld && !relocalizing && !relocalizeDone && shot == Shot.IDLE) {
+            if (relocalizeHeld && !relocalizing && !relocalizeDone && shot == Shot.IDLE && lost) {
+                // No odometry: only the heading, against a back wall (+90 audience / -90 far)
+                relocalizing = true;
+                relocalizeTimer.reset();
+                double h = fallback.heading();
+                double wallHeading = Math.toRadians(Math.cos(h - Math.PI / 2) >= 0 ? 90.0 : -90.0);
+                boolean atWall = Math.abs(Math.toDegrees(normalize(h - wallHeading))) <= WALL_SNAP_DEG;
+                relocalizeWall = atWall ? new Pose(0.0, 0.0, wallHeading) : null;
+                event = atWall ? "re-align the IMU heading to the wall: keep X held"
+                        : "no odometry: re-align only with the camera wall flush on a back wall";
+            }
+            if (relocalizeHeld && !relocalizing && !relocalizeDone && shot == Shot.IDLE && !lost) {
                 relocalizing = true;
                 relocalizer.reset();
                 relocalizeTimer.reset();
@@ -315,7 +366,22 @@ public class JohnTeleOp extends LinearOpMode {
                 relocalizeDone = false;
             }
             // Shoot: runs while A is held; a new one only after letting go
-            if (shootHeld && shot == Shot.IDLE && !shotLatched) {
+            if (lost) {
+                if (shootHeld && !shotLatched) {
+                    shotLatched = true;
+                    visionShot = true;
+                    visionVolleyDone = false;
+                    visionTarget = Double.NaN;
+                    event = "vision shot (no odometry): drive into range, the heading locks onto the CELL";
+                }
+                if (!shootHeld && visionShot) {
+                    shooter.cancel();
+                    shooter.setPaused(false);
+                    visionShot = false;
+                    event = "vision shot cancelled: A let go";
+                }
+            }
+            if (shootHeld && shot == Shot.IDLE && !shotLatched && !lost) {
                 shotLatched = true;
                 if (!watchdog.ok()) {
                     shotStatus = "can't aim: odometry " + watchdog.state();
@@ -342,7 +408,22 @@ public class JohnTeleOp extends LinearOpMode {
             }
 
             // ---- Re-localize ----
-            if (relocalizing) {
+            if (relocalizing && lost) {
+                if (sticksMoved) {
+                    relocalizing = false;
+                    event = "re-align cancelled: moved";
+                } else if (relocalizeTimer.milliseconds() >= RELOCALIZE_MS) {
+                    relocalizing = false;
+                    relocalizeDone = true;
+                    if (relocalizeWall != null) {
+                        double before = fallback.heading();
+                        fallback.alignTo(relocalizeWall.heading());
+                        event = String.format(Locale.US, "IMU heading re-aligned to the wall: %.1f -> %.1f deg",
+                                Math.toDegrees(before), Math.toDegrees(relocalizeWall.heading()));
+                    }
+                }
+            }
+            if (relocalizing && !lost) {
                 if (sticksMoved) {
                     relocalizing = false;
                     event = "re-localize cancelled: moved";
@@ -376,7 +457,11 @@ public class JohnTeleOp extends LinearOpMode {
             }
 
             // ---- Drive (while moving / aiming / shooting the follower drives itself) ----
-            if (shot == Shot.IDLE) {
+            if (degraded && shot == Shot.IDLE) {
+                // Pedro gets no command meanwhile, so it does not drive back to an old hold on RESUMED
+                follower.manual(DrivePowers.zero());
+            }
+            if (shot == Shot.IDLE && !degraded) {
                 DrivePowers powers = ManualDrive.fieldCentric(stickFwd * DRIVE_SCALE,
                         stickLeft * DRIVE_SCALE, stickTurn * TURN_SCALE,
                         pose.heading(), -driverFacing());   // Pedro turns the sticks by -(heading + offset)
@@ -395,12 +480,65 @@ public class JohnTeleOp extends LinearOpMode {
             follower.update();
             OdometryWatchdog.State state = watchdog.check(follower);
             pose = follower.pose();
+            if (watchdog.ok()) {
+                fallback.alignTo(pose.heading());   // the IMU carries on from here if the Pinpoint fails
+            }
+
+            // ---- Without odometry: drive the motors directly, field-centric on the IMU ----
+            String visionStatus = null;
+            if (degraded) {
+                if (lost && (visionShot || assistHeld)) {
+                    VisionAim aim = VisionAim.solve(frame, red, tracker.upAudience(), fallback.heading());
+                    if (aim != null) {
+                        lastAim = aim;
+                        lastAimMs = clock.milliseconds();
+                        if (imuStill || Double.isNaN(visionTarget)) {
+                            visionTarget = normalize(fallback.heading() + aim.turn);
+                        }
+                    }
+                }
+                boolean fresh = lastAim != null && clock.milliseconds() - lastAimMs <= VISION_MAX_AGE_MS;
+                double turn = stickTurn * TURN_SCALE;
+                double error = Double.NaN;
+                if (lost && (visionShot || assistHeld) && !Double.isNaN(visionTarget)) {
+                    error = normalize(visionTarget - fallback.heading());
+                    turn = Math.max(-FALLBACK_MAX_TURN, Math.min(FALLBACK_MAX_TURN, FALLBACK_KP * error));
+                }
+                fallback.driveFieldCentric(stickFwd * DRIVE_SCALE, stickLeft * DRIVE_SCALE, turn, driverFacing());
+
+                if (lost && visionShot) {
+                    String problem = fresh ? lastAim.zoneProblem() : "the camera does not see the "
+                            + tracker.upCellName() + " CELL: turn toward it";
+                    boolean onAim = !Double.isNaN(error) && Math.abs(error) <= Math.toRadians(Aimer.FIRE_TOLERANCE_DEG);
+                    boolean sticksStill = Math.abs(stickFwd) + Math.abs(stickLeft) < 0.05;
+                    if (fresh) {
+                        shooter.setDistance(lastAim.distance);
+                    }
+                    if (problem == null && onAim && sticksStill && !shooter.firing() && !visionVolleyDone) {
+                        shooter.startVolley();
+                        event = String.format(Locale.US, "vision volley at the %s CELL from %.0f in", tracker.upCellName(),
+                                lastAim.distance);
+                    }
+                    shooter.setPaused(!(onAim && sticksStill));
+                    if (wasFiring && !shooter.firing()) {
+                        visionVolleyDone = true;
+                        shooter.setPaused(false);
+                    }
+                    visionStatus = visionVolleyDone ? "volley done (let go of A)"
+                            : problem != null ? problem + (fresh && lastAim.hint() != null ? ": " + lastAim.hint() : "")
+                            : !onAim ? String.format(Locale.US, "turning (%.1f deg off)", Math.toDegrees(Math.abs(error)))
+                            : !sticksStill ? "in range: stop driving to fire" : shooter.firing() ? "firing" : "ready";
+                }
+            }
+            wasFiring = shooter.firing();
 
             // ---- Shooter, intakes ----
             double[] target = tracker.target();
             double distance = Math.hypot(target[0] - pose.x(), target[1] - pose.y());
-            shooter.setDistance(distance);
-            shooter.setSpin(shot != Shot.IDLE);
+            if (!lost) {
+                shooter.setDistance(distance);
+            }
+            shooter.setSpin(shot != Shot.IDLE || visionShot);
             String shooterEvent = shooter.update();
             if (shooterEvent != null) {
                 event = event == null ? shooterEvent : event + "; " + shooterEvent;
@@ -409,9 +547,10 @@ public class JohnTeleOp extends LinearOpMode {
 
             // ---- Telemetry, Dashboard, log ----
             if (watchdog.lost()) {
-                telemetry.addLine("ODOMETRY LOST, drive stopped: " + watchdog.reason());
+                telemetry.addLine("NO ODOMETRY (LOST): driving on the IMU; A = vision shot. " + watchdog.reason());
+                telemetry.addData("Vision shot (hold A)", visionShot ? (visionStatus == null ? "..." : visionStatus) : "off");
             } else if (!watchdog.ok()) {
-                telemetry.addLine("ODOMETRY PAUSED: " + watchdog.reason());
+                telemetry.addLine("ODOMETRY PAUSED: driving on the IMU meanwhile. " + watchdog.reason());
             }
             telemetry.addData("Shot (hold A)", "%s%s", shot, shotStatus.isEmpty() ? "" : ": " + shotStatus);
             telemetry.addData("Target", "%s %s CELL at (%.1f, %.1f), %.1f in away (%s)", red ? "red" : "blue",
@@ -430,6 +569,8 @@ public class JohnTeleOp extends LinearOpMode {
             }
             telemetry.addData("Camera", camera.status());
             telemetry.addData("Pinpoint", "%s, %s", state, watchdog.status());
+            telemetry.addData("IMU check", "%s, offset %.1f deg (must stay the same while turning)",
+                    fallback.status(), fallback.offsetDeg());
             telemetry.addLine("HOLD: A shoot, RS button aim assist, X re-localize, bumpers intake, B reverse. Dpad: trim");
             telemetry.update();
 
