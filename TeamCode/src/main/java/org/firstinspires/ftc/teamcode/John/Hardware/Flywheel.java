@@ -27,7 +27,7 @@ import org.firstinspires.ftc.robotcore.external.navigation.CurrentUnit;
  *    the velocity control would run away to full power whatever the target.
  *
  * Speeds measured 2026-10-23 (shooting at the up CELL from the audience wall): about 2200 RPM from
- * C1, 2300 from B1, 2400 from A1 (see Shooter.RPM_FROM_*).
+ * C1, 2300 from B1, 2400 from A1 (see Shooter.RPM_DISTANCES_IN / RPM_VALUES).
  */
 @Config("JohnFlywheel")
 public class Flywheel {

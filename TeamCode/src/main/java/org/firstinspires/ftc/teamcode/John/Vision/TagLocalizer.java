@@ -67,6 +67,18 @@ public class TagLocalizer {
         samples.clear();
     }
 
+    /**
+     * A start pose against a wall: X and heading from {@code wall}, Y from the tags (kept on the
+     * field) once there are at least {@code minSamples} readings, else {@code wall}'s Y.
+     */
+    public Pose alongWall(Pose wall, int minSamples, double robotHalfAlongWall) {
+        if (count() < minSamples) {
+            return wall;
+        }
+        double limit = 72.0 - robotHalfAlongWall;
+        return new Pose(wall.x(), Math.max(-limit, Math.min(limit, y())), wall.heading());
+    }
+
     public int count() {
         return samples.size();
     }

@@ -20,7 +20,9 @@ import java.util.Map;
  *   dpad left / right    previous / next start tile
  *   left / right bumper  start delay - / + 1 s
  *
- * The final pose of the autonomous can be handed to a following TeleOp (savePose / loadPose).
+ * The autonomous hands its last pose and which CELL is up to the TeleOp (savePose / loadPose /
+ * poseAgeS, saveUpAudience / loadUpAudience); the time stamp lets the TeleOp ignore a pose from an
+ * earlier run.
  *
  * Poses are FTC field coordinates (origin at the field center, +X toward the audience, +Y toward
  * blue, inches, heading counter-clockwise from +X). Red starts with John's camera wall flush on the
@@ -51,6 +53,8 @@ public class AutoSettings {
     private static final String KEY_POSE_X = "john.pose.x";
     private static final String KEY_POSE_Y = "john.pose.y";
     private static final String KEY_POSE_H = "john.pose.heading";
+    private static final String KEY_POSE_TIME = "john.pose.time";
+    private static final String KEY_UP_AUDIENCE = "john.upAudience";
 
     private Alliance alliance = Alliance.RED;
     private StartTile tile = StartTile.C1;
@@ -147,11 +151,30 @@ public class AutoSettings {
         blackboard.put(KEY_DELAY, delayS);
     }
 
-    /** Hands the pose (FTC) to a following OpMode, e.g. a TeleOp. */
+    /** Hands the pose (FTC) to a following OpMode, e.g. a TeleOp, with the time it was saved. */
     public static void savePose(Map<String, Object> blackboard, Pose pose) {
         blackboard.put(KEY_POSE_X, pose.x());
         blackboard.put(KEY_POSE_Y, pose.y());
         blackboard.put(KEY_POSE_H, pose.heading());
+        blackboard.put(KEY_POSE_TIME, System.currentTimeMillis());
+    }
+
+    /** Seconds since the pose was saved, or infinity if there is none. */
+    public static double poseAgeS(Map<String, Object> blackboard) {
+        Object t = blackboard.get(KEY_POSE_TIME);
+        return t instanceof Number ? (System.currentTimeMillis() - ((Number) t).longValue()) / 1000.0
+                : Double.POSITIVE_INFINITY;
+    }
+
+    /** Which CELL of our HIVE was up at the end of the autonomous. */
+    public static void saveUpAudience(Map<String, Object> blackboard, boolean upAudience) {
+        blackboard.put(KEY_UP_AUDIENCE, upAudience);
+    }
+
+    /** The up CELL the autonomous saw last (true = audience), or null. */
+    public static Boolean loadUpAudience(Map<String, Object> blackboard) {
+        Object v = blackboard.get(KEY_UP_AUDIENCE);
+        return v instanceof Boolean ? (Boolean) v : null;
     }
 
     /** The pose an earlier OpMode handed over, or null. */
