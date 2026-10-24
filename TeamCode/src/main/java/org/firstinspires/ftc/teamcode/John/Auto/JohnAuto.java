@@ -43,6 +43,8 @@ import org.firstinspires.ftc.teamcode.John.Vision.TagLocalizer;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.function.DoubleSupplier;
+import java.util.function.Supplier;
 
 /**
  * John's autonomous. The alliance, start tile and start delay come from [John] Game Setup (run it
@@ -76,8 +78,19 @@ import java.util.Locale;
  * Tipping during a volley (both volleys): when the camera sees the target CELL's tags drop
  * (CellTracker.tipping) it stops shooting, goes to the other side (the other CELL is now up), aims
  * and shoots the rest (at most MAX_SIDE_SWITCHES times per volley).
- * At PARK_DEADLINE_S whatever is still running is dropped and the robot goes to park. A failed aim
- * (more than Aimer.AIM_MAX_ERROR_DEG off) skips that volley.
+ * A failed aim (more than Aimer.AIM_MAX_ERROR_DEG off) skips that volley.
+ *
+ * At most 4 balls at a time (G407): there is no ball sensor, so a volley counts as having emptied
+ * John only when all its indexer steps were done (not skipped, stuck or cut short by a tip). If
+ * volley 1 did not, it is tried once more; if it still did not, the GARDEN is skipped (he may still
+ * hold balls) and he goes on to look and shoot with what he has.
+ *
+ * Always time to park: every loop, if the time left (AUTO_S) is no more than the estimated park
+ * time from where John is (parkSeconds) plus PARK_MARGIN_S, whatever runs is dropped and he parks.
+ * And before each stage (the volley 1 retry, GARDEN, look, shot 2, a side switch) its estimated
+ * time plus the park from where it ends must fit, else it and the rest are skipped. Estimates:
+ * AVG_DRIVE_IPS along the route (around the HIVE) plus DRIVE_OVERHEAD_S per drive, AIM_S, VOLLEY_S.
+ * In STEP_MODE (testing) the clock is not used: the estimates are only logged.
  *
  * Other robots: every drive goes through PathWatcher. When John is BLOCKED (not moving with path
  * left) or PUSHED off the path, it stops pushing, waits, plans again from where it is and retries;
@@ -153,8 +166,17 @@ public class JohnAuto extends LinearOpMode {
     /** Turning back to the wall before the GARDEN. */
     public static double TURN_TOLERANCE_DEG = 1.5;
     public static double TURN_TIMEOUT_MS = 1500;
-    /** Go to park at this time after START no matter what (AUTO is 30 s; PARK counts at its end). */
-    public static double PARK_DEADLINE_S = 25.0;
+    // ---- Time: always enough left to park ----
+    /** AUTO length; PARK counts at its end. */
+    public static double AUTO_S = 30.0;
+    /** Kept in hand on top of the park estimate. */
+    public static double PARK_MARGIN_S = 1.5;
+    /** Estimates: average speed along a route, plus this per drive (speeding up / slowing down). */
+    public static double AVG_DRIVE_IPS = 30.0;
+    public static double DRIVE_OVERHEAD_S = 0.6;
+    public static double PARK_OVERHEAD_S = 1.0;
+    public static double AIM_S = 1.2;
+    public static double VOLLEY_S = 3.5;
     /** Testing: wait for gamepad1 Y before each stage; the park deadline is off. */
     // public static boolean STEP_MODE = false;  // match
     public static boolean STEP_MODE = true;      // TEST: press Y to start each stage
@@ -177,6 +199,11 @@ public class JohnAuto extends LinearOpMode {
     private Aimer.Result aimResult = Aimer.Result.FAILED;
     /** The camera confirmed which CELL is up after the GARDEN. */
     private boolean upKnown;
+    /** The last volley did all its indexer steps (John holds no balls). */
+    private boolean emptied;
+    /** A stage did not fit: skip the rest and park. */
+    private boolean parkNow;
+    private boolean routineDone;
     private HiveCamera.Frame frame;
     private final ElapsedTime clock = new ElapsedTime();
     private CsvLog log;
@@ -264,8 +291,13 @@ public class JohnAuto extends LinearOpMode {
         Scheduler.reset();
         Scheduler.schedule(sequential(
                 waitMs(settings.delayS() * 1000.0),
-                race(mainRoutine(), waitUntil(() -> !STEP_MODE && clock.seconds() >= PARK_DEADLINE_S)),
+                race(mainRoutine(), waitUntil(() -> !STEP_MODE
+                        && AUTO_S - clock.seconds() <= parkSeconds(follower.pose()) + PARK_MARGIN_S)),
                 instant(() -> {
+                    if (!routineDone) {
+                        logEvent(String.format(Locale.US, "time to park: %.1f s left, park about %.1f s from %s",
+                                AUTO_S - clock.seconds(), parkSeconds(follower.pose()), Drawing.format(follower.pose())));
+                    }
                     shooter.cancel();
                     shooter.setSpin(false);
                     intake.off();
@@ -334,17 +366,30 @@ public class JohnAuto extends LinearOpMode {
         return sequential(
                 label("step off the wall and aim 1"), lazy(this::stepOffWall), aim(),
                 label("shoot 1"), volley("volley 1", Shooter.INDEXER_STEPS_PER_VOLLEY, 0),
-                label("garden"), lazy(this::collectGarden),
-                label("look at the HIVE"), lazy(this::lookAtHive),
+                lazy(() -> emptied ? instant(() -> { }) : sequential(
+                        instant(() -> logEvent("volley 1 did not finish: one more try")),
+                        label("retry volley 1"),
+                        guard("retry volley 1", () -> AIM_S + VOLLEY_S, follower::pose,
+                                () -> sequential(aim(), volley("volley 1 retry", Shooter.INDEXER_STEPS_PER_VOLLEY, 0))))),
+                label("garden"),
+                lazy(() -> emptied
+                        ? guard("garden", this::gardenSeconds, () -> field(gardenEnd()), this::collectGarden)
+                        : instant(() -> logEvent("GARDEN skipped: John may still hold balls (at most 4, G407)"))),
+                label("look at the HIVE"),
+                guard("look at the HIVE", () -> driveSeconds(follower.pose(), field(lookPose())) + LOOK_TIMEOUT_MS / 1000.0,
+                        () -> field(lookPose()), this::lookAtHive),
                 lazy(() -> {
                     if (!upKnown) {
                         return instant(() -> logEvent("no volley 2: the camera could not tell which CELL is up"));
                     }
                     return sequential(
-                            label("to shot 2"), lazy(this::toShootingSpot),
-                            label("aim 2"), aim(),
-                            label("shoot 2"), volley("volley 2", Shooter.INDEXER_STEPS_PER_VOLLEY, 0));
-                }));
+                            label("to shot 2, aim 2, shoot 2"),
+                            guard("shot 2", this::shotSeconds, this::shotEnd, () -> sequential(
+                                    lazy(this::toShootingSpot),
+                                    aim(),
+                                    volley("volley 2", Shooter.INDEXER_STEPS_PER_VOLLEY, 0))));
+                }),
+                instant(() -> routineDone = true));
     }
 
     /**
@@ -429,13 +474,17 @@ public class JohnAuto extends LinearOpMode {
      */
     private Command volley(String name, int steps, int switches) {
         final boolean[] tipped = {false};
+        final boolean[] skipped = {false};
         final boolean[] wasAudience = {true};
         final double[] baseline = {Double.NaN};
         final int[] left = {0};
         Command fire = new CommandBuilder()
                 .setStart(() -> {
                     tipped[0] = false;
+                    skipped[0] = false;
+                    emptied = false;
                     if (aimResult != Aimer.Result.AIMED) {
+                        skipped[0] = true;
                         logEvent(name + " skipped: " + aimer.status());
                         return;
                     }
@@ -468,6 +517,7 @@ public class JohnAuto extends LinearOpMode {
                 lazy(() -> {
                     shooter.setPaused(false);
                     if (!tipped[0]) {
+                        emptied = !skipped[0] && !shooter.stuck() && shooter.stepsLeft() == 0;
                         return instant(() -> {
                             shooter.setSpin(false);
                             if (shooter.stuck()) {
@@ -484,9 +534,11 @@ public class JohnAuto extends LinearOpMode {
                     tracker.setUpAudience(!wasAudience[0]);
                     logEvent(name + ": going to the other side, the " + tracker.upCellName() + " CELL");
                     return sequential(
-                            label(name + ": to the other side"), lazy(this::toShootingSpot),
-                            aim(),
-                            volley(name, Math.max(1, left[0]), switches + 1));
+                            label(name + ": to the other side"),
+                            guard(name + ": the other side", this::shotSeconds, this::shotEnd, () -> sequential(
+                                    lazy(this::toShootingSpot),
+                                    aim(),
+                                    volley(name, Math.max(1, left[0]), switches + 1))));
                 }));
     }
 
@@ -495,9 +547,7 @@ public class JohnAuto extends LinearOpMode {
      * camera to confirm which CELL is up (upKnown). No assumption if it cannot tell.
      */
     private Command lookAtHive() {
-        // The camera looks out of the shooter side: aim the shooter at the HIVE center
-        double heading = ShootingZone.shootingHeading(LOOK_X, LOOK_Y, 0.0, -HiveTags.HIVE_Y);
-        Pose look = new Pose(LOOK_X, LOOK_Y, heading);
+        Pose look = lookPose();
         final ElapsedTime timer = new ElapsedTime();
         logEvent(String.format(Locale.US, "look at the HIVE from (%.1f, %.1f) red frame", LOOK_X, LOOK_Y));
         return sequential(
@@ -640,6 +690,104 @@ public class JohnAuto extends LinearOpMode {
 
     // =========================================================================
     // Helpers
+    // =========================================================================
+
+    // =========================================================================
+    // Time: estimates and stage guards
+    // =========================================================================
+
+    /**
+     * Runs {@code stage} if its estimated time plus the park from where it ends ({@code end}, field
+     * frame) still fits in the time left (keeping PARK_MARGIN_S); else skips it and everything
+     * after it (parkNow). STEP_MODE: runs it anyway, the estimate is only logged.
+     */
+    private Command guard(String what, DoubleSupplier seconds, Supplier<Pose> end, Supplier<Command> stage) {
+        return lazy(() -> {
+            if (parkNow) {
+                return instant(() -> logEvent(what + " skipped: going to park"));
+            }
+            double stageS = seconds.getAsDouble();
+            double parkS = parkSeconds(end.get());
+            double left = AUTO_S - clock.seconds();
+            boolean fits = stageS + parkS + PARK_MARGIN_S <= left;
+            String estimate = String.format(Locale.US, "%s: about %.1f s, then park %.1f s, %.1f s left", what, stageS,
+                    parkS, left);
+            if (!fits && !STEP_MODE) {
+                parkNow = true;
+                return instant(() -> logEvent(estimate + ": does not fit, going to park"));
+            }
+            logEvent(estimate + (fits ? "" : ": would not fit (step mode: run anyway)"));
+            return stage.get();
+        });
+    }
+
+    /** Estimated park time from a pose (field frame): around the HIVE to the approach, then slow. */
+    private double parkSeconds(Pose from) {
+        Pose approach = field(new Pose(PARK_APPROACH_X, PARK_APPROACH_Y, Math.toRadians(PARK_HEADING_DEG)));
+        Pose park = field(new Pose(PARK_X, parkY(), Math.toRadians(PARK_HEADING_DEG)));
+        return routeLength(from, approach) / AVG_DRIVE_IPS
+                + Math.hypot(park.x() - approach.x(), park.y() - approach.y()) / PARK_SPEED_IPS + PARK_OVERHEAD_S;
+    }
+
+    /** Estimated time to drive from a to b (field frame) around the HIVE. */
+    private double driveSeconds(Pose a, Pose b) {
+        return routeLength(a, b) / AVG_DRIVE_IPS + DRIVE_OVERHEAD_S;
+    }
+
+    private double routeLength(Pose a, Pose b) {
+        List<double[]> route = ShootingZone.route(a, b, !blue);
+        double length = 0;
+        for (int i = 1; i < route.size(); i++) {
+            length += Math.hypot(route.get(i)[0] - route.get(i - 1)[0], route.get(i)[1] - route.get(i - 1)[1]);
+        }
+        return length;
+    }
+
+    /** GARDEN estimate from here: to the wall, along it, slow through the balls. */
+    private double gardenSeconds() {
+        Pose here = follower.pose();
+        double wallX = AUDIENCE_WALL_X - RobotGeometry.WIDTH_IN / 2.0 - WALL_GAP;
+        Pose atWall = field(new Pose(wallX, red(here).y(), Math.toRadians(90.0)));
+        double slowY = GARDEN_FIRST_BALL_Y + BALL_RADIUS + RobotGeometry.LENGTH_IN / 2.0 + SLOW_BEFORE_BALL_IN;
+        double end = gardenEnd().y();
+        double fast = Math.max(0.0, red(here).y() - slowY);
+        double slowLength = Math.max(0.0, Math.min(red(here).y(), slowY) - end);
+        return 0.5 + driveSeconds(here, atWall) + fast / AVG_DRIVE_IPS + slowLength / COLLECT_SPEED_IPS
+                + Intake.SETTLE_MS / 1000.0;
+    }
+
+    /** Where the GARDEN run ends (red frame): in the red corner along the audience wall. */
+    private static Pose gardenEnd() {
+        return new Pose(AUDIENCE_WALL_X - RobotGeometry.WIDTH_IN / 2.0 - WALL_GAP,
+                RED_WALL_Y + RobotGeometry.LENGTH_IN / 2.0 + WALL_GAP, Math.toRadians(90.0));
+    }
+
+    /** Where to look at the HIVE from (red frame), the shooter (and camera) facing its center. */
+    private static Pose lookPose() {
+        return new Pose(LOOK_X, LOOK_Y, ShootingZone.shootingHeading(LOOK_X, LOOK_Y, 0.0, -HiveTags.HIVE_Y));
+    }
+
+    /** Where the next shot is taken from (field frame): here if in range, else the nearest zone spot. */
+    private Pose shotEnd() {
+        Pose here = follower.pose();
+        double[] t = tracker.target();
+        if (ShootingZone.problem(here.x(), here.y(), t[0], t[1], tracker.upAudience()) == null) {
+            return here;
+        }
+        Pose spot = ShootingZone.nearestSpot(here, t[0], t[1], tracker.upAudience(), !blue);
+        return spot == null ? here : spot;
+    }
+
+    /** Shot estimate from here: drive to the spot (if needed), aim, volley. */
+    private double shotSeconds() {
+        Pose here = follower.pose();
+        Pose spot = shotEnd();
+        double drive = Math.hypot(spot.x() - here.x(), spot.y() - here.y()) < 0.5 ? 0.0 : driveSeconds(here, spot);
+        return drive + AIM_S + VOLLEY_S;
+    }
+
+    // =========================================================================
+    // Start position and other helpers
     // =========================================================================
 
     /** The camera's position along the wall is steady enough to use. */
