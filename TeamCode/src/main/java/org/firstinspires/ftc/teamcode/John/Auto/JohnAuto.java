@@ -157,6 +157,8 @@ public class JohnAuto extends LinearOpMode {
     public static int MIN_START_SAMPLES = 5;
     /** Use the camera's Y only when its readings agree this well (median distance from the median). */
     public static double START_MAX_SPREAD_IN = 2.0;
+    /** After this long in INIT, warn if the camera has not seen a HIVE tag. */
+    public static double CAMERA_CHECK_S = 2.0;
 
     // ---- Looking at the HIVE after the GARDEN ----
     /**
@@ -263,9 +265,23 @@ public class JohnAuto extends LinearOpMode {
         TagLocalizer startFix = new TagLocalizer(START_SAMPLES);
 
         // INIT: show the Game Setup, find the position along the wall (no buttons, nothing moves)
+        ElapsedTime initTimer = new ElapsedTime();
+        int initFrames = 0;
+        int initFramesWithTags = 0;
         while (opModeInInit()) {
             Pose wall = settings.startPose();
-            startFix.add(camera.poll(), wall.heading());
+            HiveCamera.Frame initFrame = camera.poll();
+            if (initFrame != null) {
+                initFrames++;
+                if (!initFrame.tags.isEmpty()) {
+                    initFramesWithTags++;
+                }
+            }
+            startFix.add(initFrame, wall.heading());
+            String cameraWarning = cameraWarning(initTimer.seconds(), initFrames, initFramesWithTags);
+            if (cameraWarning != null) {
+                telemetry.addLine("!!! " + cameraWarning);
+            }
             Pose start = startPose(wall, startFix);
             if (haveSettings) {
                 telemetry.addLine("Game Setup:");
@@ -317,6 +333,10 @@ public class JohnAuto extends LinearOpMode {
         follower.update();
         follower.hold(start);
         gamepad1.resetEdgeDetection();
+        String startWarning = cameraWarning(initTimer.seconds(), initFrames, initFramesWithTags);
+        if (startWarning != null) {
+            logEvent("WARNING at START: " + startWarning);
+        }
         logEvent(String.format(Locale.US, "start: %s %s at %s (%s), delay %.0f s", settings.alliance(), settings.tile(),
                 Drawing.format(start), useCamera(startFix)
                         ? String.format(Locale.US, "camera Y, %d readings, tile %+.1f", startFix.count(),
@@ -866,6 +886,28 @@ public class JohnAuto extends LinearOpMode {
     // =========================================================================
     // Start position and other helpers
     // =========================================================================
+
+    /**
+     * A warning when, after CAMERA_CHECK_S of INIT, the camera is missing, sends no frames, or sees
+     * no HIVE tag although John faces the HIVE from his start wall (then the Limelight's exposure /
+     * gain is likely off, or the lens is covered); null when all is well.
+     */
+    private String cameraWarning(double initS, int frames, int framesWithTags) {
+        if (!camera.available()) {
+            return "NO CAMERA: " + camera.status();
+        }
+        if (initS < CAMERA_CHECK_S) {
+            return null;
+        }
+        if (frames == 0) {
+            return "THE LIMELIGHT SENDS NO FRAMES (pipeline " + HiveCamera.PIPELINE + " running? cable?)";
+        }
+        if (framesWithTags == 0) {
+            return String.format(Locale.US, "THE CAMERA SEES NO HIVE TAGS in %d frames: check the Limelight "
+                    + "exposure / gain (pipeline %d), the lens, and that John faces the HIVE", frames, HiveCamera.PIPELINE);
+        }
+        return null;
+    }
 
     /** The camera's position along the wall is steady enough to use. */
     private static boolean useCamera(TagLocalizer fix) {

@@ -58,7 +58,8 @@ import java.util.Locale;
  *    tag's field Y never changes when the HIVE tips, so each tag gives the position along the wall
  *    (TagLocalizer, median over START_SAMPLES readings). X and heading come from the wall; the X
  *    the tags imply is shown as a check. Without a tag fix, the Game Setup tile (or C1) is used.
- * The alliance comes from [John] Game Setup if one was saved; B / X in INIT change it (red / blue).
+ * The alliance comes from [John] Game Setup; only when none was saved B / X in INIT pick it (red /
+ * blue). Field-centric driving takes the drivers to be at that alliance's wall.
  *
  * DRIVING: field-centric from the driver's view (red drivers face +Y, blue -Y): pushing the stick
  * away from you drives away from you, whatever way John faces. Pedro's ManualDrive.driveOrHold
@@ -85,9 +86,10 @@ import java.util.Locale;
  * AIM ASSIST (right stick button held): you drive, the heading locks onto the CELL.
  *
  * POSITION MODE: ODOMETRY (default: the Pinpoint and the start pose; vision only at the start, for
- * the position along the wall) or VISION-CORRECTED. Back held RELOCALIZE_MS toggles it (Back, so it
- * is not pressed by accident); telemetry "Position" shows the mode.
- * RE-POSITION FROM VISION (Back held, in ODOMETRY mode; anywhere, standing still, HIVE tags in view):
+ * the position along the wall) or VISION-CORRECTED. Back held RELOCALIZE_MS: VISION-CORRECTED (it
+ * re-positions from vision first, every time); Start pressed: ODOMETRY. No toggles. Telemetry
+ * "Position" shows the mode.
+ * RE-POSITION FROM VISION (Back held; anywhere, standing still, HIVE tags in view):
  *  - flush on a back wall: that wall's exact pose (WallFinder);
  *  - else the full pose from the tags alone (TagLocalizer.solvePose, median over the hold). If its
  *    heading agrees with the Pinpoint's within KEEP_HEADING_DEG, the Pinpoint heading is kept (more
@@ -98,8 +100,8 @@ import java.util.Locale;
  * every CORRECT_PERIOD_MS the pose moves CORRECT_GAIN of the way to its median, at most
  * CORRECT_MAX_STEP_IN (the tags are noisy: small steps, a median); more than CORRECT_REJECT_IN off
  * is ignored. The heading only beyond CORRECT_HEADING_DEADBAND_DEG, by HEADING_GAIN, at most
- * HEADING_MAX_STEP_DEG per step. Not while a shot runs. Back held again: back to ODOMETRY mode
- * (the corrections stop; the pose stays where it is).
+ * HEADING_MAX_STEP_DEG per step. Not while a shot runs. Start: back to ODOMETRY mode (the
+ * corrections stop; the pose stays where it is).
  *
  * (Earlier description, for the wall part:)
  * RE-LOCALIZE (Back held RELOCALIZE_MS, standing still, the HIVE in view; letting go early cancels):
@@ -125,8 +127,8 @@ import java.util.Locale;
  *
  * ROBOT_CENTRIC (off by default; field-centric is preferred): the left stick drives relative to the robot, "forward" toward the intake
  * B end or the intake A end (left stick button switches); turning is the same. The automatic shot is unchanged.
- *   Back (hold 1 s)        toggle the position mode: ODOMETRY -> re-position from vision and keep
- *                          correcting (VISION-CORRECTED); VISION-CORRECTED -> back to ODOMETRY
+ *   Back (hold 1 s)        VISION-CORRECTED: re-position from vision, then keep correcting
+ *   Start (press)          ODOMETRY: no vision corrections
  *   dpad up / down         flywheel trim + / - TRIM_STEP_RPM;  dpad left / right: trim 0
  *
  * WITHOUT ODOMETRY (OdometryWatchdog PAUSED or LOST): the sticks drive the motors directly,
@@ -264,11 +266,14 @@ public class JohnTeleOp extends LinearOpMode {
         // ---- INIT: nothing moves; the camera finds the position along the wall ----
         gamepad1.resetEdgeDetection();
         while (opModeInInit()) {
-            if (gamepad1.bWasPressed() && !red) {
+            // The alliance comes from Game Setup; B / X only without one (B is "intake reverse" in the
+            // TeleOp, and pressed by habit in INIT it flipped the alliance: r0132)
+            boolean pickRed = gamepad1.bWasPressed(), pickBlue = gamepad1.xWasPressed();
+            if (!haveSetup && pickRed && !red) {
                 red = true;
                 startFix.reset();
             }
-            if (gamepad1.xWasPressed() && red) {
+            if (!haveSetup && pickBlue && red) {
                 red = false;
                 startFix.reset();
             }
@@ -293,8 +298,9 @@ public class JohnTeleOp extends LinearOpMode {
             Pose start = startFrom == Start.AUTO ? autoPose
                     : wallFound != null ? wallFound : startFix.alongWall(wall, MIN_START_SAMPLES, RobotGeometry.LENGTH_IN / 2.0);
 
-            telemetry.addData("Alliance", "%s   (B red, X blue)%s", red ? "RED" : "BLUE",
-                    haveSetup ? "" : "   (no Game Setup saved)");
+            telemetry.addData("Alliance", haveSetup ? "%s   (from Game Setup; drivers at the %s wall)"
+                            : "%s   (no Game Setup saved: B red, X blue; drivers at the %s wall)",
+                    red ? "RED" : "BLUE", red ? "red" : "blue");
             telemetry.addData("Start from", "%s   (dpad left / right)%s", startFrom,
                     autoPose == null ? ": no autonomous pose" : String.format(Locale.US, ": the autonomous ended %.0f s ago%s%s",
                             autoAgeS, autoAgeS > AUTO_POSE_MAX_AGE_S ? " (old)" : "",
@@ -384,6 +390,11 @@ public class JohnTeleOp extends LinearOpMode {
             // Held buttons run the automated actions; pressed (edge) buttons toggle / step
             boolean shootHeld = gamepad1.a;
             boolean relocalizeHeld = gamepad1.back;
+            if (gamepad1.startWasPressed() && autoCorrect) {
+                autoCorrect = false;
+                correctWindow.clear();
+                event = "position mode: ODOMETRY (Start; vision corrections off)";
+            }
             boolean assistHeld = gamepad1.right_stick_button;
             boolean intakeToggle = gamepad1.leftBumperWasPressed() | gamepad1.rightBumperWasPressed();
             if (gamepad1.yWasPressed()) {
@@ -481,9 +492,8 @@ public class JohnTeleOp extends LinearOpMode {
                 relocalizeWalls.reset();
                 relocalizeVision.clear();
                 relocalizeTimer.reset();
-                relocalizeTurnsOff = autoCorrect;
-                event = relocalizeTurnsOff ? "back to ODOMETRY mode: keep Back held"
-                        : "re-position from vision: keep Back held, stand still";
+                relocalizeTurnsOff = false;
+                event = "re-position from vision: keep Back held, stand still";
             }
             if (relocalizing && !relocalizeHeld) {
                 relocalizing = false;
@@ -625,7 +635,7 @@ public class JohnTeleOp extends LinearOpMode {
                 if (off > CORRECT_REJECT_IN) {
                     if (clock.milliseconds() - lastRejectLogMs > 5000) {
                         lastRejectLogMs = clock.milliseconds();
-                        event = String.format(Locale.US, "vision disagrees by %.0f in: not corrected (Back held: odometry only)", off);
+                        event = String.format(Locale.US, "vision disagrees by %.0f in: not corrected (Start: odometry only)", off);
                     }
                 } else {
                     double scale = Math.min(1.0, CORRECT_MAX_STEP_IN / Math.max(1e-9, CORRECT_GAIN * off));
@@ -763,7 +773,7 @@ public class JohnTeleOp extends LinearOpMode {
                 telemetry.addLine("ODOMETRY PAUSED: driving on the IMU meanwhile. " + watchdog.reason());
             }
             telemetry.addData("Position", autoCorrect
-                    ? String.format(Locale.US, "VISION-CORRECTED (%d samples, %.1f in corrected so far; hold Back: odometry)",
+                    ? String.format(Locale.US, "VISION-CORRECTED (%d samples, %.1f in corrected so far; Start: odometry)",
                             correctWindow.size(), correctedIn)
                     : "ODOMETRY (hold Back 1 s: re-position from vision)");
             telemetry.addData("Shot (hold A)", "%s%s", shot, shotStatus.isEmpty() ? "" : ": " + shotStatus);
@@ -787,7 +797,7 @@ public class JohnTeleOp extends LinearOpMode {
             telemetry.addData("Pinpoint", "%s, %s", state, watchdog.status());
             telemetry.addData("IMU check", "%s, offset %.1f deg (must stay the same while turning)",
                     fallback.status(), fallback.offsetDeg());
-            telemetry.addLine("HOLD: A shoot, RS button aim assist, Back position mode, B intakes reverse. "
+            telemetry.addLine("HOLD: A shoot, RS button aim assist, Back vision mode (Start: odometry), B intakes reverse. "
                     + "Bumpers: intakes on/off. Y: indexer back 90. Dpad: trim");
             telemetry.update();
 
