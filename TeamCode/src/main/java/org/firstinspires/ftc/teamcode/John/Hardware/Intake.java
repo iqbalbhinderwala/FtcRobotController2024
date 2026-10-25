@@ -23,9 +23,13 @@ public class Intake {
     public enum Side { A, B }
 
     public static double POWER = 1.0;
-    public static boolean A_REVERSED = false;
-    /** Intake B runs the other way round (found on the robot 2026-10-24). */
-    public static boolean B_REVERSED = true;
+    /**
+     * Intake A runs the other way round. (2026-10-24: the A / B cables had been swapped, so this was
+     * found as "B reversed"; with intakeA on the left intake and intakeB on the right again, the
+     * reversal moved with the motor.)
+     */
+    public static boolean A_REVERSED = true;
+    public static boolean B_REVERSED = false;
     /** on(side) runs both intakes (as tested), not just the leading one. */
     public static boolean BOTH_TOGETHER = true;
     /** Time to keep running after the robot stops, so the last ball gets pulled in. */

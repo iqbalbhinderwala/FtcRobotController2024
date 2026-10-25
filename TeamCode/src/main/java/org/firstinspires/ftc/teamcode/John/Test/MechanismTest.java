@@ -24,6 +24,7 @@ import org.firstinspires.ftc.teamcode.John.Util.CsvLog;
  *
  * gamepad1:
  *   dpad right / left   both intakes together: in on/off / reverse on/off
+ *   left / right trigger   (hold) intake A / intake B on its own, "in", as hard as pressed
  *   Y                   flywheel on/off (holds the target RPM; boost start, see Flywheel)
  *   dpad up / down      flywheel target + / - FLYWHEEL_STEP_RPM
  *   right / left bumper indexer + / - 90 deg
@@ -45,8 +46,8 @@ public class MechanismTest extends LinearOpMode {
 
     // ---- Intakes ----
     public static double INTAKE_POWER = 1.0;
-    public static boolean INTAKE_A_REVERSED = false;
-    public static boolean INTAKE_B_REVERSED = true;   // as JohnIntake.B_REVERSED (2026-10-24)
+    public static boolean INTAKE_A_REVERSED = true;    // as JohnIntake.A_REVERSED (2026-10-24, cables fixed)
+    public static boolean INTAKE_B_REVERSED = false;
 
     // ---- Flywheel target steps ----
     public static double FLYWHEEL_STEP_RPM = 100;
@@ -151,8 +152,11 @@ public class MechanismTest extends LinearOpMode {
             // Intakes: fixed power
             intakeA.setDirection(INTAKE_A_REVERSED ? DcMotorSimple.Direction.REVERSE : DcMotorSimple.Direction.FORWARD);
             intakeB.setDirection(INTAKE_B_REVERSED ? DcMotorSimple.Direction.REVERSE : DcMotorSimple.Direction.FORWARD);
-            intakeA.setPower(intakePower(intakes));
-            intakeB.setPower(intakePower(intakes));
+            // Triggers held: one intake on its own (left A, right B), as hard as the trigger is pressed
+            double ltA = gamepad1.left_trigger, rtB = gamepad1.right_trigger;
+            boolean single = ltA > 0.05 || rtB > 0.05;
+            intakeA.setPower(single ? ltA * INTAKE_POWER : intakePower(intakes));
+            intakeB.setPower(single ? rtB * INTAKE_POWER : intakePower(intakes));
 
             flywheel.update();
             if (flywheel.event() != null) {
@@ -217,7 +221,10 @@ public class MechanismTest extends LinearOpMode {
             double ampsIdx = indexer.amps();
             int flywheelTicks = flywheel.ticks();
 
-            telemetry.addData("Intakes (dpad right in / left reverse)", "%s, A %.1f A, B %.1f A", intakes, ampsA, ampsB);
+            telemetry.addData("Intakes (dpad right in / left reverse; LT = A only, RT = B only)", "%s, A %.1f A, B %.1f A",
+                    gamepad1.left_trigger > 0.05 || gamepad1.right_trigger > 0.05
+                            ? String.format("SINGLE: A %.0f%%, B %.0f%%", gamepad1.left_trigger * 100, gamepad1.right_trigger * 100)
+                            : intakes.toString(), ampsA, ampsB);
             telemetry.addData("Flywheel (Y, dpad up/down)", "%s, target %.0f RPM, %s, %.1f A",
                     flywheel.isOn() ? "ON" : "off", flywheel.targetRpm(),
                     flywheel.closedLoop() ? String.format("actual %.0f RPM%s%s", flywheel.rpm(),
