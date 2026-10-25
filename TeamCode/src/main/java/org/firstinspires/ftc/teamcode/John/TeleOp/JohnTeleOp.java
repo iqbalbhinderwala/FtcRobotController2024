@@ -84,7 +84,10 @@ import java.util.Locale;
  *  - After a volley (or a cancel) it waits for A to be let go before it starts again.
  * AIM ASSIST (right stick button held): you drive, the heading locks onto the CELL.
  *
- * RE-POSITION FROM VISION (X held RELOCALIZE_MS, anywhere, standing still, HIVE tags in view):
+ * POSITION MODE: ODOMETRY (default: the Pinpoint and the start pose; vision only at the start, for
+ * the position along the wall) or VISION-CORRECTED. Back held RELOCALIZE_MS toggles it (Back, so it
+ * is not pressed by accident); telemetry "Position" shows the mode.
+ * RE-POSITION FROM VISION (Back held, in ODOMETRY mode; anywhere, standing still, HIVE tags in view):
  *  - flush on a back wall: that wall's exact pose (WallFinder);
  *  - else the full pose from the tags alone (TagLocalizer.solvePose, median over the hold). If its
  *    heading agrees with the Pinpoint's within KEEP_HEADING_DEG, the Pinpoint heading is kept (more
@@ -95,10 +98,11 @@ import java.util.Locale;
  * every CORRECT_PERIOD_MS the pose moves CORRECT_GAIN of the way to its median, at most
  * CORRECT_MAX_STEP_IN (the tags are noisy: small steps, a median); more than CORRECT_REJECT_IN off
  * is ignored. The heading only beyond CORRECT_HEADING_DEADBAND_DEG, by HEADING_GAIN, at most
- * HEADING_MAX_STEP_DEG per step. Not while a shot runs.
+ * HEADING_MAX_STEP_DEG per step. Not while a shot runs. Back held again: back to ODOMETRY mode
+ * (the corrections stop; the pose stays where it is).
  *
  * (Earlier description, for the wall part:)
- * RE-LOCALIZE (X held RELOCALIZE_MS, standing still, the HIVE in view; letting go early cancels):
+ * RE-LOCALIZE (Back held RELOCALIZE_MS, standing still, the HIVE in view; letting go early cancels):
  *  - against the audience wall (C1 / D1) or the far wall (C6 / D6), either alliance: drive there
  *    and put the camera wall flush on it, shooter facing the field (within WALL_SNAP_IN of the wall
  *    position and WALL_SNAP_DEG of its heading, by the odometry). X and heading from that wall, Y
@@ -121,7 +125,8 @@ import java.util.Locale;
  *
  * ROBOT_CENTRIC (off by default; field-centric is preferred): the left stick drives relative to the robot, "forward" toward the intake
  * B end or the intake A end (left stick button switches); turning is the same. The automatic shot is unchanged.
- *   X (hold 0.5 s)         re-localize: best with the camera wall flush on the audience or far wall
+ *   Back (hold 1 s)        toggle the position mode: ODOMETRY -> re-position from vision and keep
+ *                          correcting (VISION-CORRECTED); VISION-CORRECTED -> back to ODOMETRY
  *   dpad up / down         flywheel trim + / - TRIM_STEP_RPM;  dpad left / right: trim 0
  *
  * WITHOUT ODOMETRY (OdometryWatchdog PAUSED or LOST): the sticks drive the motors directly,
@@ -131,7 +136,7 @@ import java.util.Locale;
  * (VisionAim) gives the turn (made on the IMU), the distance (flywheel speed) and the zone check;
  * you drive (hints in telemetry: back up / move toward the middle), the heading locks onto the CELL,
  * and it fires when in range, on aim and the sticks are still. No drive into range (that needs the
- * position). The right stick button locks the heading onto the CELL the same way. X held against a
+ * position). The right stick button locks the heading onto the CELL the same way. Back held against a
  * back wall re-aligns the IMU heading to it.
  *
  * OdometryWatchdog stops Pedro's drive on bad Pinpoint reads. Logged to
@@ -353,7 +358,8 @@ public class JohnTeleOp extends LinearOpMode {
         double lastRejectLogMs = -1e9;
         double correctedIn = 0.0;   // total correction, for telemetry
         boolean relocalizing = false;
-        boolean relocalizeDone = false;   // X must be let go before the next re-localize
+        boolean relocalizeDone = false;   // Back must be let go before the next toggle
+        boolean relocalizeTurnsOff = false;   // this hold switches back to ODOMETRY mode
         Pose relocalizeWall = null;       // the wall pose when re-localizing against a wall
         ElapsedTime relocalizeTimer = new ElapsedTime();
         boolean holdMode = HOLD_WHEN_RELEASED;
@@ -377,7 +383,7 @@ public class JohnTeleOp extends LinearOpMode {
             String event = null;
             // Held buttons run the automated actions; pressed (edge) buttons toggle / step
             boolean shootHeld = gamepad1.a;
-            boolean relocalizeHeld = gamepad1.x;
+            boolean relocalizeHeld = gamepad1.back;
             boolean assistHeld = gamepad1.right_stick_button;
             boolean intakeToggle = gamepad1.leftBumperWasPressed() | gamepad1.rightBumperWasPressed();
             if (gamepad1.yWasPressed()) {
@@ -466,7 +472,7 @@ public class JohnTeleOp extends LinearOpMode {
                 double wallHeading = Math.toRadians(Math.cos(h - Math.PI / 2) >= 0 ? 90.0 : -90.0);
                 boolean atWall = Math.abs(Math.toDegrees(normalize(h - wallHeading))) <= WALL_SNAP_DEG;
                 relocalizeWall = atWall ? new Pose(0.0, 0.0, wallHeading) : null;
-                event = atWall ? "re-align the IMU heading to the wall: keep X held"
+                event = atWall ? "re-align the IMU heading to the wall: keep Back held"
                         : "no odometry: re-align only with the camera wall flush on a back wall";
             }
             if (relocalizeHeld && !relocalizing && !relocalizeDone && shot == Shot.IDLE && !lost) {
@@ -475,11 +481,13 @@ public class JohnTeleOp extends LinearOpMode {
                 relocalizeWalls.reset();
                 relocalizeVision.clear();
                 relocalizeTimer.reset();
-                event = "re-position from vision: keep X held, stand still";
+                relocalizeTurnsOff = autoCorrect;
+                event = relocalizeTurnsOff ? "back to ODOMETRY mode: keep Back held"
+                        : "re-position from vision: keep Back held, stand still";
             }
             if (relocalizing && !relocalizeHeld) {
                 relocalizing = false;
-                event = "re-localize cancelled: X let go";
+                event = "position mode unchanged: Back let go";
             }
             if (!relocalizeHeld) {
                 relocalizeDone = false;
@@ -548,6 +556,12 @@ public class JohnTeleOp extends LinearOpMode {
                 if (sticksMoved) {
                     relocalizing = false;
                     event = "re-localize cancelled: moved";
+                } else if (relocalizeTimer.milliseconds() >= RELOCALIZE_MS && relocalizeTurnsOff) {
+                    relocalizing = false;
+                    relocalizeDone = true;   // once per hold
+                    autoCorrect = false;
+                    correctWindow.clear();
+                    event = "position mode: ODOMETRY (vision corrections off)";
                 } else if (relocalizeTimer.milliseconds() >= RELOCALIZE_MS) {
                     relocalizing = false;
                     relocalizeDone = true;   // once per hold
@@ -611,7 +625,7 @@ public class JohnTeleOp extends LinearOpMode {
                 if (off > CORRECT_REJECT_IN) {
                     if (clock.milliseconds() - lastRejectLogMs > 5000) {
                         lastRejectLogMs = clock.milliseconds();
-                        event = String.format(Locale.US, "vision disagrees by %.0f in: not corrected (X held to re-position)", off);
+                        event = String.format(Locale.US, "vision disagrees by %.0f in: not corrected (Back held: odometry only)", off);
                     }
                 } else {
                     double scale = Math.min(1.0, CORRECT_MAX_STEP_IN / Math.max(1e-9, CORRECT_GAIN * off));
@@ -748,6 +762,10 @@ public class JohnTeleOp extends LinearOpMode {
             } else if (!watchdog.ok()) {
                 telemetry.addLine("ODOMETRY PAUSED: driving on the IMU meanwhile. " + watchdog.reason());
             }
+            telemetry.addData("Position", autoCorrect
+                    ? String.format(Locale.US, "VISION-CORRECTED (%d samples, %.1f in corrected so far; hold Back: odometry)",
+                            correctWindow.size(), correctedIn)
+                    : "ODOMETRY (hold Back 1 s: re-position from vision)");
             telemetry.addData("Shot (hold A)", "%s%s", shot, shotStatus.isEmpty() ? "" : ": " + shotStatus);
             telemetry.addData("Target", "%s %s CELL at (%.1f, %.1f), %.1f in away (%s)", red ? "red" : "blue",
                     tracker.upCellName(), target[0], target[1], distance, tracker.source());
@@ -765,14 +783,11 @@ public class JohnTeleOp extends LinearOpMode {
                 telemetry.addData("Re-positioning", "%d tag readings, %d vision poses; %s", relocalizer.count(),
                         relocalizeVision.size(), relocalizeWalls.describe(MIN_RELOCALIZE_SAMPLES));
             }
-            telemetry.addData("Vision correction", autoCorrect
-                    ? String.format(Locale.US, "ON (%d samples, %.1f in corrected so far)", correctWindow.size(), correctedIn)
-                    : "off (X held to re-position turns it on)");
             telemetry.addData("Camera", camera.status());
             telemetry.addData("Pinpoint", "%s, %s", state, watchdog.status());
             telemetry.addData("IMU check", "%s, offset %.1f deg (must stay the same while turning)",
                     fallback.status(), fallback.offsetDeg());
-            telemetry.addLine("HOLD: A shoot, RS button aim assist, X re-localize, B intakes reverse. "
+            telemetry.addLine("HOLD: A shoot, RS button aim assist, Back position mode, B intakes reverse. "
                     + "Bumpers: intakes on/off. Y: indexer back 90. Dpad: trim");
             telemetry.update();
 
