@@ -209,6 +209,14 @@ public class JohnTeleOp extends LinearOpMode {
     public static double CORRECT_HEADING_DEADBAND_DEG = 3.0;
     public static double HEADING_GAIN = 0.05;
     public static double HEADING_MAX_STEP_DEG = 0.5;
+    /**
+     * Vision heading samples farther than this from the current heading are not used for the
+     * correction: r0188's vision poses sometimes came out ~180 deg rotated (tags read as if in the
+     * reverse order), and the correction then turned the heading round by 0.5 deg a step.
+     */
+    public static double CORRECT_HEADING_REJECT_DEG = 20.0;
+    /** Re-position: a vision heading more than this from the Pinpoint's is taken as that 180 deg flip. */
+    public static double FLIP_HEADING_DEG = 120.0;
     public static int MIN_RELOCALIZE_SAMPLES = 4;
     /** Re-localize against the audience / far wall when this close to its position and heading. */
     public static double WALL_SNAP_IN = 6.0;
@@ -348,8 +356,10 @@ public class JohnTeleOp extends LinearOpMode {
                     ? Math.hypot(autoCheck.x() - autoPose.x(), autoCheck.y() - autoPose.y()) : Double.NaN;
             double autoHeadingError = autoPose != null && visionStart != null
                     ? Math.abs(Math.toDegrees(normalize(visionStart.heading() - autoPose.heading()))) : Double.NaN;
+            // A vision heading ~180 deg off is the flipped fit (r0188), not a reason to distrust the pose
             boolean autoOk = autoFresh && (Double.isNaN(autoError) || autoError <= AUTO_CHECK_IN)
-                    && (Double.isNaN(autoHeadingError) || autoHeadingError <= AUTO_CHECK_DEG);
+                    && (Double.isNaN(autoHeadingError) || autoHeadingError <= AUTO_CHECK_DEG
+                    || autoHeadingError > FLIP_HEADING_DEG);
             if (!startOverridden) {
                 startFrom = autoOk ? Start.AUTO : Start.WALL;
             }
@@ -429,6 +439,7 @@ public class JohnTeleOp extends LinearOpMode {
         TagLocalizer relocalizer = new TagLocalizer(100);
         WallFinder relocalizeWalls = new WallFinder(100);
         List<Pose> relocalizeVision = new ArrayList<>();
+        java.util.TreeSet<Integer> relocalizeIds = new java.util.TreeSet<>();   // tag IDs seen, for the log
         boolean autoCorrect = AUTO_CORRECT_FROM_START;
         ArrayDeque<double[]> correctWindow = new ArrayDeque<>();   // {ms, x, y, heading or NaN}
         ElapsedTime correctTimer = new ElapsedTime();
@@ -512,6 +523,9 @@ public class JohnTeleOp extends LinearOpMode {
                 if (seen != null) {
                     relocalizeVision.add(seen);
                 }
+                for (HiveCamera.Tag tag : frame.tags) {
+                    relocalizeIds.add(tag.id);
+                }
             }
             if (usable && autoCorrect && !lost && !relocalizing && shot == Shot.IDLE && frame != null
                     && !frame.tags.isEmpty()) {
@@ -563,6 +577,7 @@ public class JohnTeleOp extends LinearOpMode {
                 relocalizer.reset();
                 relocalizeWalls.reset();
                 relocalizeVision.clear();
+                relocalizeIds.clear();
                 relocalizeTimer.reset();
                 relocalizeTurnsOff = false;
                 event = "re-position from vision: keep Back held, stand still";
@@ -659,11 +674,19 @@ public class JohnTeleOp extends LinearOpMode {
                         how = atWall.x() > 0 ? "audience wall" : "far wall";
                     } else if (vision != null) {
                         double dh = Math.toDegrees(normalize(vision.heading() - before.heading()));
-                        if (Math.abs(dh) <= KEEP_HEADING_DEG) {
+                        if (Math.abs(dh) <= KEEP_HEADING_DEG || Math.abs(dh) > FLIP_HEADING_DEG) {
+                            // Close: the Pinpoint heading is more exact. Near 180 deg off: the vision
+                            // fit is flipped (r0188), so the Pinpoint heading is kept as well.
                             fixed = relocalizer.count() >= MIN_RELOCALIZE_SAMPLES
                                     ? new Pose(relocalizer.x(), relocalizer.y(), before.heading())
-                                    : new Pose(vision.x(), vision.y(), before.heading());
-                            how = String.format(Locale.US, "vision, Pinpoint heading kept (vision %+.1f deg)", dh);
+                                    : null;
+                            how = Math.abs(dh) <= KEEP_HEADING_DEG
+                                    ? String.format(Locale.US, "vision, Pinpoint heading kept (vision %+.1f deg)", dh)
+                                    : String.format(Locale.US, "tags with the Pinpoint heading; vision heading %+.0f deg "
+                                            + "off: ignored (180 deg ambiguity)", dh);
+                            if (fixed == null && Math.abs(dh) <= KEEP_HEADING_DEG) {
+                                fixed = new Pose(vision.x(), vision.y(), before.heading());
+                            }
                         } else {
                             fixed = vision;
                             how = String.format(Locale.US, "vision, heading too (%+.1f deg)", dh);
@@ -680,7 +703,8 @@ public class JohnTeleOp extends LinearOpMode {
                         autoCorrect = true;
                         correctWindow.clear();
                         event = String.format(Locale.US, "re-positioned (%s, %d frames): %s -> %s; vision correction on",
-                                how, relocalizeVision.size(), Drawing.format(before), Drawing.format(fixed));
+                                how, relocalizeVision.size(), Drawing.format(before), Drawing.format(fixed))
+                                + "; tags " + relocalizeIds;
                     } else {
                         event = "re-localize failed: " + relocalizer.count() + " tag readings (standing still? HIVE in "
                                 + "view? against a back wall, both HIVEs may be tilted away from it: try the other wall)";
@@ -697,8 +721,9 @@ public class JohnTeleOp extends LinearOpMode {
                 for (double[] w : correctWindow) {
                     xs.add(w[1]);
                     ys.add(w[2]);
-                    if (!Double.isNaN(w[3])) {
-                        hs.add(normalize(w[3] - now.heading()));
+                    double dh = Double.isNaN(w[3]) ? Double.NaN : normalize(w[3] - now.heading());
+                    if (!Double.isNaN(dh) && Math.abs(Math.toDegrees(dh)) <= CORRECT_HEADING_REJECT_DEG) {
+                        hs.add(dh);   // a far-off (flipped) vision heading is never followed
                     }
                 }
                 double ex = median(xs) - now.x();

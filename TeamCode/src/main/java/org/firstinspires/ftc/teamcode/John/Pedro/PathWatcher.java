@@ -44,6 +44,12 @@ public class PathWatcher {
     public static int RETRIES = 2;
     /** A follow() that has not reached its end after this long gives up (it must never hang). */
     public static double FOLLOW_TIMEOUT_MS = 8000;
+    /**
+     * Stalled within this of the end (a follow or a creep) counts as arrived, "as far as it goes":
+     * the blocked check does not look at the last MIN_REMAINING_IN, and r0186 sat 0.8" short of the
+     * park approach (a ball against the wall) until the autonomous ended.
+     */
+    public static double ARRIVE_WITHIN_IN = 4.0;
     public static double RETRY_WAIT_MS = 1000;
 
     public enum Trip { NONE, BLOCKED, PUSHED }
@@ -118,12 +124,14 @@ public class PathWatcher {
         final boolean[] finished = {false};
         final ElapsedTime wait = new ElapsedTime();
         final ElapsedTime running = new ElapsedTime();
+        final double[] stallNearEndMs = {-1.0};
         return new CommandBuilder()
                 .setStart(() -> {
                     attempt[0] = 0;
                     waiting[0] = false;
                     finished[0] = false;
                     gaveUp = false;
+                    stallNearEndMs[0] = -1.0;
                     follower.follow(plan.get());
                     running.reset();
                     start();
@@ -144,6 +152,23 @@ public class PathWatcher {
                     if (follower.atParametricEnd()) {
                         finished[0] = true;
                         return;
+                    }
+                    // Stalled close to the end: as far as it goes (Pedro would never call it done)
+                    Velocity vNow = follower.velocity();
+                    double nowMs = timer.milliseconds();
+                    if (nowMs >= START_GRACE_MS && follower.remainingDistance() <= ARRIVE_WITHIN_IN
+                            && Math.hypot(vNow.vx, vNow.vy) < BLOCKED_SPEED_IPS) {
+                        if (stallNearEndMs[0] < 0) {
+                            stallNearEndMs[0] = nowMs;
+                        } else if (nowMs - stallNearEndMs[0] >= BLOCKED_MS) {
+                            follower.hold(follower.pose());
+                            finished[0] = true;
+                            log.accept(String.format(Locale.US, "%s: as far as it goes, %.1f in short of the end", name,
+                                    follower.remainingDistance()));
+                            return;
+                        }
+                    } else {
+                        stallNearEndMs[0] = -1.0;
                     }
                     if (running.milliseconds() > FOLLOW_TIMEOUT_MS) {
                         follower.hold(follower.pose());
@@ -280,7 +305,7 @@ public class PathWatcher {
                     prevAlong[0] = along;
                     prevMs[0] = nowMs;
                     // Stalled close to the end: as far as it goes
-                    if (CREEP_STALL_NEAR_END_IS_ARRIVED && remaining <= MIN_REMAINING_IN && nowMs >= START_GRACE_MS
+                    if (CREEP_STALL_NEAR_END_IS_ARRIVED && remaining <= ARRIVE_WITHIN_IN && nowMs >= START_GRACE_MS
                             && Math.abs(speedAlong[0]) < BLOCKED_SPEED_IPS) {
                         if (stallNearEndMs[0] < 0) {
                             stallNearEndMs[0] = nowMs;

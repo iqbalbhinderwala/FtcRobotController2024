@@ -206,8 +206,8 @@ public class JohnAuto extends LinearOpMode {
     public static int MAX_SIDE_SWITCHES = 2;
 
     // ---- Speeds and timing ----
-    /** 8 (was 12, a third slower, 2026-10-24; measured ~8.5 in/s average at 12). */
-    public static double COLLECT_SPEED_IPS = 8.0;
+    /** 4 (2026-10-25; was 8, before that 12). */
+    public static double COLLECT_SPEED_IPS = 4.0;
     /** After the GARDEN the intake runs this much longer (the balls move on toward the indexer). */
     public static double INTAKE_AFTER_GARDEN_S = 2.0;
     /**
