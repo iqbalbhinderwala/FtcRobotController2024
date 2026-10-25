@@ -37,6 +37,9 @@ import org.firstinspires.ftc.teamcode.John.Vision.TagLocalizer;
 import org.firstinspires.ftc.teamcode.John.Vision.VisionAim;
 import org.firstinspires.ftc.teamcode.John.Vision.WallFinder;
 
+import java.util.ArrayDeque;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
 
@@ -81,6 +84,20 @@ import java.util.Locale;
  *  - After a volley (or a cancel) it waits for A to be let go before it starts again.
  * AIM ASSIST (right stick button held): you drive, the heading locks onto the CELL.
  *
+ * RE-POSITION FROM VISION (X held RELOCALIZE_MS, anywhere, standing still, HIVE tags in view):
+ *  - flush on a back wall: that wall's exact pose (WallFinder);
+ *  - else the full pose from the tags alone (TagLocalizer.solvePose, median over the hold). If its
+ *    heading agrees with the Pinpoint's within KEEP_HEADING_DEG, the Pinpoint heading is kept (more
+ *    exact; it keeps tracking even while John is carried) and only the position comes from the tags;
+ *    otherwise the vision heading is taken too.
+ * From then on (or from the start with AUTO_CORRECT_FROM_START) VISION CORRECTION runs: whenever
+ * John stands still with tags in view, the tags' position goes into a window (CORRECT_WINDOW_MS);
+ * every CORRECT_PERIOD_MS the pose moves CORRECT_GAIN of the way to its median, at most
+ * CORRECT_MAX_STEP_IN (the tags are noisy: small steps, a median); more than CORRECT_REJECT_IN off
+ * is ignored. The heading only beyond CORRECT_HEADING_DEADBAND_DEG, by HEADING_GAIN, at most
+ * HEADING_MAX_STEP_DEG per step. Not while a shot runs.
+ *
+ * (Earlier description, for the wall part:)
  * RE-LOCALIZE (X held RELOCALIZE_MS, standing still, the HIVE in view; letting go early cancels):
  *  - against the audience wall (C1 / D1) or the far wall (C6 / D6), either alliance: drive there
  *    and put the camera wall flush on it, shooter facing the field (within WALL_SNAP_IN of the wall
@@ -159,7 +176,24 @@ public class JohnTeleOp extends LinearOpMode {
     /** Warn when the tags' X differs from the wall X by more than this (not flush, or mount / tag size off). */
     public static double X_CHECK_WARN_IN = 4.0;
     /** Re-localize: collect tags for this long while X is held and John stands still. */
-    public static double RELOCALIZE_MS = 500;
+    public static double RELOCALIZE_MS = 1000;
+    /** Re-position: keep the Pinpoint heading when the vision heading is within this of it. */
+    public static double KEEP_HEADING_DEG = 10.0;
+    /** Full vision pose: at least this many tags spread at least this far (for the heading). */
+    public static int POSE_MIN_TAGS = 3;
+    public static double POSE_MIN_SPAN_IN = 8.0;
+
+    // ---- Vision correction (after the first re-position) ----
+    public static boolean AUTO_CORRECT_FROM_START = false;
+    public static double CORRECT_PERIOD_MS = 300;
+    public static double CORRECT_WINDOW_MS = 1500;
+    public static int CORRECT_MIN_SAMPLES = 5;
+    public static double CORRECT_GAIN = 0.15;
+    public static double CORRECT_MAX_STEP_IN = 0.5;
+    public static double CORRECT_REJECT_IN = 24.0;
+    public static double CORRECT_HEADING_DEADBAND_DEG = 3.0;
+    public static double HEADING_GAIN = 0.05;
+    public static double HEADING_MAX_STEP_DEG = 0.5;
     public static int MIN_RELOCALIZE_SAMPLES = 4;
     /** Re-localize against the audience / far wall when this close to its position and heading. */
     public static double WALL_SNAP_IN = 6.0;
@@ -312,6 +346,12 @@ public class JohnTeleOp extends LinearOpMode {
         boolean upFromAuto = startFrom == Start.AUTO && autoUpAudience != null;
         TagLocalizer relocalizer = new TagLocalizer(100);
         WallFinder relocalizeWalls = new WallFinder(100);
+        List<Pose> relocalizeVision = new ArrayList<>();
+        boolean autoCorrect = AUTO_CORRECT_FROM_START;
+        ArrayDeque<double[]> correctWindow = new ArrayDeque<>();   // {ms, x, y, heading or NaN}
+        ElapsedTime correctTimer = new ElapsedTime();
+        double lastRejectLogMs = -1e9;
+        double correctedIn = 0.0;   // total correction, for telemetry
         boolean relocalizing = false;
         boolean relocalizeDone = false;   // X must be let go before the next re-localize
         Pose relocalizeWall = null;       // the wall pose when re-localizing against a wall
@@ -379,6 +419,29 @@ public class JohnTeleOp extends LinearOpMode {
             if (usable && relocalizing && !lost) {
                 relocalizer.add(frame, pose.heading());
                 relocalizeWalls.add(frame);
+                Pose seen = TagLocalizer.solvePose(frame, POSE_MIN_TAGS, POSE_MIN_SPAN_IN);
+                if (seen != null) {
+                    relocalizeVision.add(seen);
+                }
+            }
+            if (usable && autoCorrect && !lost && !relocalizing && shot == Shot.IDLE && frame != null
+                    && !frame.tags.isEmpty()) {
+                // This frame's position with the Pinpoint heading (median over its tags) + its own heading
+                List<Double> xs = new ArrayList<>(), ys = new ArrayList<>();
+                for (HiveCamera.Tag tag : frame.tags) {
+                    double[] xy = TagLocalizer.robotPosition(tag, pose.heading());
+                    xs.add(xy[0]);
+                    ys.add(xy[1]);
+                }
+                Pose seen = TagLocalizer.solvePose(frame, POSE_MIN_TAGS, POSE_MIN_SPAN_IN);
+                correctWindow.addLast(new double[]{clock.milliseconds(), median(xs), median(ys),
+                        seen == null ? Double.NaN : seen.heading()});
+            }
+            while (!correctWindow.isEmpty() && clock.milliseconds() - correctWindow.peekFirst()[0] > CORRECT_WINDOW_MS) {
+                correctWindow.removeFirst();
+            }
+            if (!tracker.still()) {
+                correctWindow.clear();   // samples are only good for where John stood
             }
             if (tracker.event() != null) {
                 event = tracker.event();
@@ -410,8 +473,9 @@ public class JohnTeleOp extends LinearOpMode {
                 relocalizing = true;
                 relocalizer.reset();
                 relocalizeWalls.reset();
+                relocalizeVision.clear();
                 relocalizeTimer.reset();
-                event = "re-localize: keep X held, stand still";
+                event = "re-position from vision: keep X held, stand still";
             }
             if (relocalizing && !relocalizeHeld) {
                 relocalizing = false;
@@ -487,22 +551,85 @@ public class JohnTeleOp extends LinearOpMode {
                 } else if (relocalizeTimer.milliseconds() >= RELOCALIZE_MS) {
                     relocalizing = false;
                     relocalizeDone = true;   // once per hold
-                    // Against a back wall (from the tags alone, so a wrong heading is fixed too), else
-                    // from the tags with the Pinpoint heading
+                    // Against a back wall: exact. Else the vision pose (keeping the Pinpoint heading
+                    // when it agrees), else the tags with the Pinpoint heading.
+                    Pose before = follower.pose();
                     Pose atWall = relocalizeWalls.found(MIN_RELOCALIZE_SAMPLES);
-                    if (atWall != null || relocalizer.count() >= MIN_RELOCALIZE_SAMPLES) {
-                        Pose before = follower.pose();
-                        Pose fixed = atWall != null ? atWall : new Pose(relocalizer.x(), relocalizer.y(), before.heading());
+                    Pose vision = relocalizeVision.size() >= MIN_RELOCALIZE_SAMPLES ? medianPose(relocalizeVision) : null;
+                    Pose fixed = null;
+                    String how = null;
+                    if (atWall != null) {
+                        fixed = atWall;
+                        how = atWall.x() > 0 ? "audience wall" : "far wall";
+                    } else if (vision != null) {
+                        double dh = Math.toDegrees(normalize(vision.heading() - before.heading()));
+                        if (Math.abs(dh) <= KEEP_HEADING_DEG) {
+                            fixed = relocalizer.count() >= MIN_RELOCALIZE_SAMPLES
+                                    ? new Pose(relocalizer.x(), relocalizer.y(), before.heading())
+                                    : new Pose(vision.x(), vision.y(), before.heading());
+                            how = String.format(Locale.US, "vision, Pinpoint heading kept (vision %+.1f deg)", dh);
+                        } else {
+                            fixed = vision;
+                            how = String.format(Locale.US, "vision, heading too (%+.1f deg)", dh);
+                        }
+                    } else if (relocalizer.count() >= MIN_RELOCALIZE_SAMPLES) {
+                        fixed = new Pose(relocalizer.x(), relocalizer.y(), before.heading());
+                        how = "tags, Pinpoint heading (too few tags for a vision heading)";
+                    }
+                    if (fixed != null) {
                         follower.setPose(fixed);
                         watchdog.poseSet();
                         follower.manual(DrivePowers.zero());   // drop a hold in the old coordinates
                         fallback.alignTo(fixed.heading());
-                        event = String.format(Locale.US, "re-localized (%s, %d tag readings): %s -> %s",
-                                atWall != null ? (atWall.x() > 0 ? "audience wall" : "far wall") : "tags",
-                                relocalizer.count(), Drawing.format(before), Drawing.format(fixed));
+                        autoCorrect = true;
+                        correctWindow.clear();
+                        event = String.format(Locale.US, "re-positioned (%s, %d frames): %s -> %s; vision correction on",
+                                how, relocalizeVision.size(), Drawing.format(before), Drawing.format(fixed));
                     } else {
                         event = "re-localize failed: " + relocalizer.count() + " tag readings (standing still? HIVE in "
                                 + "view? against a back wall, both HIVEs may be tilted away from it: try the other wall)";
+                    }
+                }
+            }
+
+            // ---- Vision correction: small steps toward the median of the recent tag positions ----
+            if (autoCorrect && !lost && watchdog.ok() && !relocalizing && shot == Shot.IDLE && tracker.still()
+                    && correctTimer.milliseconds() >= CORRECT_PERIOD_MS && correctWindow.size() >= CORRECT_MIN_SAMPLES) {
+                correctTimer.reset();
+                List<Double> xs = new ArrayList<>(), ys = new ArrayList<>(), hs = new ArrayList<>();
+                Pose now = follower.pose();
+                for (double[] w : correctWindow) {
+                    xs.add(w[1]);
+                    ys.add(w[2]);
+                    if (!Double.isNaN(w[3])) {
+                        hs.add(normalize(w[3] - now.heading()));
+                    }
+                }
+                double ex = median(xs) - now.x();
+                double ey = median(ys) - now.y();
+                double off = Math.hypot(ex, ey);
+                if (off > CORRECT_REJECT_IN) {
+                    if (clock.milliseconds() - lastRejectLogMs > 5000) {
+                        lastRejectLogMs = clock.milliseconds();
+                        event = String.format(Locale.US, "vision disagrees by %.0f in: not corrected (X held to re-position)", off);
+                    }
+                } else {
+                    double scale = Math.min(1.0, CORRECT_MAX_STEP_IN / Math.max(1e-9, CORRECT_GAIN * off));
+                    double sx = CORRECT_GAIN * ex * scale;
+                    double sy = CORRECT_GAIN * ey * scale;
+                    double sh = 0.0;
+                    if (hs.size() >= CORRECT_MIN_SAMPLES) {
+                        double dh = median(hs);
+                        if (Math.abs(Math.toDegrees(dh)) > CORRECT_HEADING_DEADBAND_DEG) {
+                            double maxStep = Math.toRadians(HEADING_MAX_STEP_DEG);
+                            sh = Math.max(-maxStep, Math.min(maxStep, HEADING_GAIN * dh));
+                        }
+                    }
+                    if (Math.hypot(sx, sy) > 0.02 || sh != 0.0) {
+                        follower.setPose(new Pose(now.x() + sx, now.y() + sy, normalize(now.heading() + sh)));
+                        watchdog.poseSet();
+                        follower.manual(DrivePowers.zero());   // re-hold at the corrected pose
+                        correctedIn += Math.hypot(sx, sy);
                     }
                 }
             }
@@ -635,9 +762,12 @@ public class JohnTeleOp extends LinearOpMode {
                     : zone + ": the shot drives into range first");
             telemetry.addData("Pose (FTC)", Drawing.format(pose));
             if (relocalizing) {
-                telemetry.addData("Re-localizing", "%d tag readings; %s", relocalizer.count(),
-                        relocalizeWalls.describe(MIN_RELOCALIZE_SAMPLES));
+                telemetry.addData("Re-positioning", "%d tag readings, %d vision poses; %s", relocalizer.count(),
+                        relocalizeVision.size(), relocalizeWalls.describe(MIN_RELOCALIZE_SAMPLES));
             }
+            telemetry.addData("Vision correction", autoCorrect
+                    ? String.format(Locale.US, "ON (%d samples, %.1f in corrected so far)", correctWindow.size(), correctedIn)
+                    : "off (X held to re-position turns it on)");
             telemetry.addData("Camera", camera.status());
             telemetry.addData("Pinpoint", "%s, %s", state, watchdog.status());
             telemetry.addData("IMU check", "%s, offset %.1f deg (must stay the same while turning)",
@@ -825,6 +955,25 @@ public class JohnTeleOp extends LinearOpMode {
     // =========================================================================
     // Helpers
     // =========================================================================
+
+    private static double median(List<Double> v) {
+        List<Double> s = new ArrayList<>(v);
+        Collections.sort(s);
+        int n = s.size();
+        return n == 0 ? Double.NaN : n % 2 == 1 ? s.get(n / 2) : (s.get(n / 2 - 1) + s.get(n / 2)) / 2.0;
+    }
+
+    /** Median of each of x, y and heading (the heading around the first one, wrap-safe). */
+    private static Pose medianPose(List<Pose> poses) {
+        List<Double> xs = new ArrayList<>(), ys = new ArrayList<>(), hs = new ArrayList<>();
+        double ref = poses.get(0).heading();
+        for (Pose p : poses) {
+            xs.add(p.x());
+            ys.add(p.y());
+            hs.add(normalize(p.heading() - ref));
+        }
+        return new Pose(median(xs), median(ys), normalize(ref + median(hs)));
+    }
 
     /** Field direction the driver looks along (FTC, radians): red +90 deg, blue -90 deg. */
     private double driverFacing() {

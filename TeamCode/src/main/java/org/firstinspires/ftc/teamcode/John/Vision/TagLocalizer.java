@@ -123,6 +123,53 @@ public class TagLocalizer {
         return n % 2 == 1 ? v.get(n / 2) : (v.get(n / 2 - 1) + v.get(n / 2)) / 2.0;
     }
 
+    /**
+     * The full robot pose (x, y and heading) from one frame's tags alone, no odometry: the tags'
+     * known field positions (any HIVE; X from their CELL being up or down by height) fitted to where
+     * they are seen in the robot frame (a 2D rigid fit). Null with fewer than {@code minTags} tags, or
+     * when they span less than {@code minSpanIn} (the heading would be too uncertain).
+     */
+    public static Pose solvePose(HiveCamera.Frame frame, int minTags, double minSpanIn) {
+        if (frame == null || frame.tags.size() < Math.max(2, minTags)) {
+            return null;
+        }
+        int n = frame.tags.size();
+        double[] fx = new double[n], fy = new double[n], rx = new double[n], ry = new double[n];
+        double fcx = 0, fcy = 0, rcx = 0, rcy = 0;
+        for (int i = 0; i < n; i++) {
+            HiveCamera.Tag t = frame.tags.get(i);
+            fx[i] = HiveTags.cellX(HiveTags.audience(t.id), HiveTags.isUp(t.up));
+            fy[i] = HiveTags.tagY(t.id);
+            rx[i] = t.forward;
+            ry[i] = t.left;
+            fcx += fx[i];
+            fcy += fy[i];
+            rcx += rx[i];
+            rcy += ry[i];
+        }
+        fcx /= n;
+        fcy /= n;
+        rcx /= n;
+        rcy /= n;
+        double dot = 0, cross = 0, span = 0;
+        for (int i = 0; i < n; i++) {
+            double ax = rx[i] - rcx, ay = ry[i] - rcy;
+            double bx = fx[i] - fcx, by = fy[i] - fcy;
+            dot += ax * bx + ay * by;
+            cross += ax * by - ay * bx;
+            for (int j = i + 1; j < n; j++) {
+                span = Math.max(span, Math.hypot(fx[i] - fx[j], fy[i] - fy[j]));
+            }
+        }
+        if (span < minSpanIn) {
+            return null;
+        }
+        double h = Math.atan2(cross, dot);
+        double c = Math.cos(h), s = Math.sin(h);
+        // Field = R(h) * robot + t, so t = field centroid - R(h) * robot centroid
+        return new Pose(fcx - (rcx * c - rcy * s), fcy - (rcx * s + rcy * c), h);
+    }
+
     /** The up CELL of one HIVE as seen in a frame. */
     public static final class UpCell {
         /** Audience CELL (true) or far CELL. */

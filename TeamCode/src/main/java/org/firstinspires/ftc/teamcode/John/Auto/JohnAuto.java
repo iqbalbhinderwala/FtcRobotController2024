@@ -63,7 +63,9 @@ import java.util.function.Supplier;
  *  2. Aim at the up CELL (Aimer: refine with the camera) and shoot the 4 preloaded balls (Shooter:
  *     flywheel speed from the distance, one ball per indexer step, jam handling).
  *  3. GARDEN: turn back, slide flush on the audience wall, then drive along it toward the red corner
- *     with the intakes on: fast until just before the first ball, then COLLECT_SPEED_IPS.
+ *     with the intakes on: fast until just before the first ball, then COLLECT_SPEED_IPS. The intake
+ *     keeps running INTAKE_AFTER_GARDEN_S longer (the balls move on toward the indexer while driving),
+ *     unless the next volley or the park comes first.
  *  4. Look at the HIVE from near the GARDEN (LOOK_X, LOOK_Y: B1, camera facing the HIVE). All of a
  *     HIVE's tags face the end that is up, so from our side they are readable exactly when the near
  *     CELL is up; once it has tipped they all face away. Seen: the camera confirms which CELL is up
@@ -93,8 +95,10 @@ import java.util.function.Supplier;
  * And before each stage (the volley 1 retry, GARDEN, look, shot 2, a side switch) its estimated
  * time plus the park from where it ends must fit, else it and the rest are skipped. Estimates:
  * AVG_DRIVE_IPS along the route (around the HIVE) plus DRIVE_OVERHEAD_S per drive, AIM_S, VOLLEY_S.
- * The park deadline runs in STEP_MODE too (the Driver Station's 30 s timer stops the OpMode either
- * way); a forced park does not wait for Y. In STEP_MODE the stage guards only log their estimates.
+ * The park deadline runs in STEP_MODE too; there the time spent waiting for Y does not count
+ * (autoSeconds()), and a forced park does not wait for Y. In STEP_MODE the stage guards only log
+ * their estimates. For step-mode tests switch the Driver Station's 30 s timer off (the timer next to
+ * INIT), or it stops the OpMode at 30 s of real time.
  *
  * Nothing may hang: every stage has a hard limit (*_MAX_S); past it, it is dropped (shooter
  * stopped, the robot holds where it is), logged, and the routine goes on. Every follow and creep
@@ -179,6 +183,8 @@ public class JohnAuto extends LinearOpMode {
 
     // ---- Speeds and timing ----
     public static double COLLECT_SPEED_IPS = 12.0;
+    /** After the GARDEN the intake runs this much longer (the balls move on toward the indexer). */
+    public static double INTAKE_AFTER_GARDEN_S = 2.0;
     public static double PARK_SPEED_IPS = 15.0;
     /** Turning back to the wall before the GARDEN. */
     public static double TURN_TOLERANCE_DEG = 1.5;
@@ -230,6 +236,11 @@ public class JohnAuto extends LinearOpMode {
     private boolean routineDone;
     private HiveCamera.Frame frame;
     private final ElapsedTime clock = new ElapsedTime();
+    /** Step mode: time spent waiting for Y, not counted as autonomous time. */
+    private double waitedS;
+    private double lastLoopS;
+    /** When to switch the intake off after the GARDEN (autonomous seconds), or NaN. */
+    private double intakeOffAtS = Double.NaN;
     private CsvLog log;
 
     @Override
@@ -316,11 +327,11 @@ public class JohnAuto extends LinearOpMode {
         Scheduler.schedule(sequential(
                 waitMs(settings.delayS() * 1000.0),
                 race(mainRoutine(), waitUntil(() ->
-                        AUTO_S - clock.seconds() <= parkSeconds(follower.pose()) + PARK_MARGIN_S)),
+                        AUTO_S - autoSeconds() <= parkSeconds(follower.pose()) + PARK_MARGIN_S)),
                 instant(() -> {
                     if (!routineDone) {
                         logEvent(String.format(Locale.US, "time to park: %.1f s left, park about %.1f s from %s",
-                                AUTO_S - clock.seconds(), parkSeconds(follower.pose()), Drawing.format(follower.pose())));
+                                AUTO_S - autoSeconds(), parkSeconds(follower.pose()), Drawing.format(follower.pose())));
                     }
                     shooter.cancel();
                     shooter.setSpin(false);
@@ -331,7 +342,20 @@ public class JohnAuto extends LinearOpMode {
                 limit("park", PARK_MAX_S, lazy(this::park)),
                 instant(() -> step = "done")));
 
+        lastLoopS = clock.seconds();
         while (opModeIsActive()) {
+            double nowS = clock.seconds();
+            if (STEP_MODE && step.startsWith("press Y")) {
+                waitedS += nowS - lastLoopS;   // waiting for Y is not autonomous time
+            }
+            lastLoopS = nowS;
+            if (!Double.isNaN(intakeOffAtS) && autoSeconds() >= intakeOffAtS) {
+                intakeOffAtS = Double.NaN;
+                if (!intake.status().equals("off")) {
+                    intake.off();
+                    logEvent("intake off (after the GARDEN)");
+                }
+            }
             if (gamepad1.yWasPressed()) {
                 advance = true;
             }
@@ -353,7 +377,8 @@ public class JohnAuto extends LinearOpMode {
             AutoSettings.savePose(blackboard, pose);
             AutoSettings.saveUpAudience(blackboard, tracker.upAudience());
 
-            telemetry.addData("Time", "%.1f s", clock.seconds());
+            telemetry.addData("Time", STEP_MODE ? "%.1f s autonomous (%.1f s with the Y waits)" : "%.1f s",
+                    autoSeconds(), clock.seconds());
             telemetry.addData("Step", step);
             telemetry.addData("Alliance / tile", "%s / %s", settings.alliance(), settings.tile());
             telemetry.addData("Pose (FTC)", Drawing.format(pose));
@@ -520,6 +545,10 @@ public class JohnAuto extends LinearOpMode {
                     wasAudience[0] = tracker.upAudience();
                     baseline[0] = tracker.upHeight();
                     tracker.tipping(Double.NaN);   // clears the count
+                    if (!intake.status().equals("off")) {
+                        intake.off();
+                        logEvent(name + ": intake off");
+                    }
                     shooter.startVolley(steps);
                     logEvent(String.format(Locale.US, "%s: %d indexer steps at the %s CELL (tags at %.1f in)", name, steps,
                             tracker.upCellName(), baseline[0]));
@@ -637,8 +666,12 @@ public class JohnAuto extends LinearOpMode {
                 intake.start(Intake.Side.A),
                 watcher.follow("garden: along the wall", () -> toward(field(slowStart), true, 0)),
                 watcher.creep("garden: collect", () -> field(end), COLLECT_SPEED_IPS),
-                waitMs(Intake.SETTLE_MS),
-                intake.stop());
+                // The intake keeps running through the next stages, so the balls work their way to
+                // the indexer while driving; the next volley (or the park) stops it
+                instant(() -> {
+                    intakeOffAtS = autoSeconds() + INTAKE_AFTER_GARDEN_S;
+                    logEvent(String.format(Locale.US, "garden done: the intake keeps running %.1f s more", INTAKE_AFTER_GARDEN_S));
+                }));
     }
 
     /**
@@ -747,7 +780,7 @@ public class JohnAuto extends LinearOpMode {
             }
             double stageS = seconds.getAsDouble();
             double parkS = parkSeconds(end.get());
-            double left = AUTO_S - clock.seconds();
+            double left = AUTO_S - autoSeconds();
             boolean fits = stageS + parkS + PARK_MARGIN_S <= left;
             String estimate = String.format(Locale.US, "%s: about %.1f s, then park %.1f s, %.1f s left", what, stageS,
                     parkS, left);
@@ -758,6 +791,11 @@ public class JohnAuto extends LinearOpMode {
             logEvent(estimate + (fits ? "" : ": would not fit (step mode: run anyway)"));
             return stage.get();
         });
+    }
+
+    /** Autonomous time: since START, minus (in step mode) the time spent waiting for Y. */
+    private double autoSeconds() {
+        return clock.seconds() - (STEP_MODE ? waitedS : 0.0);
     }
 
     /** Estimated park time from a pose (field frame): around the HIVE to the approach, then slow. */
