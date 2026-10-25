@@ -222,8 +222,8 @@ public class JohnAuto extends LinearOpMode {
     public static double SHOT_MAX_S = 18.0;
     public static double PARK_MAX_S = 12.0;
     /** Testing: wait for gamepad1 Y before each stage; the park deadline is off. */
-    // public static boolean STEP_MODE = false;  // match
-    public static boolean STEP_MODE = true;      // TEST: press Y to start each stage
+    public static boolean STEP_MODE = false;     // match
+    // public static boolean STEP_MODE = true;   // TEST: press Y to start each stage
 
     private static final String LOG_HEADER = "t_s,step,x,y,h_deg,follower,shooter,intake,target_x,target_y,"
             + "target_src,up_cell,tags,watchdog,event";

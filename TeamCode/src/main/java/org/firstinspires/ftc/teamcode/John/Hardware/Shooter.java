@@ -29,7 +29,8 @@ import java.util.Locale;
 public class Shooter {
 
     public static String RPM_DISTANCES_IN = "50.3,55.5,69.0";
-    public static String RPM_VALUES = "2200,2300,2400";
+    /** The 2026-10-23 speeds (2200 / 2300 / 2400) raised by one trim step, +50 (2026-10-24). */
+    public static String RPM_VALUES = "2250,2350,2450";
     /** 4 balls, plus 2 extra indexer steps in case a ball comes late. */
     public static int INDEXER_STEPS_PER_VOLLEY = 6;
     /** Time between two balls (200-250 ms worked in the Mechanism Test; 150 ms missed 1 in 4). */
