@@ -217,7 +217,14 @@ public class JohnTeleOp extends LinearOpMode {
     public static double UP_CELL_TRUST_S = 15.0;
 
     // ---- Driving into the shooting zone ----
-    public static double MOVE_SPEED_IPS = 40.0;
+    /**
+     * Speed cap for the drive into range; 0 = none (2026-10-24, was 40: with Pedro's speed cap short
+     * moves of 2-4" never got going, r0169 "could not reach the shooting spot").
+     */
+    public static double MOVE_SPEED_IPS = 0.0;
+    /** This much too close / too angled still counts as in range (odometry noise at the edge, r0169). */
+    public static double ZONE_TOLERANCE_IN = 1.5;
+    public static double ZONE_TOLERANCE_DEG = 2.0;
     public static double MOVE_TIMEOUT_MS = 6000;
 
     private enum Shot { IDLE, MOVE, AIM, FIRE }
@@ -860,7 +867,8 @@ public class JohnTeleOp extends LinearOpMode {
             telemetry.addData("Intakes (bumper toggles, B reverse)", intake.status());
             telemetry.addData("Drive", ROBOT_CENTRIC ? "ROBOT-centric, forward = intake " + (forwardIsB ? "B" : "A")
                     + " (left stick button switches)" : "field-centric");
-            String zone = ShootingZone.problem(pose.x(), pose.y(), target[0], target[1], tracker.upAudience());
+            String zone = ShootingZone.problem(pose.x(), pose.y(), target[0], target[1], tracker.upAudience(),
+                    ZONE_TOLERANCE_IN, ZONE_TOLERANCE_DEG);
             telemetry.addData("Shooting zone", zone == null
                     ? String.format(Locale.US, "IN RANGE (%.0f deg off the CELL axis)",
                             ShootingZone.offAxisDeg(pose.x(), pose.y(), target[0], target[1], tracker.upAudience()))
@@ -950,11 +958,14 @@ public class JohnTeleOp extends LinearOpMode {
     private String requestShot() {
         Pose here = follower.pose();
         double[] t = tracker.target();
-        String problem = ShootingZone.problem(here.x(), here.y(), t[0], t[1], tracker.upAudience());
+        String problem = ShootingZone.problem(here.x(), here.y(), t[0], t[1], tracker.upAudience(),
+                ZONE_TOLERANCE_IN, ZONE_TOLERANCE_DEG);
         if (problem == null) {
             return startAim();
         }
-        Pose spot = ShootingZone.nearestSpot(here, t[0], t[1], tracker.upAudience(), red);
+        // The whole field: the own-half rule is for the autonomous (r0169: from just over the middle
+        // line it drove 37" instead of backing up 6")
+        Pose spot = ShootingZone.nearestSpot(here, t[0], t[1], tracker.upAudience(), red, false);
         if (spot == null) {
             shotStatus = problem + ", and no spot in range on the field";
             return "no shot: " + shotStatus;
@@ -987,7 +998,7 @@ public class JohnTeleOp extends LinearOpMode {
             legs[i] = line(a, b).heading(aimer.facingTarget(i == 0 ? start.heading() : null));
         }
         Path p = legs.length == 1 ? legs[0] : path(legs);
-        return p.with(foresight.maxVelocityConstraint.at(MOVE_SPEED_IPS));
+        return MOVE_SPEED_IPS > 0 ? p.with(foresight.maxVelocityConstraint.at(MOVE_SPEED_IPS)) : p;
     }
 
     private String startAim() {

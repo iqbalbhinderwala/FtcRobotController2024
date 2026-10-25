@@ -69,12 +69,21 @@ public class ShootingZone {
 
     /** Why a robot position cannot shoot at the CELL ("too close ...", "too angled ..."), or null if it can. */
     public static String problem(double x, double y, double cellX, double cellY, boolean audienceCell) {
+        return problem(x, y, cellX, cellY, audienceCell, 0.0, 0.0);
+    }
+
+    /**
+     * The same, but up to {@code toleranceIn} too close or {@code toleranceDeg} too angled still
+     * counts as in range (against odometry noise right at the edge).
+     */
+    public static String problem(double x, double y, double cellX, double cellY, boolean audienceCell,
+                                 double toleranceIn, double toleranceDeg) {
         double d = distance(x, y, cellX, cellY);
-        if (d < MIN_DISTANCE_IN) {
+        if (d < MIN_DISTANCE_IN - toleranceIn) {
             return String.format(Locale.US, "too close (%.1f in, min %.1f)", d, MIN_DISTANCE_IN);
         }
         double off = offAxisDeg(x, y, cellX, cellY, audienceCell);
-        if (off > MAX_OFF_AXIS_DEG) {
+        if (off > MAX_OFF_AXIS_DEG + toleranceDeg) {
             return String.format(Locale.US, "too angled (%.0f deg off the CELL axis, max %.0f)", off, MAX_OFF_AXIS_DEG);
         }
         return null;
@@ -91,6 +100,15 @@ public class ShootingZone {
      * heading = shootingHeading; null if there is none.
      */
     public static Pose nearestSpot(Pose from, double cellX, double cellY, boolean audienceCell, boolean red) {
+        return nearestSpot(from, cellX, cellY, audienceCell, red, true);
+    }
+
+    /**
+     * The same; {@code ownHalfOnly} false searches the whole field (the TeleOp: the own-half rule
+     * G402 is for the autonomous only).
+     */
+    public static Pose nearestSpot(Pose from, double cellX, double cellY, boolean audienceCell, boolean red,
+                                   boolean ownHalfOnly) {
         double axis = audienceCell ? 0.0 : Math.PI;
         double maxOff = Math.max(0.0, MAX_OFF_AXIS_DEG - MARGIN_DEG);
         Pose best = null;
@@ -101,7 +119,7 @@ public class ShootingZone {
                 double x = cellX + r * Math.cos(a);
                 double y = cellY + r * Math.sin(a);
                 double heading = shootingHeading(x, y, cellX, cellY);
-                if ((red ? y > 0 : y < 0) || !onField(x, y, heading)) {
+                if ((ownHalfOnly && (red ? y > 0 : y < 0)) || !onField(x, y, heading)) {
                     continue;
                 }
                 double d = Math.hypot(x - from.x(), y - from.y());

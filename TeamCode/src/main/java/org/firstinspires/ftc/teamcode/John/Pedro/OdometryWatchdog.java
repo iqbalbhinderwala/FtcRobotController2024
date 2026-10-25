@@ -65,6 +65,12 @@ public class OdometryWatchdog {
     /** A pose this close to the field center (inside the HIVE) with a heading near 0 is a reboot. */
     public static double REBOOT_RADIUS_IN = 6.0;
     public static double REBOOT_HEADING_DEG = 10.0;
+    /**
+     * ...and only when the pose jumped there (this far from the last good read): driving smoothly
+     * through the middle at heading ~0 is not a reboot (r0169: twice, at 41 in/s, 1.4" from the last
+     * good read).
+     */
+    public static double REBOOT_JUMP_IN = 6.0;
     /** Pinpoint internal loop time considered sane (normally about 500-1100 us). */
     public static int MIN_LOOP_US = 200;
     public static int MAX_LOOP_US = 5000;
@@ -199,7 +205,8 @@ public class OdometryWatchdog {
             // At the field center with heading ~0 after being elsewhere: a zero read or a reboot
             boolean nearOrigin = Math.hypot(pose.x(), pose.y()) < REBOOT_RADIUS_IN
                     && Math.abs(Math.toDegrees(normalize(pose.heading()))) < REBOOT_HEADING_DEG;
-            if (nearOrigin && Math.hypot(lastGood.x(), lastGood.y()) >= REBOOT_RADIUS_IN) {
+            if (nearOrigin && Math.hypot(lastGood.x(), lastGood.y()) >= REBOOT_RADIUS_IN
+                    && Math.hypot(pose.x() - lastGood.x(), pose.y() - lastGood.y()) > REBOOT_JUMP_IN) {
                 return String.format("Pinpoint pose at the field center (%.1f, %.1f, %.0f deg): zero read or reboot",
                         pose.x(), pose.y(), Math.toDegrees(pose.heading()));
             }
