@@ -45,7 +45,8 @@ public class ShootingZone {
      */
     public static double HIVE_HALF_X = 20.0;
     public static double HIVE_HALF_Y = 25.0;
-    public static double HIVE_CLEARANCE_IN = 2.0;
+    /** 4 (was 2): the autonomous clipped a HIVE leg going around it (2026-10-24). */
+    public static double HIVE_CLEARANCE_IN = 4.0;
 
     private static final double FIELD_HALF = 72.0;
 
@@ -120,13 +121,14 @@ public class ShootingZone {
 
     /**
      * Waypoints from {@code from} to {@code to} that keep the robot center out of the HIVE frame
-     * grown by half the robot's longest side plus HIVE_CLEARANCE_IN: straight if that is clear,
+     * grown by half the robot's diagonal (it may be turned any way on the way) plus
+     * HIVE_CLEARANCE_IN: straight if that is clear,
      * else via one or two corners of that box (the shortest clear way), only corners on our own
      * half if that works. Includes both ends. Starting inside the grown box (right beside the
      * frame), it drives straight.
      */
     public static List<double[]> route(Pose from, Pose to, boolean red) {
-        double grow = Math.max(RobotGeometry.LENGTH_IN, RobotGeometry.WIDTH_IN) / 2.0 + HIVE_CLEARANCE_IN;
+        double grow = Math.hypot(RobotGeometry.LENGTH_IN, RobotGeometry.WIDTH_IN) / 2.0 + HIVE_CLEARANCE_IN;
         double hx = HIVE_HALF_X + grow;
         double hy = HIVE_HALF_Y + grow;
         double[] a = {from.x(), from.y()};

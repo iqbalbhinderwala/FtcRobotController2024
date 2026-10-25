@@ -52,7 +52,9 @@ import java.util.Locale;
  *    put John within AUTO_CHECK_IN of it, else he was moved since (e.g. carried back after a test)
  *    and WALL is used;
  *  - WALL against either back wall (WallFinder: the tags tell which, no odometry or alliance
- *    needed), else the alliance's start wall at the Game Setup tile. The old description follows:
+ *    needed), else the VISION pose (TagLocalizer.solvePose, median over INIT), else the alliance's
+ *    start wall at the Game Setup tile. The autonomous pose is also rejected when the vision
+ *    heading differs by more than AUTO_CHECK_DEG. The old description follows:
  *  - WALL: John's camera wall flush on the alliance's start wall (red: the audience wall; blue: the
  *    far wall), shooter facing the field, anywhere along the wall. The camera reads the HIVE tags; a
  *    tag's field Y never changes when the HIVE tips, so each tag gives the position along the wall
@@ -176,6 +178,8 @@ public class JohnTeleOp extends LinearOpMode {
     public static double AUTO_POSE_MAX_AGE_S = 60.0;
     /** ...and the camera puts John within this of it (else he was moved since). */
     public static double AUTO_CHECK_IN = 6.0;
+    /** ...and its heading within this of the vision heading. */
+    public static double AUTO_CHECK_DEG = 20.0;
     /** Tag readings kept for the start position (median). */
     public static int START_SAMPLES = 60;
     /** Fewer readings than this: no tag fix, use the Game Setup tile. */
@@ -257,11 +261,16 @@ public class JohnTeleOp extends LinearOpMode {
         Pose autoPose = AutoSettings.loadPose(blackboard);
         double autoAgeS = AutoSettings.poseAgeS(blackboard);
         Boolean autoUpAudience = AutoSettings.loadUpAudience(blackboard);
-        boolean autoFresh = autoPose != null && autoAgeS <= AUTO_POSE_MAX_AGE_S;
+        // An impossible pose (off the field, or inside the HIVE frame, e.g. the Pinpoint's (0, 0, 0))
+        // is never used
+        boolean autoPossible = autoPose != null && Math.abs(autoPose.x()) < 72.0 && Math.abs(autoPose.y()) < 72.0
+                && !(Math.abs(autoPose.x()) < ShootingZone.HIVE_HALF_X && Math.abs(autoPose.y()) < ShootingZone.HIVE_HALF_Y);
+        boolean autoFresh = autoPossible && autoAgeS <= AUTO_POSE_MAX_AGE_S;
         Start startFrom = autoFresh ? Start.AUTO : Start.WALL;
         boolean startOverridden = false;
         WallFinder walls = new WallFinder(START_SAMPLES);
         TagLocalizer autoCheck = new TagLocalizer(START_SAMPLES);
+        List<Pose> initVision = new ArrayList<>();   // full poses from the tags alone
 
         // ---- INIT: nothing moves; the camera finds the position along the wall ----
         gamepad1.resetEdgeDetection();
@@ -288,27 +297,47 @@ public class JohnTeleOp extends LinearOpMode {
             if (autoPose != null) {
                 autoCheck.add(initFrame, autoPose.heading());
             }
+            Pose seenPose = TagLocalizer.solvePose(initFrame, POSE_MIN_TAGS, POSE_MIN_SPAN_IN);
+            if (seenPose != null) {
+                initVision.add(seenPose);
+                if (initVision.size() > START_SAMPLES) {
+                    initVision.remove(0);
+                }
+            }
+            Pose visionStart = initVision.size() >= MIN_START_SAMPLES ? medianPose(initVision) : null;
             double autoError = autoPose != null && autoCheck.count() >= MIN_START_SAMPLES
                     ? Math.hypot(autoCheck.x() - autoPose.x(), autoCheck.y() - autoPose.y()) : Double.NaN;
-            boolean autoOk = autoFresh && (Double.isNaN(autoError) || autoError <= AUTO_CHECK_IN);
+            double autoHeadingError = autoPose != null && visionStart != null
+                    ? Math.abs(Math.toDegrees(normalize(visionStart.heading() - autoPose.heading()))) : Double.NaN;
+            boolean autoOk = autoFresh && (Double.isNaN(autoError) || autoError <= AUTO_CHECK_IN)
+                    && (Double.isNaN(autoHeadingError) || autoHeadingError <= AUTO_CHECK_DEG);
             if (!startOverridden) {
                 startFrom = autoOk ? Start.AUTO : Start.WALL;
             }
             Pose wallFound = walls.found(MIN_START_SAMPLES);
             Pose start = startFrom == Start.AUTO ? autoPose
-                    : wallFound != null ? wallFound : startFix.alongWall(wall, MIN_START_SAMPLES, RobotGeometry.LENGTH_IN / 2.0);
+                    : wallFound != null ? wallFound
+                    : visionStart != null ? visionStart
+                    : startFix.alongWall(wall, MIN_START_SAMPLES, RobotGeometry.LENGTH_IN / 2.0);
 
             telemetry.addData("Alliance", haveSetup ? "%s   (from Game Setup; drivers at the %s wall)"
                             : "%s   (no Game Setup saved: B red, X blue; drivers at the %s wall)",
                     red ? "RED" : "BLUE", red ? "red" : "blue");
             telemetry.addData("Start from", "%s   (dpad left / right)%s", startFrom,
-                    autoPose == null ? ": no autonomous pose" : String.format(Locale.US, ": the autonomous ended %.0f s ago%s%s",
+                    autoPose == null ? ": no autonomous pose"
+                            : !autoPossible ? ": the autonomous pose " + Drawing.format(autoPose) + " is impossible, not used"
+                            : String.format(Locale.US, ": the autonomous ended %.0f s ago%s%s",
                             autoAgeS, autoAgeS > AUTO_POSE_MAX_AGE_S ? " (old)" : "",
                             Double.isNaN(autoError) ? ", camera cannot check it"
-                                    : String.format(Locale.US, ", camera: %.1f in from it%s", autoError,
-                                            autoError > AUTO_CHECK_IN ? " -> MOVED SINCE, not used" : "")));
+                                    : String.format(Locale.US, ", camera: %.1f in%s from it%s", autoError,
+                                            Double.isNaN(autoHeadingError) ? ""
+                                                    : String.format(Locale.US, " / %.0f deg", autoHeadingError),
+                                            autoOk ? "" : " -> MOVED SINCE, not used")));
             telemetry.addData("Back wall (camera)", walls.describe(MIN_START_SAMPLES));
-            if (startFrom == Start.WALL && wallFound == null) {
+            telemetry.addData("Vision pose (camera)", visionStart == null
+                    ? "none (" + initVision.size() + " frames with enough tags)"
+                    : Drawing.format(visionStart) + " (" + initVision.size() + " frames)");
+            if (startFrom == Start.WALL && wallFound == null && visionStart == null) {
                 telemetry.addLine(String.format("Place John with the camera wall flush on the %s wall, shooter facing the field.",
                         red ? "audience" : "far"));
                 if (startFix.count() >= MIN_START_SAMPLES) {
@@ -330,6 +359,7 @@ public class JohnTeleOp extends LinearOpMode {
             TelemetryPacket packet = new TelemetryPacket(Drawing.drawDefaultField());
             Drawing.drawField(packet.fieldOverlay());
             Drawing.drawRobot(packet.fieldOverlay(), start);
+            Drawing.drawTags(packet.fieldOverlay(), start, initFrame);
             dashboard.sendTelemetryPacket(packet);
         }
         if (isStopRequested()) {
@@ -340,8 +370,10 @@ public class JohnTeleOp extends LinearOpMode {
         }
 
         Pose wallFound = walls.found(MIN_START_SAMPLES);
+        Pose visionStart = initVision.size() >= MIN_START_SAMPLES ? medianPose(initVision) : null;
         Pose start = startFrom == Start.AUTO ? autoPose
                 : wallFound != null ? wallFound
+                : visionStart != null ? visionStart
                 : startFix.alongWall(wallPose(settings), MIN_START_SAMPLES, RobotGeometry.LENGTH_IN / 2.0);
         follower.setPose(start);
         watchdog.poseSet();
@@ -383,6 +415,7 @@ public class JohnTeleOp extends LinearOpMode {
                 String.format(Locale.US, "start %s at %s (%s)", red ? "red" : "blue", Drawing.format(start),
                         startFrom == Start.AUTO ? "from the autonomous"
                                 : wallFound != null ? walls.describe(MIN_START_SAMPLES)
+                                : visionStart != null ? "vision pose from " + initVision.size() + " frames"
                                 : startFix.count() >= MIN_START_SAMPLES ? startFix.count() + " tag readings" : "no tag fix"));
 
         while (opModeIsActive()) {
@@ -805,6 +838,7 @@ public class JohnTeleOp extends LinearOpMode {
             TelemetryPacket packet = new TelemetryPacket(Drawing.drawDefaultField());
             Drawing.drawField(packet.fieldOverlay());
             Drawing.drawRobot(packet.fieldOverlay(), pose);
+            Drawing.drawTags(packet.fieldOverlay(), pose, frame);
             Drawing.drawTarget(packet.fieldOverlay(), shot != Shot.IDLE ? pose : null, target[0], target[1], "orange");
             if (aimPose != null) {
                 Drawing.drawRobotOutline(packet.fieldOverlay(), aimPose, "orange", null);

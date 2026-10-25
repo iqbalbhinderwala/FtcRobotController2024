@@ -5,6 +5,9 @@ import com.acmerobotics.dashboard.config.Config;
 import com.pedropathing.math.Pose;
 
 import org.firstinspires.ftc.teamcode.John.RobotGeometry;
+import org.firstinspires.ftc.teamcode.John.Vision.HiveCamera;
+import org.firstinspires.ftc.teamcode.John.Vision.HiveTags;
+import org.firstinspires.ftc.teamcode.John.Vision.TagLocalizer;
 
 import java.util.Locale;
 
@@ -58,6 +61,16 @@ public class Drawing {
     public static int OUTLINE_STROKE_WIDTH = 1;
     public static int HEADING_STROKE_WIDTH = 2;
     public static String TEXT_FONT = "3px sans-serif";
+
+    /** Tags the camera sees: where it sees them (from the pose), and where they really are. */
+    public static boolean DRAW_TAGS = true;
+    public static String TAG_SEEN_COLOR = "lime";
+    public static String TAG_NOMINAL_COLOR = "yellow";
+    /** Keep drawing the last camera frame this long (frames come slower than the loop). */
+    public static double TAG_SHOW_MS = 300;
+
+    private static HiveCamera.Frame shownFrame;
+    private static long shownAtNanos;
 
     /** The Dashboard's own field is drawn when the custom image is off (pass to new TelemetryPacket(...)). */
     public static boolean drawDefaultField() {
@@ -118,6 +131,44 @@ public class Drawing {
     /** Another pose (e.g. a target) as a footprint in one color, with an optional label. */
     public static void drawRobotOutline(Canvas canvas, Pose pose, String color, String label) {
         drawFootprint(canvas, pose, color, color, label);
+    }
+
+    /**
+     * The HIVE tags in the latest camera frame (kept TAG_SHOW_MS): a line from the camera to where it
+     * sees each tag from {@code robot}, a circle there with the tag's ID, and a dot where the tag
+     * really is (its CELL up or down by the measured height). With a right pose they coincide.
+     */
+    public static void drawTags(Canvas canvas, Pose robot, HiveCamera.Frame frame) {
+        if (canvas == null || robot == null || !DRAW_TAGS) {
+            return;
+        }
+        long now = System.nanoTime();
+        if (frame != null) {
+            shownFrame = frame;
+            shownAtNanos = now;
+        }
+        if (shownFrame == null || (now - shownAtNanos) / 1e6 > TAG_SHOW_MS) {
+            return;
+        }
+        applyFieldTransform(canvas);
+        double c = Math.cos(robot.heading());
+        double s = Math.sin(robot.heading());
+        double camX = robot.x() + RobotGeometry.CAMERA_FORWARD_IN * c - RobotGeometry.CAMERA_LEFT_IN * s;
+        double camY = robot.y() + RobotGeometry.CAMERA_FORWARD_IN * s + RobotGeometry.CAMERA_LEFT_IN * c;
+        for (HiveCamera.Tag tag : shownFrame.tags) {
+            double[] seen = TagLocalizer.fieldPoint(tag, robot);
+            double nx = HiveTags.cellX(HiveTags.audience(tag.id), HiveTags.isUp(tag.up));
+            double ny = HiveTags.tagY(tag.id);
+            canvas.setFill(TAG_NOMINAL_COLOR);
+            canvas.fillCircle(nx, ny, 0.8);
+            canvas.setStroke(TAG_SEEN_COLOR);
+            canvas.setStrokeWidth(OUTLINE_STROKE_WIDTH);
+            canvas.strokeLine(camX, camY, seen[0], seen[1]);
+            canvas.strokeCircle(seen[0], seen[1], 1.2);
+            double[] at = screenOffset(seen[0], seen[1], 1.5, 1.5);
+            canvas.setFill(TAG_SEEN_COLOR);
+            canvas.fillText(Integer.toString(tag.id), at[0], at[1], TEXT_FONT, textTheta(), false);
+        }
     }
 
     /** A target point (e.g. the CELL being aimed at) as a small circle, with a line from {@code from} if given. */

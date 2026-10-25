@@ -148,9 +148,14 @@ public class JohnAuto extends LinearOpMode {
     public static double LOADING_ZONE_MAX_X = -24.0;
     public static double LOADING_ZONE_MAX_Y = -60.4;
     public static double PARK_OVERLAP_IN = 1.0;
-    /** Before the last park stretch; the drive there goes around the HIVE frame (ShootingZone.route). */
-    public static double PARK_APPROACH_X = -24.0;
-    public static double PARK_APPROACH_Y = -56.0;
+    /**
+     * Before the last park stretch: just off the red wall, beside the LOADING ZONE, at the park
+     * heading; the drive there goes around the HIVE frame (ShootingZone.route). The last stretch then
+     * slides along the wall into the zone, so a robot already there is pushed along the wall, not
+     * into it (2026-10-24: coming in at an angle it tried to push a robot into the wall).
+     */
+    public static double PARK_APPROACH_X = -12.0;
+    public static double PARK_APPROACH_Y = -62.0;
 
     // ---- Start position from the camera ----
     public static int START_SAMPLES = 60;
@@ -169,8 +174,9 @@ public class JohnAuto extends LinearOpMode {
     public static double LOOK_X = 56.0;
     public static double LOOK_Y = -36.0;
     /**
-     * Not seeing any of our HIVE's tags from the look spot (camera working) means it has tipped:
-     * from our side its tags are readable only while the near CELL is up.
+     * Not seeing any of our HIVE's tags from the look spot means it has tipped: from our side its
+     * tags are readable only while the near CELL is up. Only if the camera has seen HIVE tags earlier
+     * in the run (so it works; a camera with a bad exposure would otherwise "see" a tip).
      */
     public static boolean NOT_SEEN_MEANS_TIPPED = true;
     /**
@@ -243,6 +249,8 @@ public class JohnAuto extends LinearOpMode {
     private double lastLoopS;
     /** When to switch the intake off after the GARDEN (autonomous seconds), or NaN. */
     private double intakeOffAtS = Double.NaN;
+    /** The camera has seen a HIVE tag in this run (INIT included): it works, so not seeing one means something. */
+    private boolean cameraSawTags;
     private CsvLog log;
 
     @Override
@@ -275,6 +283,7 @@ public class JohnAuto extends LinearOpMode {
                 initFrames++;
                 if (!initFrame.tags.isEmpty()) {
                     initFramesWithTags++;
+                    cameraSawTags = true;
                 }
             }
             startFix.add(initFrame, wall.heading());
@@ -308,6 +317,7 @@ public class JohnAuto extends LinearOpMode {
             Drawing.drawField(packet.fieldOverlay());
             if (haveSettings) {
                 Drawing.drawRobot(packet.fieldOverlay(), start);
+                Drawing.drawTags(packet.fieldOverlay(), start, initFrame);
             }
             dashboard.sendTelemetryPacket(packet);
         }
@@ -382,6 +392,9 @@ public class JohnAuto extends LinearOpMode {
             follower.update();
             OdometryWatchdog.State state = watchdog.check(follower);
             frame = camera.poll();
+            if (frame != null && !frame.tags.isEmpty()) {
+                cameraSawTags = true;
+            }
             tracker.update(frame, follower);
             if (tracker.event() != null) {
                 logEvent(tracker.event());
@@ -394,7 +407,11 @@ public class JohnAuto extends LinearOpMode {
             if (shooterEvent != null) {
                 logEvent(shooterEvent);
             }
-            AutoSettings.savePose(blackboard, pose);
+            // Only good poses: at STOP the Pinpoint reads NOT_READY / zeros, and saving that handed the
+            // TeleOp (0, 0, 0) (r0134 -> r0136)
+            if (state == OdometryWatchdog.State.OK) {
+                AutoSettings.savePose(blackboard, pose);
+            }
             AutoSettings.saveUpAudience(blackboard, tracker.upAudience());
 
             telemetry.addData("Time", STEP_MODE ? "%.1f s autonomous (%.1f s with the Y waits)" : "%.1f s",
@@ -415,6 +432,7 @@ public class JohnAuto extends LinearOpMode {
             TelemetryPacket packet = new TelemetryPacket(Drawing.drawDefaultField());
             Drawing.drawField(packet.fieldOverlay());
             Drawing.drawRobot(packet.fieldOverlay(), pose);
+            Drawing.drawTags(packet.fieldOverlay(), pose, frame);
             Drawing.drawTarget(packet.fieldOverlay(), null, target[0], target[1], "orange");
             dashboard.sendTelemetryPacket(packet);
 
@@ -646,14 +664,16 @@ public class JohnAuto extends LinearOpMode {
                             boolean seenAny = tracker.msSinceSeen() < t;
                             if (upKnown) {
                                 logEvent("the camera confirms the " + tracker.upCellName() + " CELL is up");
-                            } else if (!seenAny && NOT_SEEN_MEANS_TIPPED && camera.available()) {
+                            } else if (!seenAny && NOT_SEEN_MEANS_TIPPED && camera.available() && cameraSawTags) {
                                 // Red: the far CELL (field -X) is up; blue: the field audience CELL
                                 tracker.setUpAudience(blue);
                                 upKnown = true;
                                 logEvent(String.format(Locale.US, "no tag of our HIVE in %.0f ms from the GARDEN side: it has "
                                         + "tipped, the %s CELL is up (NOT_SEEN_MEANS_TIPPED)", t, tracker.upCellName()));
                             } else {
-                                logEvent(String.format(Locale.US, "the camera could not tell in %.0f ms", t));
+                                logEvent(String.format(Locale.US, "the camera could not tell in %.0f ms%s", t,
+                                        cameraSawTags ? "" : " (it has seen no HIVE tag in this run: not trusted to mean "
+                                                + "tipped; check the exposure / gain)"));
                             }
                         }));
     }
