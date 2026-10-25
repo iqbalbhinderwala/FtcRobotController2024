@@ -46,7 +46,7 @@ public class MechanismTest extends LinearOpMode {
     // ---- Intakes ----
     public static double INTAKE_POWER = 1.0;
     public static boolean INTAKE_A_REVERSED = false;
-    public static boolean INTAKE_B_REVERSED = false;
+    public static boolean INTAKE_B_REVERSED = true;   // as JohnIntake.B_REVERSED (2026-10-24)
 
     // ---- Flywheel target steps ----
     public static double FLYWHEEL_STEP_RPM = 100;

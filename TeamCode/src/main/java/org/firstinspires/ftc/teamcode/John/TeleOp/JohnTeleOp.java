@@ -91,7 +91,14 @@ import java.util.Locale;
  *   left stick             drive (field-centric)
  *   right stick X          turn;  right stick button (hold): aim assist
  *   A (hold)               shoot: move into range, aim, fire (let go: cancel)
- *   bumpers (hold)         intakes in;  B (hold): intakes reverse
+ *   bumpers (press)        intake on / off (toggle);  B (hold): intake reverse while held. Only the
+ *                          intake at the forward end runs (left stick button switches the end)
+ *   left stick button      switch the forward end (intake B / intake A): the intake that runs and,
+ *                          robot-centric, the stick's forward
+ *   Y                      indexer one step (90 deg) backward, to clear a jam by hand (not while firing)
+ *
+ * ROBOT_CENTRIC (off by default; field-centric is preferred): the left stick drives relative to the robot, "forward" toward the intake
+ * B end or the intake A end (left stick button switches); turning is the same. The automatic shot is unchanged.
  *   X (hold 0.5 s)         re-localize: best with the camera wall flush on the audience or far wall
  *   dpad up / down         flywheel trim + / - TRIM_STEP_RPM;  dpad left / right: trim 0
  *
@@ -113,8 +120,10 @@ import java.util.Locale;
 public class JohnTeleOp extends LinearOpMode {
 
     // ---- Driving ----
-    public static double DRIVE_SCALE = 1.0;
-    public static double TURN_SCALE = 0.8;
+    /** Testing: drive relative to the robot instead of the field (left stick button picks the forward end). */
+    public static boolean ROBOT_CENTRIC = false;
+    public static double DRIVE_SCALE = 0.8;
+    public static double TURN_SCALE = 0.6;
     public static double STICK_DEADBAND = 0.05;
     public static boolean HOLD_WHEN_RELEASED = true;
     /** A stick moved this far cancels an aim / volley. */
@@ -276,6 +285,8 @@ public class JohnTeleOp extends LinearOpMode {
         Pose relocalizeWall = null;       // the wall pose when re-localizing against a wall
         ElapsedTime relocalizeTimer = new ElapsedTime();
         boolean holdMode = HOLD_WHEN_RELEASED;
+        boolean intakeOn = false;
+        boolean forwardIsB = true;
         // Without odometry
         boolean visionShot = false;
         boolean visionVolleyDone = false;
@@ -295,6 +306,20 @@ public class JohnTeleOp extends LinearOpMode {
             boolean shootHeld = gamepad1.a;
             boolean relocalizeHeld = gamepad1.x;
             boolean assistHeld = gamepad1.right_stick_button;
+            boolean intakeToggle = gamepad1.leftBumperWasPressed() | gamepad1.rightBumperWasPressed();
+            if (gamepad1.yWasPressed()) {
+                if (shooter.firing()) {
+                    event = "indexer back: not while firing";
+                } else {
+                    shooter.indexer().step(-1);   // also clears a STUCK indexer
+                    event = "indexer one step back (unclog)";
+                }
+            }
+            if (gamepad1.leftStickButtonWasPressed()) {
+                forwardIsB = !forwardIsB;
+                event = "forward = intake " + (forwardIsB ? "B" : "A") + " (that intake runs)";
+            }
+            double ends = forwardIsB ? 1.0 : -1.0;   // robot +X is the intake B end
             boolean trimUp = gamepad1.dpadUpWasPressed(), trimDown = gamepad1.dpadDownWasPressed();
             boolean trimReset = gamepad1.dpadLeftWasPressed() | gamepad1.dpadRightWasPressed();
 
@@ -462,9 +487,11 @@ public class JohnTeleOp extends LinearOpMode {
                 follower.manual(DrivePowers.zero());
             }
             if (shot == Shot.IDLE && !degraded) {
-                DrivePowers powers = ManualDrive.fieldCentric(stickFwd * DRIVE_SCALE,
-                        stickLeft * DRIVE_SCALE, stickTurn * TURN_SCALE,
-                        pose.heading(), -driverFacing());   // Pedro turns the sticks by -(heading + offset)
+                DrivePowers powers = ROBOT_CENTRIC
+                        ? new DrivePowers(ends * stickFwd * DRIVE_SCALE, ends * stickLeft * DRIVE_SCALE, stickTurn * TURN_SCALE)
+                        : ManualDrive.fieldCentric(stickFwd * DRIVE_SCALE,
+                                stickLeft * DRIVE_SCALE, stickTurn * TURN_SCALE,
+                                pose.heading(), -driverFacing());   // Pedro turns the sticks by -(heading + offset)
                 if (assistHeld) {
                     // Aim assist: the driver drives, the heading locks onto the CELL
                     DrivePowers locked = ManualDrive.headingLock(follower,
@@ -504,7 +531,11 @@ public class JohnTeleOp extends LinearOpMode {
                     error = normalize(visionTarget - fallback.heading());
                     turn = Math.max(-FALLBACK_MAX_TURN, Math.min(FALLBACK_MAX_TURN, FALLBACK_KP * error));
                 }
-                fallback.driveFieldCentric(stickFwd * DRIVE_SCALE, stickLeft * DRIVE_SCALE, turn, driverFacing());
+                if (ROBOT_CENTRIC) {
+                    fallback.drive(ends * stickFwd * DRIVE_SCALE, ends * stickLeft * DRIVE_SCALE, turn);
+                } else {
+                    fallback.driveFieldCentric(stickFwd * DRIVE_SCALE, stickLeft * DRIVE_SCALE, turn, driverFacing());
+                }
 
                 if (lost && visionShot) {
                     String problem = fresh ? lastAim.zoneProblem() : "the camera does not see the "
@@ -543,7 +574,13 @@ public class JohnTeleOp extends LinearOpMode {
             if (shooterEvent != null) {
                 event = event == null ? shooterEvent : event + "; " + shooterEvent;
             }
-            intake.set(gamepad1.left_bumper || gamepad1.right_bumper ? Intake.POWER : gamepad1.b ? -Intake.POWER : 0.0);
+            if (intakeToggle) {
+                intakeOn = !intakeOn;
+                event = event == null ? (intakeOn ? "intakes on" : "intakes off") : event;
+            }
+            // Only the intake at the forward end; B held reverses it (e.g. to clear a ball)
+            intake.only(forwardIsB ? Intake.Side.B : Intake.Side.A,
+                    gamepad1.b ? -Intake.POWER : intakeOn ? Intake.POWER : 0.0);
 
             // ---- Telemetry, Dashboard, log ----
             if (watchdog.lost()) {
@@ -556,6 +593,9 @@ public class JohnTeleOp extends LinearOpMode {
             telemetry.addData("Target", "%s %s CELL at (%.1f, %.1f), %.1f in away (%s)", red ? "red" : "blue",
                     tracker.upCellName(), target[0], target[1], distance, tracker.source());
             telemetry.addData("Shooter", "%s, trim %+.0f (dpad)", shooter.status(), shooter.trimRpm());
+            telemetry.addData("Intakes (bumper toggles, B reverse)", intake.status());
+            telemetry.addData("Drive", "%s, forward / active intake = %s (left stick button switches)",
+                    ROBOT_CENTRIC ? "ROBOT-centric" : "field-centric", forwardIsB ? "B" : "A");
             String zone = ShootingZone.problem(pose.x(), pose.y(), target[0], target[1], tracker.upAudience());
             telemetry.addData("Shooting zone", zone == null
                     ? String.format(Locale.US, "IN RANGE (%.0f deg off the CELL axis)",
@@ -571,7 +611,8 @@ public class JohnTeleOp extends LinearOpMode {
             telemetry.addData("Pinpoint", "%s, %s", state, watchdog.status());
             telemetry.addData("IMU check", "%s, offset %.1f deg (must stay the same while turning)",
                     fallback.status(), fallback.offsetDeg());
-            telemetry.addLine("HOLD: A shoot, RS button aim assist, X re-localize, bumpers intake, B reverse. Dpad: trim");
+            telemetry.addLine("HOLD: A shoot, RS button aim assist, X re-localize, B intakes reverse. "
+                    + "Bumpers: intakes on/off. Y: indexer back 90. Dpad: trim");
             telemetry.update();
 
             Pose aimPose = shot == Shot.AIM || shot == Shot.FIRE ? aimer.aimPose() : null;

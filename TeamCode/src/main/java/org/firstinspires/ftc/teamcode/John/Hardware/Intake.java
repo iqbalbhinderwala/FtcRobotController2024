@@ -24,7 +24,8 @@ public class Intake {
 
     public static double POWER = 1.0;
     public static boolean A_REVERSED = false;
-    public static boolean B_REVERSED = false;
+    /** Intake B runs the other way round (found on the robot 2026-10-24). */
+    public static boolean B_REVERSED = true;
     /** on(side) runs both intakes (as tested), not just the leading one. */
     public static boolean BOTH_TOGETHER = true;
     /** Time to keep running after the robot stops, so the last ball gets pulled in. */
@@ -55,6 +56,12 @@ public class Intake {
         boolean b = BOTH_TOGETHER || side == Side.B;
         apply(a ? POWER : 0.0, b ? POWER : 0.0);
         status = BOTH_TOGETHER ? "in (both, " + side + " leading)" : "intake " + side + " in";
+    }
+
+    /** Only this side's intake at this power (+ in, - out); the other one stops. */
+    public void only(Side side, double power) {
+        apply(side == Side.A ? power : 0.0, side == Side.B ? power : 0.0);
+        status = power == 0 ? "off" : "intake " + side + (power > 0 ? " in" : " reverse");
     }
 
     public void off() {
