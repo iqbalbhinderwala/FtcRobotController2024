@@ -6,6 +6,14 @@ import com.qualcomm.robotcore.hardware.Gamepad;
 import org.firstinspires.ftc.robotcore.external.Telemetry;
 import org.firstinspires.ftc.teamcode.John.RobotGeometry;
 
+import org.firstinspires.ftc.robotcore.internal.system.AppUtil;
+
+import java.io.File;
+import java.io.FileReader;
+import java.io.FileWriter;
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.util.Locale;
 import java.util.Map;
 
 /**
@@ -23,6 +31,11 @@ import java.util.Map;
  * The autonomous hands its last pose and which CELL is up to the TeleOp (savePose / loadPose /
  * poseAgeS, saveUpAudience / loadUpAudience); the time stamp lets the TeleOp ignore a pose from an
  * earlier run.
+ *
+ * The blackboard is cleared when the Robot Controller app restarts (also by every redeploy), so
+ * save() also writes the choice to SETUP_FILE; the TeleOp falls back to it (loadFile), so it keeps
+ * the right alliance after a restart (2026-10-24, r0171 ran as red that way). [John] Auto does not:
+ * it still needs a Game Setup in the current app session.
  *
  * Poses are FTC field coordinates (origin at the field center, +X toward the audience, +Y toward
  * blue, inches, heading counter-clockwise from +X). Red starts with John's camera wall flush on the
@@ -149,6 +162,48 @@ public class AutoSettings {
         blackboard.put(KEY_ALLIANCE, alliance.name());
         blackboard.put(KEY_TILE, tile.name());
         blackboard.put(KEY_DELAY, delayS);
+        String line = alliance.name() + "," + tile.name() + "," + delayS;
+        if (!line.equals(lastWritten)) {   // Game Setup saves every loop: write only on a change
+            try (FileWriter w = new FileWriter(setupFile())) {
+                w.write(line + "," + System.currentTimeMillis() + "\n");
+                lastWritten = line;
+            } catch (IOException ignored) {
+                // the blackboard still has it
+            }
+        }
+    }
+
+    private String lastWritten;
+
+    private static File setupFile() {
+        return new File(AppUtil.FIRST_FOLDER, "john_game_setup.txt");
+    }
+
+    /**
+     * The last Game Setup from the file (survives app restarts), or null. Its age in seconds is in
+     * fileAgeS().
+     */
+    public static AutoSettings loadFile() {
+        try (BufferedReader r = new BufferedReader(new FileReader(setupFile()))) {
+            String[] parts = r.readLine().trim().split(",");
+            AutoSettings s = new AutoSettings(new java.util.HashMap<>());
+            s.alliance = Alliance.valueOf(parts[0]);
+            s.tile = StartTile.valueOf(parts[1]);
+            s.delayS = clampDelay(Double.parseDouble(parts[2]));
+            s.fileTimeMs = parts.length > 3 ? Long.parseLong(parts[3]) : 0L;
+            return s;
+        } catch (IOException | RuntimeException e) {
+            return null;
+        }
+    }
+
+    private long fileTimeMs;
+
+    /** For a loadFile() result: how long ago it was saved, for telemetry. */
+    public String fileAge() {
+        double s = (System.currentTimeMillis() - fileTimeMs) / 1000.0;
+        return fileTimeMs <= 0 ? "unknown age" : s < 120 ? String.format(Locale.US, "%.0f s ago", s)
+                : s < 7200 ? String.format(Locale.US, "%.0f min ago", s / 60) : String.format(Locale.US, "%.1f h ago", s / 3600);
     }
 
     /** Hands the pose (FTC) to a following OpMode, e.g. a TeleOp, with the time it was saved. */

@@ -109,8 +109,9 @@ import java.util.function.Supplier;
  * left) or PUSHED off the path, it stops pushing, waits, plans again from where it is and retries;
  * after PathWatcher.RETRIES it gives up and the routine goes on with the next stage. Parking (the
  * partner robot will likely park in the same LOADING ZONE): if the park is blocked, John stays if
- * he is already partly in the LOADING ZONE (that scores), otherwise he tries spots PARK_ALT_OFFSET_IN
- * to either side along it, the nearer one first.
+ * he is already partly in the LOADING ZONE (that scores), otherwise he tries a spot PARK_ALT_OFFSET_IN
+ * shallower (never deeper). He parks on the seam of the zone's end nearer his route, never driving
+ * through the zone.
  *
  * Slow stretches (the GARDEN pass, the last park stretch) are PathWatcher.creep: a capped-speed
  * Pedro path never got John moving (r0109 / r0111: its coast feedforward is below the static
@@ -138,28 +139,35 @@ public class JohnAuto extends LinearOpMode {
     public static double BALL_RADIUS = 1.4;
     /** Start the slow stretch this far before intake A reaches the first ball. */
     public static double SLOW_BEFORE_BALL_IN = 4.0;
-    /** Park: partly inside the red LOADING ZONE (X -48 to -24, Y -72 to -60.4), camera wall on the wall. */
-    public static double PARK_X = -36.0;
+    /**
+     * Park: partly inside the red LOADING ZONE (A5: X -48 to -24, Y -72 to -60.4), camera wall on the
+     * wall, never driving through it (a partner may be in it). John comes in from the end nearer his
+     * route: from the audience side (X > the zone's middle, e.g. from A2 or the look spot) he parks
+     * centered on the A4 / A5 seam (X -24), from the far side (e.g. after shooting from B6) on the
+     * A5 / A6 seam (X -48); PARK_INTO_ZONE_IN more into the zone (0: centered on the seam, 8.5" of
+     * John inside, which counts).
+     */
+    public static double PARK_INTO_ZONE_IN = 0.0;
     /**
      * 0: the camera wall against the red wall, the shooter (and camera) facing the field / HIVE; the
      * last stretch slides along the wall along John's length (2026-10-24, was 90: an intake end to
      * the wall). Parked like this the camera sees the HIVE, which helps the TeleOp's start check.
      */
     public static double PARK_HEADING_DEG = 0.0;
-    /** Other park spots along the LOADING ZONE, this far to either side of PARK_X, if the park is blocked. */
-    public static double PARK_ALT_OFFSET_IN = 10.0;
+    /** If the park is blocked (and John is not partly in yet): a spot this much shallower (never deeper). */
+    public static double PARK_ALT_OFFSET_IN = 5.0;
     /** Red LOADING ZONE (FTC); PARK scores when the robot is partly inside (by at least PARK_OVERLAP_IN). */
     public static double LOADING_ZONE_MIN_X = -48.0;
     public static double LOADING_ZONE_MAX_X = -24.0;
     public static double LOADING_ZONE_MAX_Y = -60.4;
     public static double PARK_OVERLAP_IN = 1.0;
     /**
-     * Before the last park stretch: just off the red wall, beside the LOADING ZONE, at the park
-     * heading; the drive there goes around the HIVE frame (ShootingZone.route). The last stretch then
-     * slides along the wall into the zone, so a robot already there is pushed along the wall, not
-     * into it (2026-10-24: coming in at an angle it tried to push a robot into the wall).
+     * Before the last park stretch: just off the red wall, this far outside the seam John parks on, at
+     * the park heading; the drive there goes around the HIVE frame (ShootingZone.route). The last
+     * stretch then slides along the wall onto the seam, so a robot in the way is pushed along the
+     * wall, not into it.
      */
-    public static double PARK_APPROACH_X = -12.0;
+    public static double PARK_APPROACH_OUT_IN = 12.0;
     /** The approach is this far off the park line (away from the wall), the rest is along the wall. */
     public static double PARK_APPROACH_OFF_WALL_IN = 1.0;
 
@@ -189,14 +197,17 @@ public class JohnAuto extends LinearOpMode {
      * Look at least this long (the HIVE may still be settling), at most LOOK_TIMEOUT_MS; it counts
      * when a frame at most CONFIRM_MAX_AGE_MS old agrees with the up CELL.
      */
-    public static double LOOK_MIN_MS = 600;
-    public static double LOOK_TIMEOUT_MS = 2500;
+    // 300 / 1000 (were 600 / 2500, 2026-10-24): r0163 / r0164 / r0168 all waited the full 2.5 s
+    // for tags that a tipped HIVE never shows; at ~30 frames / s, 1 s without a tag is clear enough.
+    public static double LOOK_MIN_MS = 300;
+    public static double LOOK_TIMEOUT_MS = 1000;
     public static double CONFIRM_MAX_AGE_MS = 200;
     /** Times per volley it may stop for a tip and go to the other side. */
     public static int MAX_SIDE_SWITCHES = 2;
 
     // ---- Speeds and timing ----
-    public static double COLLECT_SPEED_IPS = 12.0;
+    /** 8 (was 12, a third slower, 2026-10-24; measured ~8.5 in/s average at 12). */
+    public static double COLLECT_SPEED_IPS = 8.0;
     /** After the GARDEN the intake runs this much longer (the balls move on toward the indexer). */
     public static double INTAKE_AFTER_GARDEN_S = 2.0;
     public static double PARK_SPEED_IPS = 15.0;
@@ -750,9 +761,14 @@ public class JohnAuto extends LinearOpMode {
      */
     private Command park() {
         double heading = Math.toRadians(PARK_HEADING_DEG);
-        Pose approach = new Pose(PARK_APPROACH_X, parkY() + PARK_APPROACH_OFF_WALL_IN, heading);
-        Pose parkPose = new Pose(PARK_X, parkY(), heading);
-        logEvent(String.format(Locale.US, "park at (%.1f, %.1f) from %s", PARK_X, parkY(), Drawing.format(follower.pose())));
+        boolean fromAudience = fromAudienceSide(red(follower.pose()));
+        double side = fromAudience ? 1.0 : -1.0;   // +X: the A4 side, -X: the A6 side
+        double parkX = parkX(fromAudience);
+        Pose approach = new Pose(parkX + side * PARK_APPROACH_OUT_IN, parkY() + PARK_APPROACH_OFF_WALL_IN, heading);
+        Pose parkPose = new Pose(parkX, parkY(), heading);
+        logEvent(String.format(Locale.US, "park on the %s seam at (%.1f, %.1f), coming along the wall from the %s side, from %s",
+                fromAudience ? "A4 / A5" : "A5 / A6", parkX, parkY(), fromAudience ? "audience" : "far",
+                Drawing.format(follower.pose())));
         return sequential(
                 watcher.follow("park: around the HIVE", () -> around(field(approach), 0)),
                 watcher.creep("park", () -> field(parkPose), PARK_SPEED_IPS),
@@ -760,12 +776,9 @@ public class JohnAuto extends LinearOpMode {
                     if (!watcher.gaveUp()) {
                         return instant(() -> logEvent("parked at " + Drawing.format(follower.pose())));
                     }
+                    // Only a shallower spot: never deeper into the zone (that pushes the partner out)
                     List<Double> spots = new ArrayList<>();
-                    double x = red(follower.pose()).x();
-                    double a = PARK_X + PARK_ALT_OFFSET_IN;
-                    double b = PARK_X - PARK_ALT_OFFSET_IN;
-                    spots.add(Math.abs(a - x) <= Math.abs(b - x) ? a : b);
-                    spots.add(Math.abs(a - x) <= Math.abs(b - x) ? b : a);
+                    spots.add(parkX + side * PARK_ALT_OFFSET_IN);
                     return parkElsewhere(spots);
                 }));
     }
@@ -789,6 +802,16 @@ public class JohnAuto extends LinearOpMode {
                 watcher.creep("park (other spot)", () -> field(spot), PARK_SPEED_IPS),
                 lazy(() -> watcher.gaveUp() ? parkElsewhere(spots)
                         : instant(() -> logEvent("parked at " + Drawing.format(follower.pose())))));
+    }
+
+    /** John comes to the LOADING ZONE from its audience-side end (red frame: X beyond its middle). */
+    private static boolean fromAudienceSide(Pose red) {
+        return red.x() >= (LOADING_ZONE_MIN_X + LOADING_ZONE_MAX_X) / 2.0;
+    }
+
+    /** The park spot along the wall (red frame): on the seam of the end John comes from. */
+    private static double parkX(boolean fromAudience) {
+        return fromAudience ? LOADING_ZONE_MAX_X - PARK_INTO_ZONE_IN : LOADING_ZONE_MIN_X + PARK_INTO_ZONE_IN;
     }
 
     /** The park line (red frame): the robot's half extent across the wall at the park heading, plus WALL_GAP. */
@@ -850,8 +873,12 @@ public class JohnAuto extends LinearOpMode {
 
     /** Estimated park time from a pose (field frame): around the HIVE to the approach, then slow. */
     private double parkSeconds(Pose from) {
-        Pose approach = field(new Pose(PARK_APPROACH_X, parkY() + PARK_APPROACH_OFF_WALL_IN, Math.toRadians(PARK_HEADING_DEG)));
-        Pose park = field(new Pose(PARK_X, parkY(), Math.toRadians(PARK_HEADING_DEG)));
+        boolean fromAudience = fromAudienceSide(red(from));
+        double parkX = parkX(fromAudience);
+        double side = fromAudience ? 1.0 : -1.0;
+        Pose approach = field(new Pose(parkX + side * PARK_APPROACH_OUT_IN, parkY() + PARK_APPROACH_OFF_WALL_IN,
+                Math.toRadians(PARK_HEADING_DEG)));
+        Pose park = field(new Pose(parkX, parkY(), Math.toRadians(PARK_HEADING_DEG)));
         return routeLength(from, approach) / AVG_DRIVE_IPS
                 + Math.hypot(park.x() - approach.x(), park.y() - approach.y()) / PARK_SPEED_IPS + PARK_OVERHEAD_S;
     }

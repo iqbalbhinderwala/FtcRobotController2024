@@ -76,7 +76,7 @@ import java.util.Locale;
  *    camera confirmation in UP_CELL_TRUST_S, nor the autonomous' at the start), the closest CELL of
  *    our HIVE. If the camera finds the other CELL up while moving or aiming, the shot starts over
  *    for that one (while A is held).
- *  - Outside the shooting zone (ShootingZone: closer than 43.6", or more than 45 deg to the side of
+ *  - Outside the shooting zone (ShootingZone: closer than 48", or more than 45 deg to the side of
  *    the way the CELL opening faces), it first drives to the nearest spot inside it, around the
  *    HIVE frame if needed (MOVE_SPEED_IPS), the shooter turning toward the CELL on the way
  *    (Aimer.facingTarget). Blocked or pushed on the way (PathWatcher), it stops.
@@ -259,6 +259,16 @@ public class JohnTeleOp extends LinearOpMode {
 
         AutoSettings settings = new AutoSettings(blackboard);
         boolean haveSetup = AutoSettings.isSaved(blackboard);
+        String setupSource = "Game Setup";
+        if (!haveSetup) {
+            // After an app restart (or a redeploy) the blackboard is empty: the last Game Setup file
+            AutoSettings fromFile = AutoSettings.loadFile();
+            if (fromFile != null) {
+                settings = fromFile;
+                haveSetup = true;
+                setupSource = "the last Game Setup (file, " + fromFile.fileAge() + ")";
+            }
+        }
         red = settings.alliance() == AutoSettings.Alliance.RED;
         TagLocalizer startFix = new TagLocalizer(START_SAMPLES);
         CsvLog log = new CsvLog("john_teleop", LOG_HEADER);
@@ -342,9 +352,9 @@ public class JohnTeleOp extends LinearOpMode {
                     : visionStart != null ? visionStart
                     : startFix.alongWall(wall, MIN_START_SAMPLES, RobotGeometry.LENGTH_IN / 2.0);
 
-            telemetry.addData("Alliance", haveSetup ? "%s   (from Game Setup; drivers at the %s wall)"
-                            : "%s   (no Game Setup saved: B red, X blue; drivers at the %s wall)",
-                    red ? "RED" : "BLUE", red ? "red" : "blue");
+            telemetry.addData("Alliance", haveSetup ? "%s   (from %s; drivers at the %s wall)"
+                            : "%s   (%sno Game Setup saved: B red, X blue; drivers at the %s wall)",
+                    red ? "RED" : "BLUE", haveSetup ? setupSource : "", red ? "red" : "blue");
             telemetry.addData("Start from", "%s   (dpad left / right)%s", startFrom,
                     autoPose == null ? ": no autonomous pose"
                             : !autoPossible ? ": the autonomous pose " + Drawing.format(autoPose) + " is impossible, not used"

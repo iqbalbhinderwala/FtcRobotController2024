@@ -15,9 +15,8 @@ import java.util.Locale;
  * robot center to the CELL's tag cluster center, seen from above (see HiveTags).
  *
  * The zone (tested 2026-10-23):
- *  - at least MIN_DISTANCE_IN from the CELL: centered on the C1 / C2 seam (about 35") was too
- *    close; John must stay entirely in C1, its field-side edge at the seam (X 48) at most: center
- *    at 48 + WIDTH / 2 = 56.6 while aiming across column C, 43.6" from the audience CELL;
+ *  - at least MIN_DISTANCE_IN (48") from the CELL: centered on the C1 / C2 seam (about 35") was too
+ *    close, and about 47" (r0157, a ball on the lower rim) too; C1 at 50.3" is fine;
  *  - at most MAX_OFF_AXIS_DEG between the line from the CELL to the robot and the way the CELL
  *    opening faces (outward along the arm: +X for an audience CELL, -X for a far CELL). The widest
  *    tested shot was from A1 at the audience wall (43.2 deg), rounded to 45; A2 (64 deg) is too
@@ -30,7 +29,12 @@ import java.util.Locale;
 @Config("JohnShootingZone")
 public class ShootingZone {
 
-    public static double MIN_DISTANCE_IN = 48.0 + RobotGeometry.WIDTH_IN / 2.0 - HiveTags.cellX(true, true);
+    /**
+     * 48 (was 43.6, from the C1 / C2 seam test): volley 2 of r0157 from about 47" (picked at the old
+     * minimum + MARGIN_IN) put a ball on the lower rim; from C1 at 50.3" all go in. nearestSpot()
+     * now picks spots at 48 + MARGIN_IN = 50".
+     */
+    public static double MIN_DISTANCE_IN = 48.0;
     public static double MAX_OFF_AXIS_DEG = 45.0;
     /** How far inside the zone's edges nearestSpot() aims, so odometry error still lands inside. */
     public static double MARGIN_IN = 2.0;
