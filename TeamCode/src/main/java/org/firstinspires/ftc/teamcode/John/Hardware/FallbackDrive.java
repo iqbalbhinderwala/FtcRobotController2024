@@ -28,8 +28,12 @@ import java.util.Locale;
 @Config("JohnFallbackDrive")
 public class FallbackDrive {
 
-    public static RevHubOrientationOnRobot.LogoFacingDirection LOGO = RevHubOrientationOnRobot.LogoFacingDirection.UP;
-    public static RevHubOrientationOnRobot.UsbFacingDirection USB = RevHubOrientationOnRobot.UsbFacingDirection.FORWARD;
+    /**
+     * How the Control Hub is mounted on John (2026-10-24): the REV logo faces the camera wall (the
+     * robot's right), the USB ports face down.
+     */
+    public static RevHubOrientationOnRobot.LogoFacingDirection LOGO = RevHubOrientationOnRobot.LogoFacingDirection.RIGHT;
+    public static RevHubOrientationOnRobot.UsbFacingDirection USB = RevHubOrientationOnRobot.UsbFacingDirection.DOWN;
 
     private final DcMotor frontLeft, frontRight, backLeft, backRight;
     private final IMU imu;
