@@ -121,10 +121,10 @@ import java.util.Locale;
  *   left stick             drive (field-centric)
  *   right stick X          turn;  right stick button (hold): aim assist
  *   A (hold)               shoot: move into range, aim, fire (let go: cancel)
- *   bumpers (press)        intake on / off (toggle; A turns it off);  B (hold): intake reverse while held. Only the
- *                          intake at the forward end runs (left stick button switches the end)
- *   left stick button      switch the forward end (intake B / intake A): the intake that runs and,
- *                          robot-centric, the stick's forward
+ *   bumpers (press)        intake on / off (toggle; A turns it off);  B (hold): intake reverse while held.
+ *                          Driving toward an intake end runs only that intake; standing still (or
+ *                          sideways) both
+ *   left stick button      robot-centric: switch the stick's forward end (intake B / intake A)
  *   Y                      indexer one step (90 deg) backward, to clear a jam by hand (not while firing)
  *
  * ROBOT_CENTRIC (off by default; field-centric is preferred): the left stick drives relative to the robot, "forward" toward the intake
@@ -163,6 +163,10 @@ public class JohnTeleOp extends LinearOpMode {
     public static double AIM_ASSIST_KP = 1.5;
     public static double AIM_ASSIST_MAX_TURN = 0.6;
     public static double TRIM_STEP_RPM = 50;
+    /** Driving toward an intake end at least this much (stick, robot frame): only that intake runs. */
+    public static double INTAKE_LEAD_MIN = 0.15;
+    /** After this long in INIT, warn if the camera has not seen a HIVE tag. */
+    public static double CAMERA_CHECK_S = 2.0;
 
     // ---- Without odometry (vision shot) ----
     /** Heading lock on the IMU: turn power per radian, at most FALLBACK_MAX_TURN. */
@@ -274,6 +278,9 @@ public class JohnTeleOp extends LinearOpMode {
 
         // ---- INIT: nothing moves; the camera finds the position along the wall ----
         gamepad1.resetEdgeDetection();
+        ElapsedTime initTimer = new ElapsedTime();
+        int initFrames = 0;
+        int initFramesWithTags = 0;
         while (opModeInInit()) {
             // The alliance comes from Game Setup; B / X only without one (B is "intake reverse" in the
             // TeleOp, and pressed by habit in INIT it flipped the alliance: r0132)
@@ -292,6 +299,21 @@ public class JohnTeleOp extends LinearOpMode {
             }
             Pose wall = wallPose(settings);
             HiveCamera.Frame initFrame = camera.poll();
+            if (initFrame != null) {
+                initFrames++;
+                if (!initFrame.tags.isEmpty()) {
+                    initFramesWithTags++;
+                }
+            }
+            if (!camera.available()) {
+                telemetry.addLine("!!! NO CAMERA: " + camera.status());
+            } else if (initTimer.seconds() >= CAMERA_CHECK_S && initFrames == 0) {
+                telemetry.addLine("!!! THE LIMELIGHT SENDS NO FRAMES (pipeline " + HiveCamera.PIPELINE + " running? cable?)");
+            } else if (initTimer.seconds() >= CAMERA_CHECK_S && initFramesWithTags == 0) {
+                telemetry.addLine(String.format(Locale.US, "!!! THE CAMERA SEES NO HIVE TAGS in %d frames: the start pose "
+                        + "is a guess. Check the Limelight pipeline %d (AprilTag 36h11) / exposure / gain / lens, and "
+                        + "that John faces the HIVE", initFrames, HiveCamera.PIPELINE));
+            }
             startFix.add(initFrame, wall.heading());
             walls.add(initFrame);
             if (autoPose != null) {
@@ -440,7 +462,7 @@ public class JohnTeleOp extends LinearOpMode {
             }
             if (gamepad1.leftStickButtonWasPressed()) {
                 forwardIsB = !forwardIsB;
-                event = "forward = intake " + (forwardIsB ? "B" : "A") + " (that intake runs)";
+                event = "forward = intake " + (forwardIsB ? "B" : "A");
             }
             double ends = forwardIsB ? 1.0 : -1.0;   // robot +X is the intake B end
             boolean trimUp = gamepad1.dpadUpWasPressed(), trimDown = gamepad1.dpadDownWasPressed();
@@ -794,9 +816,21 @@ public class JohnTeleOp extends LinearOpMode {
                 intakeOn = !intakeOn;
                 event = event == null ? (intakeOn ? "intakes on" : "intakes off") : event;
             }
-            // Only the intake at the forward end; B held reverses it (e.g. to clear a ball)
-            intake.only(forwardIsB ? Intake.Side.B : Intake.Side.A,
-                    gamepad1.b ? -Intake.POWER : intakeOn ? Intake.POWER : 0.0);
+            // Driving toward an intake end: only that intake (the one meeting the balls); standing
+            // still or sideways: both. B held reverses (e.g. to clear a ball).
+            double robotForward;
+            if (ROBOT_CENTRIC) {
+                robotForward = ends * stickFwd;
+            } else {
+                double a = driverFacing() - (degraded ? fallback.heading() : pose.heading());
+                robotForward = stickFwd * Math.cos(a) - stickLeft * Math.sin(a);
+            }
+            double intakePower = gamepad1.b ? -Intake.POWER : intakeOn ? Intake.POWER : 0.0;
+            if (Math.abs(robotForward) >= INTAKE_LEAD_MIN) {
+                intake.only(robotForward > 0 ? Intake.Side.B : Intake.Side.A, intakePower);   // +X is the B end
+            } else {
+                intake.set(intakePower);
+            }
 
             // ---- Telemetry, Dashboard, log ----
             if (watchdog.lost()) {
@@ -814,8 +848,8 @@ public class JohnTeleOp extends LinearOpMode {
                     tracker.upCellName(), target[0], target[1], distance, tracker.source());
             telemetry.addData("Shooter", "%s, trim %+.0f (dpad)", shooter.status(), shooter.trimRpm());
             telemetry.addData("Intakes (bumper toggles, B reverse)", intake.status());
-            telemetry.addData("Drive", "%s, forward / active intake = %s (left stick button switches)",
-                    ROBOT_CENTRIC ? "ROBOT-centric" : "field-centric", forwardIsB ? "B" : "A");
+            telemetry.addData("Drive", ROBOT_CENTRIC ? "ROBOT-centric, forward = intake " + (forwardIsB ? "B" : "A")
+                    + " (left stick button switches)" : "field-centric");
             String zone = ShootingZone.problem(pose.x(), pose.y(), target[0], target[1], tracker.upAudience());
             telemetry.addData("Shooting zone", zone == null
                     ? String.format(Locale.US, "IN RANGE (%.0f deg off the CELL axis)",

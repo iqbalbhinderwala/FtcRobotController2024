@@ -138,9 +138,14 @@ public class JohnAuto extends LinearOpMode {
     public static double BALL_RADIUS = 1.4;
     /** Start the slow stretch this far before intake A reaches the first ball. */
     public static double SLOW_BEFORE_BALL_IN = 4.0;
-    /** Park: partly inside the red LOADING ZONE (X -48 to -24, Y -72 to -60.4), heading 90. */
+    /** Park: partly inside the red LOADING ZONE (X -48 to -24, Y -72 to -60.4), camera wall on the wall. */
     public static double PARK_X = -36.0;
-    public static double PARK_HEADING_DEG = 90.0;
+    /**
+     * 0: the camera wall against the red wall, the shooter (and camera) facing the field / HIVE; the
+     * last stretch slides along the wall along John's length (2026-10-24, was 90: an intake end to
+     * the wall). Parked like this the camera sees the HIVE, which helps the TeleOp's start check.
+     */
+    public static double PARK_HEADING_DEG = 0.0;
     /** Other park spots along the LOADING ZONE, this far to either side of PARK_X, if the park is blocked. */
     public static double PARK_ALT_OFFSET_IN = 10.0;
     /** Red LOADING ZONE (FTC); PARK scores when the robot is partly inside (by at least PARK_OVERLAP_IN). */
@@ -155,7 +160,8 @@ public class JohnAuto extends LinearOpMode {
      * into it (2026-10-24: coming in at an angle it tried to push a robot into the wall).
      */
     public static double PARK_APPROACH_X = -12.0;
-    public static double PARK_APPROACH_Y = -62.0;
+    /** The approach is this far off the park line (away from the wall), the rest is along the wall. */
+    public static double PARK_APPROACH_OFF_WALL_IN = 1.0;
 
     // ---- Start position from the camera ----
     public static int START_SAMPLES = 60;
@@ -744,7 +750,7 @@ public class JohnAuto extends LinearOpMode {
      */
     private Command park() {
         double heading = Math.toRadians(PARK_HEADING_DEG);
-        Pose approach = new Pose(PARK_APPROACH_X, PARK_APPROACH_Y, heading);
+        Pose approach = new Pose(PARK_APPROACH_X, parkY() + PARK_APPROACH_OFF_WALL_IN, heading);
         Pose parkPose = new Pose(PARK_X, parkY(), heading);
         logEvent(String.format(Locale.US, "park at (%.1f, %.1f) from %s", PARK_X, parkY(), Drawing.format(follower.pose())));
         return sequential(
@@ -785,8 +791,12 @@ public class JohnAuto extends LinearOpMode {
                         : instant(() -> logEvent("parked at " + Drawing.format(follower.pose())))));
     }
 
+    /** The park line (red frame): the robot's half extent across the wall at the park heading, plus WALL_GAP. */
     private static double parkY() {
-        return RED_WALL_Y + RobotGeometry.LENGTH_IN / 2.0 + WALL_GAP;
+        double h = Math.toRadians(PARK_HEADING_DEG);
+        double halfAcross = RobotGeometry.LENGTH_IN / 2.0 * Math.abs(Math.sin(h))
+                + RobotGeometry.WIDTH_IN / 2.0 * Math.abs(Math.cos(h));
+        return RED_WALL_Y + halfAcross + WALL_GAP;
     }
 
     /** True when the robot (red frame) overlaps the red LOADING ZONE by at least PARK_OVERLAP_IN both ways. */
@@ -840,7 +850,7 @@ public class JohnAuto extends LinearOpMode {
 
     /** Estimated park time from a pose (field frame): around the HIVE to the approach, then slow. */
     private double parkSeconds(Pose from) {
-        Pose approach = field(new Pose(PARK_APPROACH_X, PARK_APPROACH_Y, Math.toRadians(PARK_HEADING_DEG)));
+        Pose approach = field(new Pose(PARK_APPROACH_X, parkY() + PARK_APPROACH_OFF_WALL_IN, Math.toRadians(PARK_HEADING_DEG)));
         Pose park = field(new Pose(PARK_X, parkY(), Math.toRadians(PARK_HEADING_DEG)));
         return routeLength(from, approach) / AVG_DRIVE_IPS
                 + Math.hypot(park.x() - approach.x(), park.y() - approach.y()) / PARK_SPEED_IPS + PARK_OVERHEAD_S;
