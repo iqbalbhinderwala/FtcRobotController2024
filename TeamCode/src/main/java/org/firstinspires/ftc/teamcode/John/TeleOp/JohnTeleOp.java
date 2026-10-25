@@ -35,6 +35,7 @@ import org.firstinspires.ftc.teamcode.John.Vision.HiveCamera;
 import org.firstinspires.ftc.teamcode.John.Vision.HiveTags;
 import org.firstinspires.ftc.teamcode.John.Vision.TagLocalizer;
 import org.firstinspires.ftc.teamcode.John.Vision.VisionAim;
+import org.firstinspires.ftc.teamcode.John.Vision.WallFinder;
 
 import java.util.List;
 import java.util.Locale;
@@ -42,9 +43,13 @@ import java.util.Locale;
 /**
  * John's TeleOp: field-centric driving, and one button that aims at the up CELL and shoots.
  *
- * START POSITION (chosen in INIT, dpad left / right):
+ * START POSITION (chosen in INIT; dpad left / right overrides):
  *  - AUTO: where [John] Auto ended (and which CELL it saw up), when it ended less than
- *    AUTO_POSE_MAX_AGE_S ago: the default right after the autonomous;
+ *    AUTO_POSE_MAX_AGE_S ago and the camera does not disagree: the tags under that heading must
+ *    put John within AUTO_CHECK_IN of it, else he was moved since (e.g. carried back after a test)
+ *    and WALL is used;
+ *  - WALL against either back wall (WallFinder: the tags tell which, no odometry or alliance
+ *    needed), else the alliance's start wall at the Game Setup tile. The old description follows:
  *  - WALL: John's camera wall flush on the alliance's start wall (red: the audience wall; blue: the
  *    far wall), shooter facing the field, anywhere along the wall. The camera reads the HIVE tags; a
  *    tag's field Y never changes when the HIVE tips, so each tag gives the position along the wall
@@ -91,7 +96,7 @@ import java.util.Locale;
  *   left stick             drive (field-centric)
  *   right stick X          turn;  right stick button (hold): aim assist
  *   A (hold)               shoot: move into range, aim, fire (let go: cancel)
- *   bumpers (press)        intake on / off (toggle);  B (hold): intake reverse while held. Only the
+ *   bumpers (press)        intake on / off (toggle; A turns it off);  B (hold): intake reverse while held. Only the
  *                          intake at the forward end runs (left stick button switches the end)
  *   left stick button      switch the forward end (intake B / intake A): the intake that runs and,
  *                          robot-centric, the stick's forward
@@ -145,6 +150,8 @@ public class JohnTeleOp extends LinearOpMode {
     // ---- Start position and re-localizing ----
     /** Start from the autonomous' last pose when it is younger than this (at INIT). */
     public static double AUTO_POSE_MAX_AGE_S = 60.0;
+    /** ...and the camera puts John within this of it (else he was moved since). */
+    public static double AUTO_CHECK_IN = 6.0;
     /** Tag readings kept for the start position (median). */
     public static int START_SAMPLES = 60;
     /** Fewer readings than this: no tag fix, use the Game Setup tile. */
@@ -209,7 +216,11 @@ public class JohnTeleOp extends LinearOpMode {
         Pose autoPose = AutoSettings.loadPose(blackboard);
         double autoAgeS = AutoSettings.poseAgeS(blackboard);
         Boolean autoUpAudience = AutoSettings.loadUpAudience(blackboard);
-        Start startFrom = autoPose != null && autoAgeS <= AUTO_POSE_MAX_AGE_S ? Start.AUTO : Start.WALL;
+        boolean autoFresh = autoPose != null && autoAgeS <= AUTO_POSE_MAX_AGE_S;
+        Start startFrom = autoFresh ? Start.AUTO : Start.WALL;
+        boolean startOverridden = false;
+        WallFinder walls = new WallFinder(START_SAMPLES);
+        TagLocalizer autoCheck = new TagLocalizer(START_SAMPLES);
 
         // ---- INIT: nothing moves; the camera finds the position along the wall ----
         gamepad1.resetEdgeDetection();
@@ -224,17 +235,35 @@ public class JohnTeleOp extends LinearOpMode {
             }
             if ((gamepad1.dpadLeftWasPressed() | gamepad1.dpadRightWasPressed()) && autoPose != null) {
                 startFrom = startFrom == Start.AUTO ? Start.WALL : Start.AUTO;
+                startOverridden = true;
             }
             Pose wall = wallPose(settings);
-            startFix.add(camera.poll(), wall.heading());
-            Pose start = startFrom == Start.AUTO ? autoPose : startFix.alongWall(wall, MIN_START_SAMPLES, RobotGeometry.LENGTH_IN / 2.0);
+            HiveCamera.Frame initFrame = camera.poll();
+            startFix.add(initFrame, wall.heading());
+            walls.add(initFrame);
+            if (autoPose != null) {
+                autoCheck.add(initFrame, autoPose.heading());
+            }
+            double autoError = autoPose != null && autoCheck.count() >= MIN_START_SAMPLES
+                    ? Math.hypot(autoCheck.x() - autoPose.x(), autoCheck.y() - autoPose.y()) : Double.NaN;
+            boolean autoOk = autoFresh && (Double.isNaN(autoError) || autoError <= AUTO_CHECK_IN);
+            if (!startOverridden) {
+                startFrom = autoOk ? Start.AUTO : Start.WALL;
+            }
+            Pose wallFound = walls.found(MIN_START_SAMPLES);
+            Pose start = startFrom == Start.AUTO ? autoPose
+                    : wallFound != null ? wallFound : startFix.alongWall(wall, MIN_START_SAMPLES, RobotGeometry.LENGTH_IN / 2.0);
 
             telemetry.addData("Alliance", "%s   (B red, X blue)%s", red ? "RED" : "BLUE",
                     haveSetup ? "" : "   (no Game Setup saved)");
             telemetry.addData("Start from", "%s   (dpad left / right)%s", startFrom,
-                    autoPose == null ? ": no autonomous pose" : String.format(Locale.US, ": the autonomous ended %.0f s ago%s",
-                            autoAgeS, autoAgeS > AUTO_POSE_MAX_AGE_S ? " (old)" : ""));
-            if (startFrom == Start.WALL) {
+                    autoPose == null ? ": no autonomous pose" : String.format(Locale.US, ": the autonomous ended %.0f s ago%s%s",
+                            autoAgeS, autoAgeS > AUTO_POSE_MAX_AGE_S ? " (old)" : "",
+                            Double.isNaN(autoError) ? ", camera cannot check it"
+                                    : String.format(Locale.US, ", camera: %.1f in from it%s", autoError,
+                                            autoError > AUTO_CHECK_IN ? " -> MOVED SINCE, not used" : "")));
+            telemetry.addData("Back wall (camera)", walls.describe(MIN_START_SAMPLES));
+            if (startFrom == Start.WALL && wallFound == null) {
                 telemetry.addLine(String.format("Place John with the camera wall flush on the %s wall, shooter facing the field.",
                         red ? "audience" : "far"));
                 if (startFix.count() >= MIN_START_SAMPLES) {
@@ -265,7 +294,9 @@ public class JohnTeleOp extends LinearOpMode {
             return;
         }
 
+        Pose wallFound = walls.found(MIN_START_SAMPLES);
         Pose start = startFrom == Start.AUTO ? autoPose
+                : wallFound != null ? wallFound
                 : startFix.alongWall(wallPose(settings), MIN_START_SAMPLES, RobotGeometry.LENGTH_IN / 2.0);
         follower.setPose(start);
         watchdog.poseSet();
@@ -280,6 +311,7 @@ public class JohnTeleOp extends LinearOpMode {
         boolean shotLatched = false;      // A must be let go before the next shot
         boolean upFromAuto = startFrom == Start.AUTO && autoUpAudience != null;
         TagLocalizer relocalizer = new TagLocalizer(100);
+        WallFinder relocalizeWalls = new WallFinder(100);
         boolean relocalizing = false;
         boolean relocalizeDone = false;   // X must be let go before the next re-localize
         Pose relocalizeWall = null;       // the wall pose when re-localizing against a wall
@@ -298,6 +330,7 @@ public class JohnTeleOp extends LinearOpMode {
                 null, null, null, null, tracker.upCellName(), watchdog.state(),
                 String.format(Locale.US, "start %s at %s (%s)", red ? "red" : "blue", Drawing.format(start),
                         startFrom == Start.AUTO ? "from the autonomous"
+                                : wallFound != null ? walls.describe(MIN_START_SAMPLES)
                                 : startFix.count() >= MIN_START_SAMPLES ? startFix.count() + " tag readings" : "no tag fix"));
 
         while (opModeIsActive()) {
@@ -344,7 +377,8 @@ public class JohnTeleOp extends LinearOpMode {
                             imuStill && Math.abs(stickFwd) + Math.abs(stickLeft) < 0.05)
                     : tracker.update(frame, follower);
             if (usable && relocalizing && !lost) {
-                relocalizer.add(frame, relocalizeWall != null ? relocalizeWall.heading() : pose.heading());
+                relocalizer.add(frame, pose.heading());
+                relocalizeWalls.add(frame);
             }
             if (tracker.event() != null) {
                 event = tracker.event();
@@ -375,13 +409,9 @@ public class JohnTeleOp extends LinearOpMode {
             if (relocalizeHeld && !relocalizing && !relocalizeDone && shot == Shot.IDLE && !lost) {
                 relocalizing = true;
                 relocalizer.reset();
+                relocalizeWalls.reset();
                 relocalizeTimer.reset();
-                Pose wall = backWallPose(pose);
-                boolean atWall = Math.abs(pose.x() - wall.x()) <= WALL_SNAP_IN
-                        && Math.abs(Math.toDegrees(normalize(pose.heading() - wall.heading()))) <= WALL_SNAP_DEG;
-                relocalizeWall = atWall ? wall : null;
-                event = atWall ? "re-localize against the " + (wall.x() > 0 ? "audience" : "far")
-                        + " wall: keep X held, stand still" : "re-localize from the tags: keep X held, stand still";
+                event = "re-localize: keep X held, stand still";
             }
             if (relocalizing && !relocalizeHeld) {
                 relocalizing = false;
@@ -394,6 +424,7 @@ public class JohnTeleOp extends LinearOpMode {
             if (lost) {
                 if (shootHeld && !shotLatched) {
                     shotLatched = true;
+                    intakeOn = false;   // a shot stops the intake
                     visionShot = true;
                     visionVolleyDone = false;
                     visionTarget = Double.NaN;
@@ -408,6 +439,7 @@ public class JohnTeleOp extends LinearOpMode {
             }
             if (shootHeld && shot == Shot.IDLE && !shotLatched && !lost) {
                 shotLatched = true;
+                intakeOn = false;   // a shot stops the intake
                 if (!watchdog.ok()) {
                     shotStatus = "can't aim: odometry " + watchdog.state();
                     event = shotStatus;
@@ -455,22 +487,22 @@ public class JohnTeleOp extends LinearOpMode {
                 } else if (relocalizeTimer.milliseconds() >= RELOCALIZE_MS) {
                     relocalizing = false;
                     relocalizeDone = true;   // once per hold
-                    if (relocalizer.count() >= MIN_RELOCALIZE_SAMPLES) {
+                    // Against a back wall (from the tags alone, so a wrong heading is fixed too), else
+                    // from the tags with the Pinpoint heading
+                    Pose atWall = relocalizeWalls.found(MIN_RELOCALIZE_SAMPLES);
+                    if (atWall != null || relocalizer.count() >= MIN_RELOCALIZE_SAMPLES) {
                         Pose before = follower.pose();
-                        Pose fixed = relocalizeWall != null
-                                ? relocalizer.alongWall(relocalizeWall, MIN_RELOCALIZE_SAMPLES, RobotGeometry.LENGTH_IN / 2.0)
-                                : new Pose(relocalizer.x(), relocalizer.y(), before.heading());
+                        Pose fixed = atWall != null ? atWall : new Pose(relocalizer.x(), relocalizer.y(), before.heading());
                         follower.setPose(fixed);
                         watchdog.poseSet();
                         follower.manual(DrivePowers.zero());   // drop a hold in the old coordinates
+                        fallback.alignTo(fixed.heading());
                         event = String.format(Locale.US, "re-localized (%s, %d tag readings): %s -> %s",
-                                relocalizeWall != null ? (relocalizeWall.x() > 0 ? "audience wall" : "far wall") : "tags",
-                                relocalizer.count(),
-                                Drawing.format(before), Drawing.format(fixed));
+                                atWall != null ? (atWall.x() > 0 ? "audience wall" : "far wall") : "tags",
+                                relocalizer.count(), Drawing.format(before), Drawing.format(fixed));
                     } else {
-                        event = "re-localize failed: " + relocalizer.count() + " tag readings (standing still? "
-                                + (relocalizeWall != null ? "both HIVEs may be tilted away from this wall: try the other wall)"
-                                        : "HIVE in view?)");
+                        event = "re-localize failed: " + relocalizer.count() + " tag readings (standing still? HIVE in "
+                                + "view? against a back wall, both HIVEs may be tilted away from it: try the other wall)";
                     }
                 }
             }
@@ -603,9 +635,8 @@ public class JohnTeleOp extends LinearOpMode {
                     : zone + ": the shot drives into range first");
             telemetry.addData("Pose (FTC)", Drawing.format(pose));
             if (relocalizing) {
-                telemetry.addData("Re-localizing", "%s, %d tag readings",
-                        relocalizeWall != null ? (relocalizeWall.x() > 0 ? "audience wall" : "far wall") : "tags",
-                        relocalizer.count());
+                telemetry.addData("Re-localizing", "%d tag readings; %s", relocalizer.count(),
+                        relocalizeWalls.describe(MIN_RELOCALIZE_SAMPLES));
             }
             telemetry.addData("Camera", camera.status());
             telemetry.addData("Pinpoint", "%s, %s", state, watchdog.status());
