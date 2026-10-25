@@ -240,7 +240,8 @@ public class JohnTeleOp extends LinearOpMode {
     private enum Start { AUTO, WALL }
 
     private static final String LOG_HEADER = "t_s,shot,x,y,h_deg,aim_deg,target_x,target_y,target_src,"
-            + "distance,rpm_target,rpm,flywheel_mode,indexer_step,tags,up_cell,watchdog,event";
+            + "distance,rpm_target,rpm,flywheel_mode,indexer_step,tags,up_cell,watchdog,"
+            + "stick_fwd,stick_left,stick_turn,battery_v,event";
 
     private Follower follower;
     private ForesightConfig foresight;
@@ -369,6 +370,12 @@ public class JohnTeleOp extends LinearOpMode {
                     : visionStart != null ? visionStart
                     : startFix.alongWall(wall, MIN_START_SAMPLES, RobotGeometry.LENGTH_IN / 2.0);
 
+            if (startFrom == Start.WALL && wallFound == null && visionStart == null
+                    && startFix.count() < MIN_START_SAMPLES) {
+                telemetry.addLine("!!! START POSE UNKNOWN: no autonomous pose, no tags. Field-centric will be WRONG"
+                        + " unless John is really at the start below. Point the camera at the HIVE, or after START"
+                        + " hold Back to re-position from the tags. !!!");
+            }
             telemetry.addData("Alliance", haveSetup ? "%s   (from %s; drivers at the %s wall)"
                             : "%s   (%sno Game Setup saved: B red, X blue; drivers at the %s wall)",
                     red ? "RED" : "BLUE", haveSetup ? setupSource : "", red ? "red" : "blue");
@@ -460,13 +467,19 @@ public class JohnTeleOp extends LinearOpMode {
         VisionAim lastAim = null;
         double lastAimMs = -1e9;
         double visionTarget = Double.NaN;   // field heading to hold (IMU), from the camera
+        // Started from the wall default without any tag fix (2026-10-25 match 1: relaunched after a power
+        // loss, John was elsewhere and field-centric was wrong): warn until a Back re-position
+        boolean startUnknown = startFrom == Start.WALL && walls.found(MIN_START_SAMPLES) == null
+                && initVision.size() < MIN_START_SAMPLES && startFix.count() < MIN_START_SAMPLES;
         log.row(0.0, shot, start.x(), start.y(), Math.toDegrees(start.heading()), null, null, null, null, null, null,
-                null, null, null, null, tracker.upCellName(), watchdog.state(),
-                String.format(Locale.US, "start %s at %s (%s)", red ? "red" : "blue", Drawing.format(start),
+                null, null, null, null, tracker.upCellName(), watchdog.state(), null, null, null,
+                shooter.flywheel().voltage(),
+                String.format(Locale.US, "start %s at %s (%s)%s", red ? "red" : "blue", Drawing.format(start),
                         startFrom == Start.AUTO ? "from the autonomous"
                                 : wallFound != null ? walls.describe(MIN_START_SAMPLES)
                                 : visionStart != null ? "vision pose from " + initVision.size() + " frames"
-                                : startFix.count() >= MIN_START_SAMPLES ? startFix.count() + " tag readings" : "no tag fix"));
+                                : startFix.count() >= MIN_START_SAMPLES ? startFix.count() + " tag readings" : "no tag fix",
+                        startUnknown ? "; START POSE UNKNOWN" : ""));
 
         while (opModeIsActive()) {
             String event = null;
@@ -702,6 +715,7 @@ public class JohnTeleOp extends LinearOpMode {
                         fallback.alignTo(fixed.heading());
                         autoCorrect = true;
                         correctWindow.clear();
+                        startUnknown = false;
                         event = String.format(Locale.US, "re-positioned (%s, %d frames): %s -> %s; vision correction on",
                                 how, relocalizeVision.size(), Drawing.format(before), Drawing.format(fixed))
                                 + "; tags " + relocalizeIds;
@@ -875,6 +889,10 @@ public class JohnTeleOp extends LinearOpMode {
             }
 
             // ---- Telemetry, Dashboard, log ----
+            if (startUnknown) {
+                telemetry.addLine("!!! START POSE UNKNOWN: field-centric may be wrong. Hold Back with the camera"
+                        + " on the HIVE tags to re-position. !!!");
+            }
             if (watchdog.lost()) {
                 telemetry.addLine("NO ODOMETRY (LOST): driving on the IMU; A = vision shot. " + watchdog.reason());
                 telemetry.addData("Vision shot (hold A)", visionShot ? (visionStatus == null ? "..." : visionStatus) : "off");
@@ -929,7 +947,7 @@ public class JohnTeleOp extends LinearOpMode {
                     aimPose == null ? null : Math.toDegrees(aimPose.heading()), target[0], target[1], tracker.source(),
                     distance, shooter.flywheel().isOn() ? shooter.flywheel().targetRpm() : 0.0, shooter.flywheel().rpm(),
                     shooter.flywheel().mode(), shooter.indexer().stepCount(), frame == null ? null : frame.ids(),
-                    tracker.upCellName(), state, event);
+                    tracker.upCellName(), state, stickFwd, stickLeft, stickTurn, shooter.flywheel().voltage(), event);
         }
         shooter.stop();
         intake.off();
