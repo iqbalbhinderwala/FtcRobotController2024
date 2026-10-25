@@ -168,6 +168,12 @@ public class JohnAuto extends LinearOpMode {
      * wall, not into it.
      */
     public static double PARK_APPROACH_OUT_IN = 12.0;
+    /**
+     * Parked, the camera wall stays this far off the red wall: John must not touch the wall when
+     * parked, with room for odometry error, and it clears a ball lying against the wall (2.8"; r0186
+     * was stopped by one). The zone is 11.6" deep, so about 8.6" of John stays inside.
+     */
+    public static double PARK_WALL_GAP_IN = 3.0;
     /** The approach is this far off the park line (away from the wall), the rest is along the wall. */
     public static double PARK_APPROACH_OFF_WALL_IN = 1.0;
 
@@ -833,12 +839,12 @@ public class JohnAuto extends LinearOpMode {
         return fromAudience ? LOADING_ZONE_MAX_X - PARK_INTO_ZONE_IN : LOADING_ZONE_MIN_X + PARK_INTO_ZONE_IN;
     }
 
-    /** The park line (red frame): the robot's half extent across the wall at the park heading, plus WALL_GAP. */
+    /** The park line (red frame): the robot's half extent across the wall at the park heading, plus PARK_WALL_GAP_IN. */
     private static double parkY() {
         double h = Math.toRadians(PARK_HEADING_DEG);
         double halfAcross = RobotGeometry.LENGTH_IN / 2.0 * Math.abs(Math.sin(h))
                 + RobotGeometry.WIDTH_IN / 2.0 * Math.abs(Math.cos(h));
-        return RED_WALL_Y + halfAcross + WALL_GAP;
+        return RED_WALL_Y + halfAcross + PARK_WALL_GAP_IN;
     }
 
     /** True when the robot (red frame) overlaps the red LOADING ZONE by at least PARK_OVERLAP_IN both ways. */
