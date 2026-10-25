@@ -210,6 +210,12 @@ public class JohnAuto extends LinearOpMode {
     public static double COLLECT_SPEED_IPS = 8.0;
     /** After the GARDEN the intake runs this much longer (the balls move on toward the indexer). */
     public static double INTAKE_AFTER_GARDEN_S = 2.0;
+    /**
+     * From the start of aim 2 to the end of volley 2 the GARDEN-side intake (A) runs, standing still,
+     * so the balls keep moving into the indexer (late balls caused the indexer jams, e.g. r0179). Off
+     * while driving across the field: a loose ball picked up there would make 5 (G407).
+     */
+    public static boolean FEED_DURING_VOLLEY_2 = true;
     public static double PARK_SPEED_IPS = 15.0;
     /** Turning back to the wall before the GARDEN. */
     public static double TURN_TOLERANCE_DEG = 1.5;
@@ -268,6 +274,8 @@ public class JohnAuto extends LinearOpMode {
     private double intakeOffAtS = Double.NaN;
     /** The camera has seen a HIVE tag in this run (INIT included): it works, so not seeing one means something. */
     private boolean cameraSawTags;
+    /** The GARDEN balls are on board: aim / volley 2 run the GARDEN-side intake to feed the indexer. */
+    private boolean feedFromIntake;
     private CsvLog log;
 
     @Override
@@ -564,6 +572,12 @@ public class JohnAuto extends LinearOpMode {
                     shooter.setSpin(true);
                     aimResult = Aimer.Result.AIMING;
                     logEvent(aimer.start());
+                    if (feedFromIntake) {
+                        // Standing still from here to the end of the volley: feed the indexer
+                        intakeOffAtS = Double.NaN;
+                        intake.only(Intake.Side.A, Intake.POWER);
+                        logEvent("intake A on: feeding the indexer for the volley");
+                    }
                 })
                 .setExecute(() -> {
                     if (aimResult == Aimer.Result.AIMING) {
@@ -600,7 +614,7 @@ public class JohnAuto extends LinearOpMode {
                     wasAudience[0] = tracker.upAudience();
                     baseline[0] = tracker.upHeight();
                     tracker.tipping(Double.NaN);   // clears the count
-                    if (!intake.status().equals("off")) {
+                    if (!feedFromIntake && !intake.status().equals("off")) {
                         intake.off();
                         logEvent(name + ": intake off");
                     }
@@ -629,6 +643,10 @@ public class JohnAuto extends LinearOpMode {
                 limit(name + ": firing", VOLLEY_MAX_S, fire),
                 lazy(() -> {
                     shooter.setPaused(false);
+                    if (!intake.status().equals("off")) {
+                        intake.off();   // before any drive (a side switch, the park)
+                        logEvent(name + ": intake off");
+                    }
                     if (!tipped[0]) {
                         emptied = !skipped[0] && !shooter.stuck() && shooter.stepsLeft() == 0;
                         return instant(() -> {
@@ -727,6 +745,7 @@ public class JohnAuto extends LinearOpMode {
                 // the indexer while driving; the next volley (or the park) stops it
                 instant(() -> {
                     intakeOffAtS = autoSeconds() + INTAKE_AFTER_GARDEN_S;
+                    feedFromIntake = FEED_DURING_VOLLEY_2;
                     logEvent(String.format(Locale.US, "garden done: the intake keeps running %.1f s more", INTAKE_AFTER_GARDEN_S));
                 }));
     }
