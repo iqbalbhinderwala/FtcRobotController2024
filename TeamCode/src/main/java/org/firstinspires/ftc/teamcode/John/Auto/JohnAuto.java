@@ -140,6 +140,13 @@ public class JohnAuto extends LinearOpMode {
     /** Start the slow stretch this far before intake A reaches the first ball. */
     public static double SLOW_BEFORE_BALL_IN = 4.0;
     /**
+     * The fast run along the audience wall to the GARDEN: this far off the wall and no faster than
+     * this (0 = no cap); the slow stretch through the balls then slides onto the wall (WALL_GAP).
+     * 2026-10-25, was 0.5 in and uncapped: it ran ~54 in/s rubbing the wall.
+     */
+    public static double GARDEN_RUN_GAP_IN = 1.0;
+    public static double GARDEN_RUN_SPEED_IPS = 30.0;
+    /**
      * Park: partly inside the red LOADING ZONE (A5: X -48 to -24, Y -72 to -60.4), camera wall on the
      * wall, never driving through it (a partner may be in it). John comes in from the end nearer his
      * route: from the audience side (X > the zone's middle, e.g. from A2 or the look spot) he parks
@@ -728,13 +735,14 @@ public class JohnAuto extends LinearOpMode {
         Pose here = red(follower.pose());
         double halfLength = RobotGeometry.LENGTH_IN / 2.0;
         double wallX = AUDIENCE_WALL_X - RobotGeometry.WIDTH_IN / 2.0 - WALL_GAP;
+        double runX = AUDIENCE_WALL_X - RobotGeometry.WIDTH_IN / 2.0 - GARDEN_RUN_GAP_IN;
         double heading = Math.toRadians(90.0);
         Pose turned = here.withHeading(heading);
-        Pose atWall = new Pose(wallX, here.y(), heading);
+        Pose atWall = new Pose(runX, here.y(), heading);
         // Intake A is at the robot's -X end, which points toward the red wall (-Y) at heading 90
         double slowY = GARDEN_FIRST_BALL_Y + BALL_RADIUS + halfLength + SLOW_BEFORE_BALL_IN;
         double endY = RED_WALL_Y + halfLength + WALL_GAP;
-        Pose slowStart = new Pose(wallX, Math.min(here.y(), slowY), heading);
+        Pose slowStart = new Pose(runX, Math.min(here.y(), slowY), heading);
         Pose end = new Pose(wallX, endY, heading);
         logEvent(String.format(Locale.US, "garden: wall at x %.1f, slow from y %.1f to %.1f at %.0f in/s",
                 wallX, slowStart.y(), endY, COLLECT_SPEED_IPS));
@@ -745,7 +753,7 @@ public class JohnAuto extends LinearOpMode {
                         waitMs(TURN_TIMEOUT_MS)),
                 watcher.follow("garden: to the wall", () -> around(field(atWall), 0)),
                 intake.start(Intake.Side.A),
-                watcher.follow("garden: along the wall", () -> toward(field(slowStart), true, 0)),
+                watcher.follow("garden: along the wall", () -> toward(field(slowStart), true, GARDEN_RUN_SPEED_IPS)),
                 watcher.creep("garden: collect", () -> field(end), COLLECT_SPEED_IPS),
                 // The intake keeps running through the next stages, so the balls work their way to
                 // the indexer while driving; the next volley (or the park) stops it
@@ -914,7 +922,7 @@ public class JohnAuto extends LinearOpMode {
     }
 
     private double routeLength(Pose a, Pose b) {
-        List<double[]> route = ShootingZone.route(a, b, !blue);
+        List<double[]> route = ShootingZone.squareRoute(a, b, !blue);
         double length = 0;
         for (int i = 1; i < route.size(); i++) {
             length += Math.hypot(route.get(i)[0] - route.get(i - 1)[0], route.get(i)[1] - route.get(i - 1)[1]);
@@ -931,7 +939,8 @@ public class JohnAuto extends LinearOpMode {
         double end = gardenEnd().y();
         double fast = Math.max(0.0, red(here).y() - slowY);
         double slowLength = Math.max(0.0, Math.min(red(here).y(), slowY) - end);
-        return 0.5 + driveSeconds(here, atWall) + fast / AVG_DRIVE_IPS + slowLength / COLLECT_SPEED_IPS
+        double runIps = GARDEN_RUN_SPEED_IPS > 0 ? Math.min(AVG_DRIVE_IPS, GARDEN_RUN_SPEED_IPS) : AVG_DRIVE_IPS;
+        return 0.5 + driveSeconds(here, atWall) + fast / runIps + slowLength / COLLECT_SPEED_IPS
                 + Intake.SETTLE_MS / 1000.0;
     }
 
@@ -1020,35 +1029,58 @@ public class JohnAuto extends LinearOpMode {
 
     /**
      * From where the robot is now to {@code end} (field frame) around the HIVE frame
-     * (ShootingZone.route), turning to the end heading on the first leg.
+     * (ShootingZone.squareRoute): square to the HIVE while passing it, turning to the end heading on
+     * the first leg after it (on the first leg when the HIVE is not in the way).
      */
     private Path around(Pose end, double speed) {
-        Pose here = follower.pose();
-        List<double[]> route = ShootingZone.route(here, end, !blue);
-        Path[] legs = new Path[route.size() - 1];
-        for (int i = 0; i < legs.length; i++) {
-            Pose a = i == 0 ? here : new Pose(route.get(i)[0], route.get(i)[1], end.heading());
-            Pose b = new Pose(route.get(i + 1)[0], route.get(i + 1)[1], end.heading());
-            legs[i] = i == 0 ? line(a, b).linear(a, b) : line(a, b).constant(b);
-        }
-        Path p = legs.length == 1 ? legs[0] : path(legs);
+        Path p = squarePast(end, false);
         return speed > 0 ? slow(p, speed) : p;
     }
 
     /**
-     * From where the robot is now to {@code end} (field frame) around the HIVE frame, the shooter
-     * turning toward the target CELL along the way (Aimer.facingTarget), so it arrives aimed.
+     * The squareRoute() legs to {@code end}: before the HIVE John turns square to it
+     * (ShootingZone.squareHeading), keeps that heading while passing it, then turns toward the CELL
+     * ({@code aimed}, Aimer.facingTarget) or to the end heading. With no square legs: aimed the whole
+     * way, or turning to the end heading on the first leg.
      */
-    private Path aimedRoute(Pose end) {
+    private Path squarePast(Pose end, boolean aimed) {
         Pose here = follower.pose();
-        List<double[]> route = ShootingZone.route(here, end, !blue);
+        List<double[]> route = ShootingZone.squareRoute(here, end, !blue);
+        int firstSquare = -1, lastSquare = -1;
+        for (int i = 0; i < route.size() - 1; i++) {
+            if (route.get(i + 1)[2] > 0) {
+                firstSquare = firstSquare < 0 ? i : firstSquare;
+                lastSquare = i;
+            }
+        }
+        double sq = ShootingZone.squareHeading(here.heading(), end.heading());
         Path[] legs = new Path[route.size() - 1];
         for (int i = 0; i < legs.length; i++) {
             Pose a = i == 0 ? here : new Pose(route.get(i)[0], route.get(i)[1], end.heading());
             Pose b = new Pose(route.get(i + 1)[0], route.get(i + 1)[1], end.heading());
-            legs[i] = line(a, b).heading(aimer.facingTarget(i == 0 ? here.heading() : null));
+            if (firstSquare < 0) {
+                legs[i] = aimed ? line(a, b).heading(aimer.facingTarget(i == 0 ? here.heading() : null))
+                        : i == 0 ? line(a, b).linear(a, b) : line(a, b).constant(b);
+            } else if (i < firstSquare) {
+                legs[i] = line(a, b).linear(a, b.withHeading(sq));
+            } else if (i <= lastSquare) {
+                legs[i] = line(a, b).constant(b.withHeading(sq));
+            } else if (aimed) {
+                legs[i] = line(a, b).heading(aimer.facingTarget(i == lastSquare + 1 ? sq : null));
+            } else {
+                legs[i] = i == lastSquare + 1 ? line(a, b).linear(a.withHeading(sq), b) : line(a, b).constant(b);
+            }
         }
         return legs.length == 1 ? legs[0] : path(legs);
+    }
+
+    /**
+     * From where the robot is now to {@code end} (field frame) around the HIVE frame, the shooter
+     * turning toward the target CELL along the way (Aimer.facingTarget), so it arrives aimed; square
+     * to the HIVE while passing it (squarePast), aiming only after it.
+     */
+    private Path aimedRoute(Pose end) {
+        return squarePast(end, true);
     }
 
     /** A path driven no faster than {@code speed} in/s (Pedro reverts the limit after the path). */

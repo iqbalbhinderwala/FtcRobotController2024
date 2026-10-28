@@ -169,6 +169,127 @@ public class ShootingZone {
         return any != null ? any : new ArrayList<>(Arrays.asList(a, b));
     }
 
+    /**
+     * Like route(), for a robot that keeps square to the HIVE (heading a multiple of 90 deg, see
+     * squareHeading()) while it is close to it: then it only needs half its longest side of room, not
+     * half its diagonal, so it passes closer (2026-10-25: turning toward the CELL the whole way, the
+     * drive to B6 swept John's corners 6-10" into A3 / A4, where robots may be parked). Each point is
+     * {x, y, square}: square 1 when the leg ending there is driven square. The points where the route
+     * enters and leaves the HIVE's side (the strip |x| < the diagonal-grown box when going along X,
+     * |y| < it when going along Y) are added, so John turns square before it and turns on (to the end
+     * heading, or toward the CELL) only once past the HIVE, not while still beside it. Without the
+     * HIVE in the way, or starting inside the diagonal-grown box: route() with no square legs.
+     */
+    public static List<double[]> squareRoute(Pose from, Pose to, boolean red) {
+        double gD = Math.hypot(RobotGeometry.LENGTH_IN, RobotGeometry.WIDTH_IN) / 2.0 + HIVE_CLEARANCE_IN;
+        double gS = Math.max(RobotGeometry.LENGTH_IN, RobotGeometry.WIDTH_IN) / 2.0 + HIVE_CLEARANCE_IN;
+        double hxD = HIVE_HALF_X + gD, hyD = HIVE_HALF_Y + gD;
+        double hxS = HIVE_HALF_X + gS, hyS = HIVE_HALF_Y + gS;
+        double[] a = {from.x(), from.y()};
+        double[] b = {to.x(), to.y()};
+        boolean alongX = Math.abs(b[0] - a[0]) >= Math.abs(b[1] - a[1]);
+        List<double[]> via = null;
+        if (!inside(a, hxD, hyD) && hits(a, b, hxD, hyD)) {
+            double cx = hxS + 1.0;
+            double cy = hyS + 1.0;
+            double ours = red ? -cy : cy;
+            if (alongX && a[0] * b[0] < 0 && Math.abs(a[0]) >= cx && Math.abs(b[0]) >= cx) {
+                // From one end of the HIVE to the other: along its side, parallel to it, so John
+                // does not drift toward the alliance wall on the way (a straight line would)
+                double[] c1 = {Math.signum(a[0]) * cx, ours};
+                double[] c2 = {-c1[0], ours};
+                if (!hits(a, c1, hxS, hyS) && !hits(c1, c2, hxS, hyS) && !hits(c2, b, hxS, hyS)) {
+                    via = Arrays.asList(a, c1, c2, b);
+                }
+            }
+            if (via == null) {
+                via = hits(a, b, hxS, hyS)
+                        ? shortestVia(a, b, new double[][]{{cx, ours}, {-cx, ours}}, hxS, hyS)
+                        : Arrays.asList(a, b);
+            }
+            if (via == null) {
+                via = shortestVia(a, b, new double[][]{{cx, cy}, {cx, -cy}, {-cx, cy}, {-cx, -cy}}, hxS, hyS);
+            }
+        }
+        List<double[]> out = new ArrayList<>();
+        if (via == null) {
+            for (double[] p : route(from, to, red)) {
+                out.add(new double[]{p[0], p[1], 0});
+            }
+            return out;
+        }
+        // First entry into / last exit from the HIVE's side along the route
+        double sideX = alongX ? hxD : 1e6, sideY = alongX ? 1e6 : hyD;
+        int entryLeg = -1, exitLeg = -1;
+        double entryT = 0, exitT = 1;
+        for (int k = 0; k < via.size() - 1; k++) {
+            double[] c = clip(via.get(k), via.get(k + 1), sideX, sideY);
+            if (c != null) {
+                if (entryLeg < 0) {
+                    entryLeg = k;
+                    entryT = c[0];
+                }
+                exitLeg = k;
+                exitT = c[1];
+            }
+        }
+        add(out, a, 0);
+        for (int k = 0; k < via.size() - 1; k++) {
+            double[] p = via.get(k), q = via.get(k + 1);
+            if (k == entryLeg) {
+                add(out, lerp(p, q, entryT), 0);
+            }
+            if (k == exitLeg) {
+                add(out, lerp(p, q, exitT), 1);
+                add(out, q, 0);
+            } else {
+                add(out, q, k >= entryLeg && k < exitLeg ? 1 : 0);
+            }
+        }
+        // The route ends exactly at b
+        double[] last = out.get(out.size() - 1);
+        last[0] = b[0];
+        last[1] = b[1];
+        return out;
+    }
+
+    /**
+     * The square heading (a multiple of 90 deg) for squareRoute()'s square legs: the one that turns
+     * least in total from {@code fromHeading} to it and on to {@code toHeading}.
+     */
+    public static double squareHeading(double fromHeading, double toHeading) {
+        double best = 0, bestTurn = Double.POSITIVE_INFINITY;
+        for (int k = 0; k < 4; k++) {
+            double h = k * Math.PI / 2.0;
+            double turn = Math.abs(wrap(h - fromHeading)) + Math.abs(wrap(toHeading - h));
+            if (turn < bestTurn) {
+                bestTurn = turn;
+                best = h;
+            }
+        }
+        return best;
+    }
+
+    private static double wrap(double a) {
+        return Math.atan2(Math.sin(a), Math.cos(a));
+    }
+
+    /** Adds a route point, merging it into the last one when closer than half an inch. */
+    private static void add(List<double[]> out, double[] p, int square) {
+        if (!out.isEmpty()) {
+            double[] last = out.get(out.size() - 1);
+            if (Math.hypot(p[0] - last[0], p[1] - last[1]) < 0.5) {
+                last[2] = Math.max(last[2], square);
+                return;
+            }
+        }
+        out.add(new double[]{p[0], p[1], square});
+    }
+
+    private static double[] lerp(double[] p, double[] q, double t) {
+        return new double[]{p[0] + (q[0] - p[0]) * t, p[1] + (q[1] - p[1]) * t};
+    }
+
     /** The shortest clear way from a to b via one or two of the corners, or null. */
     private static List<double[]> shortestVia(double[] a, double[] b, double[][] corners, double hx, double hy) {
         List<double[]> best = null;
@@ -199,8 +320,13 @@ public class ShootingZone {
         return Math.abs(p[0]) < hx && Math.abs(p[1]) < hy;
     }
 
-    /** True when the segment p-q passes through the inside of the box |x| < hx, |y| < hy (Liang-Barsky). */
+    /** True when the segment p-q passes through the inside of the box |x| < hx, |y| < hy. */
     private static boolean hits(double[] p, double[] q, double hx, double hy) {
+        return clip(p, q, hx, hy) != null;
+    }
+
+    /** The part {t0, t1} of the segment p-q inside the box |x| < hx, |y| < hy, or null (Liang-Barsky). */
+    private static double[] clip(double[] p, double[] q, double hx, double hy) {
         double dx = q[0] - p[0];
         double dy = q[1] - p[1];
         double t0 = 0.0;
@@ -210,7 +336,7 @@ public class ShootingZone {
         for (int i = 0; i < 4; i++) {
             if (Math.abs(pv[i]) < 1e-12) {
                 if (qv[i] <= 0) {
-                    return false;
+                    return null;
                 }
             } else {
                 double t = qv[i] / pv[i];
@@ -221,7 +347,7 @@ public class ShootingZone {
                 }
             }
         }
-        return t1 - t0 > 1e-6;
+        return t1 - t0 > 1e-6 ? new double[]{t0, t1} : null;
     }
 
     private static double length(double[] p, double[] q) {
