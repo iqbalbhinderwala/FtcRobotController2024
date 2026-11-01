@@ -16,6 +16,8 @@ import com.qualcomm.robotcore.hardware.HardwareMap;
 
 import org.firstinspires.ftc.robotcore.external.navigation.DistanceUnit;
 
+import java.util.OptionalDouble;
+
 public class Constants {
 
     public static MecanumConfig drivetrainConfig = new MecanumConfig(c -> {
@@ -32,11 +34,21 @@ public class Constants {
         c.manualBrakeMode.set(true);
     });
 
+    /** goBILDA 4-bar pod nominal 19.894 ticks/mm, times 1.00995 from the push test. */
+    public static final double ENCODER_TICKS_PER_MM = 19.894 * 1.00995;
+
     public static PinpointConfig localizerConfig = new PinpointConfig(c -> {
         c.name.set("pinpoint");
         c.podType.set(GoBildaPinpointDriver.GoBildaOdometryPods.goBILDA_4_BAR_POD);
+        // Measured, not the 4-bar pod's nominal 19.894 ticks/mm: hand pushes of 96.0" (tape measure)
+        // read 96.88" and 97.03" (r0243, 2026-11-01), so the pods read about 1.0% long.
+        c.encoderResolutionUnit.set(DistanceUnit.MM);
+        c.ticksPerUnit.set(OptionalDouble.of(ENCODER_TICKS_PER_MM));
         c.xPodOffset.set(0.0);
-        c.yPodOffset.set(-0.9375); // -(1-1/16) = -0.9375
+        // The strafe pod is 15/16" toward the intake B end (+X, forward = positive). It was -0.9375
+        // (sign left over from the front being reversed on 2026-10-22): [John] Odometry Test spins
+        // r0234 / r0235 showed a 2.3-2.6" forward lever arm, which swung the pose up to ~5" on big turns.
+        c.yPodOffset.set(0.9375); // 1-1/16 = -0.9375
         c.xPodDirection.set(GoBildaPinpointDriver.EncoderDirection.REVERSED);
         c.yPodDirection.set(GoBildaPinpointDriver.EncoderDirection.REVERSED);
         c.globalDistanceUnit.set(DistanceUnit.INCH);
