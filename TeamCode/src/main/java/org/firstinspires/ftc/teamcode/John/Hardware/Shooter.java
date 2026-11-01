@@ -39,6 +39,13 @@ public class Shooter {
     public static double OPEN_LOOP_SPIN_UP_MS = 1500;
     /** Long enough for the indexer's jam recovery (see Indexer). */
     public static double STEP_TIMEOUT_MS = 4000;
+    /**
+     * A step this long that is within STEP_CLOSE_DEG of its target counts as done (2026-10-31, r0240:
+     * an empty step crept the last degrees for 3.6 s and cost the second volley). The next step's
+     * target is planned from the step count, so nothing is lost.
+     */
+    public static double STEP_SLOW_MS = 800;
+    public static double STEP_CLOSE_DEG = 20;
 
     private enum Feed { IDLE, SPIN_UP, STEP, INTERVAL }
 
@@ -154,7 +161,15 @@ public class Shooter {
                     break;
                 }
                 // busy() needs a moment to come on after a new target
-                if ((feedTimer.milliseconds() > 50 && !indexer.busy()) || feedTimer.milliseconds() > STEP_TIMEOUT_MS) {
+                double shortDeg = indexer.targetDegrees() - indexer.degrees();
+                boolean slowButClose = feedTimer.milliseconds() > STEP_SLOW_MS && Math.abs(shortDeg) < STEP_CLOSE_DEG
+                        && indexer.busy();
+                if (slowButClose) {
+                    add(String.format(Locale.US, "indexer step slow: %.0f deg short after %.0f ms, moving on",
+                            shortDeg, feedTimer.milliseconds()));
+                }
+                if ((feedTimer.milliseconds() > 50 && !indexer.busy()) || slowButClose
+                        || feedTimer.milliseconds() > STEP_TIMEOUT_MS) {
                     stepsDone++;
                     if (stepsDone >= steps) {
                         feed = Feed.IDLE;
