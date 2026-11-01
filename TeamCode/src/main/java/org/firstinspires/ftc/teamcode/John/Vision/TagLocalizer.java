@@ -49,6 +49,27 @@ public class TagLocalizer {
         return new double[]{tagX - dx, HiveTags.tagY(tag.id) - dy};
     }
 
+    /**
+     * Odometry check for the run logs: {camera x, camera y, distance from the odometry pose in
+     * inches} from this frame's tags (median of robotPosition() over them), or nulls without tags.
+     * It uses the odometry heading, not a heading from the tags: one cluster spans only 13", so a
+     * tag-solved heading swings by degrees (2026-10-31). So a heading error still shows here, as
+     * about 1" per degree at shooting range; trust it most when John stands still.
+     */
+    public static Object[] logCheck(HiveCamera.Frame frame, Pose odometry) {
+        if (frame == null || frame.tags.isEmpty() || odometry == null) {
+            return new Object[]{null, null, null};
+        }
+        List<Double> xs = new ArrayList<>(), ys = new ArrayList<>();
+        for (HiveCamera.Tag tag : frame.tags) {
+            double[] p = robotPosition(tag, odometry.heading());
+            xs.add(p[0]);
+            ys.add(p[1]);
+        }
+        double x = median(xs), y = median(ys);
+        return new Object[]{x, y, Math.hypot(x - odometry.x(), y - odometry.y())};
+    }
+
     /** Adds the position every tag of the frame implies; returns how many. */
     public int add(HiveCamera.Frame frame, double heading) {
         if (frame == null) {

@@ -241,7 +241,7 @@ public class JohnTeleOp extends LinearOpMode {
 
     private static final String LOG_HEADER = "t_s,shot,x,y,h_deg,aim_deg,target_x,target_y,target_src,"
             + "distance,rpm_target,rpm,flywheel_mode,indexer_step,tags,up_cell,watchdog,"
-            + "stick_fwd,stick_left,stick_turn,battery_v,event";
+            + "stick_fwd,stick_left,stick_turn,battery_v,cam_x,cam_y,cam_err_in,event";
 
     private Follower follower;
     private ForesightConfig foresight;
@@ -473,7 +473,7 @@ public class JohnTeleOp extends LinearOpMode {
                 && initVision.size() < MIN_START_SAMPLES && startFix.count() < MIN_START_SAMPLES;
         log.row(0.0, shot, start.x(), start.y(), Math.toDegrees(start.heading()), null, null, null, null, null, null,
                 null, null, null, null, tracker.upCellName(), watchdog.state(), null, null, null,
-                shooter.flywheel().voltage(),
+                shooter.flywheel().voltage(), null, null, null,
                 String.format(Locale.US, "start %s at %s (%s)%s", red ? "red" : "blue", Drawing.format(start),
                         startFrom == Start.AUTO ? "from the autonomous"
                                 : wallFound != null ? walls.describe(MIN_START_SAMPLES)
@@ -943,11 +943,13 @@ public class JohnTeleOp extends LinearOpMode {
             }
             dashboard.sendTelemetryPacket(packet);
 
+            Object[] cam = TagLocalizer.logCheck(frame, pose);   // odometry check (camera position, odometry heading)
             log.row(clock.seconds(), shot, pose.x(), pose.y(), Math.toDegrees(pose.heading()),
                     aimPose == null ? null : Math.toDegrees(aimPose.heading()), target[0], target[1], tracker.source(),
                     distance, shooter.flywheel().isOn() ? shooter.flywheel().targetRpm() : 0.0, shooter.flywheel().rpm(),
                     shooter.flywheel().mode(), shooter.indexer().stepCount(), frame == null ? null : frame.ids(),
-                    tracker.upCellName(), state, stickFwd, stickLeft, stickTurn, shooter.flywheel().voltage(), event);
+                    tracker.upCellName(), state, stickFwd, stickLeft, stickTurn, shooter.flywheel().voltage(),
+                    cam[0], cam[1], cam[2], event);
         }
         shooter.stop();
         intake.off();

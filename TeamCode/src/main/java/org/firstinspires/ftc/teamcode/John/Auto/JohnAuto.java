@@ -256,7 +256,7 @@ public class JohnAuto extends LinearOpMode {
     // public static boolean STEP_MODE = true;   // TEST: press Y to start each stage
 
     private static final String LOG_HEADER = "t_s,step,x,y,h_deg,follower,shooter,intake,target_x,target_y,"
-            + "target_src,up_cell,tags,watchdog,event";
+            + "target_src,up_cell,tags,watchdog,idx_deg,idx_target_deg,idx_amps,cam_x,cam_y,cam_err_in,event";
 
     private Follower follower;
     private ForesightConfig foresight;
@@ -1162,9 +1162,11 @@ public class JohnAuto extends LinearOpMode {
         }
         Pose p = follower.pose();
         double[] t = tracker.target();
+        Object[] cam = TagLocalizer.logCheck(frame, p);   // odometry check (camera position, odometry heading)
         log.row(clock.seconds(), step, p.x(), p.y(), Math.toDegrees(p.heading()), follower.mode(),
                 shooter.status(), intake.status(), t[0], t[1], tracker.source(), tracker.upCellName(),
-                frame == null ? null : frame.ids(), watchdog.state(), event);
+                frame == null ? null : frame.ids(), watchdog.state(), shooter.indexer().degrees(),
+                shooter.indexer().targetDegrees(), shooter.indexer().amps(), cam[0], cam[1], cam[2], event);
     }
 
     private void logEvent(String event) {
