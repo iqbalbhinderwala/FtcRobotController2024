@@ -36,12 +36,19 @@ public class CellTracker {
     public static int UP_CELL_FRAMES = 3;
     public static double TIP_DROP_IN = 3.0;
     public static int TIP_FRAMES = 2;
+    /**
+     * After a tip is seen (holdUpCell), the camera may not switch the up CELL back for this long:
+     * mid-swing the old CELL still looks up (2026-10-31, r0240: 0.06 s after the tipping alarm it
+     * switched back, and the last 2 balls went into the tipping CELL).
+     */
+    public static double HOLD_AFTER_TIP_MS = 2500;
     /** An up CELL height older than this is not used. */
     public static double HEIGHT_MAX_AGE_MS = 300;
 
     private final boolean red;
     private boolean upAudience;
     private int disagreeFrames;
+    private double holdUntilMs = Double.NEGATIVE_INFINITY;
     private final ArrayDeque<double[]> sightings = new ArrayDeque<>();   // {time ms, x, y}
     private final ElapsedTime clock = new ElapsedTime();
     private final ElapsedTime stillFor = new ElapsedTime();
@@ -91,6 +98,9 @@ public class CellTracker {
         }
         lastSeenMs = clock.milliseconds();
         if (cell.audience != upAudience) {
+            if (clock.milliseconds() < holdUntilMs) {
+                return true;   // the HIVE is still swinging over
+            }
             if (++disagreeFrames < UP_CELL_FRAMES) {
                 return true;
             }
@@ -207,6 +217,12 @@ public class CellTracker {
         upAudience = audience;
         disagreeFrames = 0;
         lowFrames = 0;
+    }
+
+    /** The HIVE was seen tipping: the {@code audience} CELL is up, and the camera may not undo that for HOLD_AFTER_TIP_MS. */
+    public void holdUpCell(boolean audience) {
+        setUpAudience(audience);
+        holdUntilMs = clock.milliseconds() + HOLD_AFTER_TIP_MS;
     }
 
     public String upCellName() {

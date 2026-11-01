@@ -675,7 +675,7 @@ public class JohnAuto extends LinearOpMode {
                             logEvent(name + ": tipped again, no more side switches");
                         });
                     }
-                    tracker.setUpAudience(!wasAudience[0]);
+                    tracker.holdUpCell(!wasAudience[0]);   // trust the tip; the camera must not undo it mid-swing
                     logEvent(name + ": going to the other side, the " + tracker.upCellName() + " CELL");
                     return sequential(
                             label(name + ": to the other side"),
