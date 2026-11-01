@@ -51,6 +51,8 @@ public class ShootingZone {
     public static double HIVE_HALF_Y = 25.0;
     /** 4 (was 2): the autonomous clipped a HIVE leg going around it (2026-10-24). */
     public static double HIVE_CLEARANCE_IN = 4.0;
+    /** squareRoute(): no leg shorter than this next to an entry / exit point (see dropShortLegs()). */
+    public static double MIN_LEG_IN = 6.0;
 
     private static final double FIELD_HALF = 72.0;
 
@@ -233,24 +235,59 @@ public class ShootingZone {
                 exitT = c[1];
             }
         }
-        add(out, a, 0);
+        add(out, a, 0, false);
         for (int k = 0; k < via.size() - 1; k++) {
             double[] p = via.get(k), q = via.get(k + 1);
             if (k == entryLeg) {
-                add(out, lerp(p, q, entryT), 0);
+                add(out, lerp(p, q, entryT), 0, true);
             }
             if (k == exitLeg) {
-                add(out, lerp(p, q, exitT), 1);
-                add(out, q, 0);
+                add(out, lerp(p, q, exitT), 1, true);
+                add(out, q, 0, false);
             } else {
-                add(out, q, k >= entryLeg && k < exitLeg ? 1 : 0);
+                add(out, q, k >= entryLeg && k < exitLeg ? 1 : 0, false);
             }
         }
         // The route ends exactly at b
         double[] last = out.get(out.size() - 1);
         last[0] = b[0];
         last[1] = b[1];
-        return out;
+        dropShortLegs(out);
+        List<double[]> result = new ArrayList<>();
+        for (double[] q : out) {
+            result.add(new double[]{q[0], q[1], q[2]});
+        }
+        return result;
+    }
+
+    /**
+     * No legs of a few inches: Pedro moves on to the next leg before finishing one that short, and
+     * PathWatcher then measures "off the path" against the wrong leg (2026-10-31, r0238 / r0239: the
+     * exit point 2.5" past a corner gave a false PUSHED at 68 in/s and a skidding stop). An entry or
+     * exit point closer than MIN_LEG_IN to a corner is dropped and the corner takes its role (John is
+     * square from / until the corner); one next to the start or the end is dropped too (square from
+     * the start / until the end).
+     */
+    private static void dropShortLegs(List<double[]> out) {
+        for (int i = 1; i < out.size() - 1; i++) {
+            double[] p = out.get(i);
+            if (p[3] == 0) {
+                continue;
+            }
+            double[] prev = out.get(i - 1), next = out.get(i + 1);
+            boolean nearPrev = length(prev, p) < MIN_LEG_IN, nearNext = length(p, next) < MIN_LEG_IN;
+            if (!nearPrev && !nearNext) {
+                continue;
+            }
+            boolean entry = p[2] == 0;
+            if (i == out.size() - 2 && nearNext) {
+                next[2] = 1;   // an exit right before the end: square until the end
+            } else if (entry && nearNext && i + 1 < out.size() - 1) {
+                next[2] = 0;   // an entry right before a corner: the turn ends at the corner
+            }
+            out.remove(i);
+            i--;
+        }
     }
 
     /**
@@ -274,8 +311,11 @@ public class ShootingZone {
         return Math.atan2(Math.sin(a), Math.cos(a));
     }
 
-    /** Adds a route point, merging it into the last one when closer than half an inch. */
-    private static void add(List<double[]> out, double[] p, int square) {
+    /**
+     * Adds a route point {x, y, square, split} ({@code split}: an entry / exit point, not a corner),
+     * merging it into the last one when closer than half an inch.
+     */
+    private static void add(List<double[]> out, double[] p, int square, boolean split) {
         if (!out.isEmpty()) {
             double[] last = out.get(out.size() - 1);
             if (Math.hypot(p[0] - last[0], p[1] - last[1]) < 0.5) {
@@ -283,7 +323,7 @@ public class ShootingZone {
                 return;
             }
         }
-        out.add(new double[]{p[0], p[1], square});
+        out.add(new double[]{p[0], p[1], square, split ? 1 : 0});
     }
 
     private static double[] lerp(double[] p, double[] q, double t) {
