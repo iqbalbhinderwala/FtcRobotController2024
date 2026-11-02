@@ -230,6 +230,15 @@ public class JohnAuto extends LinearOpMode {
      * while driving across the field: a loose ball picked up there would make 5 (G407).
      */
     public static boolean FEED_DURING_VOLLEY_2 = true;
+    /**
+     * Flywheel spin-up (1.45 s from rest) ahead of the volleys: at START for volley 1 (was at the aim,
+     * so John waited about 1.2 s aimed: r0260-r0266), and on the drive to a shooting spot once the
+     * estimated drive left is SPIN_LEAD_S (was at the end of the drive: about 1.0 s aimed). Not from
+     * the start of that drive, so the full-power boost (8.5 A) does not add to the drive's hardest
+     * acceleration. Holding speed takes about 2.3 A.
+     */
+    public static boolean SPIN_AT_START = true;
+    public static double SPIN_LEAD_S = 1.6;
     public static double PARK_SPEED_IPS = 15.0;
     /** Turning back to the wall before the GARDEN. */
     public static double TURN_TOLERANCE_DEG = 1.5;
@@ -268,6 +277,8 @@ public class JohnAuto extends LinearOpMode {
     private CellTracker tracker;
     private Aimer aimer;
     private Shooter shooter;
+    /** Driving to this shooting spot (field frame): spin the flywheel up SPIN_LEAD_S before it; null: not. */
+    private Pose spinGoal;
     private Intake intake;
     private boolean blue;
     private String step = "init";
@@ -405,6 +416,7 @@ public class JohnAuto extends LinearOpMode {
                     }
                     shooter.cancel();
                     shooter.setSpin(false);
+                    spinGoal = null;
                     intake.off();
                 }),
                 lazy(() -> routineDone ? label("park")
@@ -441,6 +453,12 @@ public class JohnAuto extends LinearOpMode {
             }
             Scheduler.execute();
             Pose pose = follower.pose();
+            if (spinGoal != null && driveSeconds(pose, spinGoal) <= SPIN_LEAD_S) {
+                spinGoal = null;
+                shooter.setSpin(true);
+                logEvent(String.format(Locale.US, "flywheel on: about %.1f s of driving left to the shooting spot",
+                        SPIN_LEAD_S));
+            }
             double[] target = tracker.target();
             shooter.setDistance(Math.hypot(target[0] - pose.x(), target[1] - pose.y()));
             String shooterEvent = shooter.update();
@@ -492,6 +510,12 @@ public class JohnAuto extends LinearOpMode {
 
     private Command mainRoutine() {
         return sequential(
+                instant(() -> {
+                    if (SPIN_AT_START) {
+                        shooter.setSpin(true);
+                        logEvent("flywheel on at the start (for volley 1)");
+                    }
+                }),
                 label("step off the wall and aim 1"),
                 limit("step off the wall and aim 1", STEP_AIM_MAX_S, sequential(lazy(this::stepOffWall), aim())),
                 label("shoot 1"),
@@ -585,6 +609,7 @@ public class JohnAuto extends LinearOpMode {
         return new CommandBuilder()
                 .setStart(() -> {
                     shooter.setSpin(true);
+                    spinGoal = null;
                     aimResult = Aimer.Result.AIMING;
                     logEvent(aimer.start());
                     if (feedFromIntake) {
@@ -787,7 +812,9 @@ public class JohnAuto extends LinearOpMode {
         Pose goal = spot.withHeading(aimer.aimHeading(spot));
         logEvent(String.format(Locale.US, "shot 2 at the %s CELL: %s, driving to %s", tracker.upCellName(), problem,
                 Drawing.format(goal)));
-        return watcher.follow("to shot 2", () -> aimedRoute(goal));
+        return sequential(
+                instant(() -> spinGoal = goal),   // the main loop spins up SPIN_LEAD_S before the end
+                watcher.follow("to shot 2", () -> aimedRoute(goal)));
     }
 
     /**
