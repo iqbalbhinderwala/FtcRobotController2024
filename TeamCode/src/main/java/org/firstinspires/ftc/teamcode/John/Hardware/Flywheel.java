@@ -239,7 +239,12 @@ public class Flywheel {
 
     /** Within TOLERANCE_RPM of the target (encoder mode only). */
     public boolean atSpeed() {
-        return closedLoop() && on && !boosting && Math.abs(rpm - targetRpm) <= TOLERANCE_RPM;
+        return within(TOLERANCE_RPM);
+    }
+
+    /** Within {@code toleranceRpm} of the target (encoder mode only). */
+    public boolean within(double toleranceRpm) {
+        return closedLoop() && on && !boosting && Math.abs(rpm - targetRpm) <= toleranceRpm;
     }
 
     public boolean isOn() {

@@ -13,9 +13,12 @@ import java.util.Locale;
  * the autonomous and the TeleOp. Call update() every loop.
  *
  *  - Speed from the distance to the CELL (setDistance): RPM_DISTANCES_IN / RPM_VALUES, linear in
- *    between, clamped at the ends. The points are the 2026-10-23 tests shooting at the up CELL from
- *    the audience wall: about 2200 RPM from C1, 2300 from B1, 2400 from A1, at 50.3 / 55.5 / 69.0"
- *    (robot center to the CELL's tag cluster center, from above; see ShootingZone).
+ *    between, clamped at the ends (robot center to the CELL's tag cluster center, from above; see
+ *    ShootingZone). setRpmOverride() replaces the table (Shot Calibration).
+ *  - Each ball fires only with the flywheel within the fire tolerance of its target: FIRE_TOLERANCE_NEAR_RPM
+ *    up to TOLERANCE_NEAR_IN, FIRE_TOLERANCE_FAR_RPM from TOLERANCE_FAR_IN, linear in between. Far
+ *    away the speed window that scores is narrow (2026-11-01, r0273: about 50 RPM at 62"), and with
+ *    +/-100 the balls of one volley left up to 129 RPM apart.
  *  - setSpin(true) keeps the flywheel at that speed (e.g. while driving or aiming); a volley spins
  *    it anyway.
  *  - startVolley(): one ball per indexer step, INDEXER_STEPS_PER_VOLLEY steps (4 balls + 2 spare):
@@ -28,9 +31,18 @@ import java.util.Locale;
 @Config("JohnShooter")
 public class Shooter {
 
-    public static String RPM_DISTANCES_IN = "50.3,55.5,69.0";
-    /** The 2026-10-23 speeds (2200 / 2300 / 2400) raised by one trim step, +50 (2026-10-24). */
-    public static String RPM_VALUES = "2250,2350,2450";
+    /**
+     * [John] Shot Calibration 2026-11-01 (r0273, 77 volleys, F 18.76, 12.4-12.8 V): the middle of the
+     * speeds that scored at least 90%: 42" 4 deg off axis 2225-2325, 49" 0 deg 2200-2350, 50" 25 deg
+     * 2275-2325, 62" 45 deg only 2425 (2400 short, 2450 long). 69" is extrapolated (not tested).
+     * Straight in front of a CELL the wall stops John at about 49"; farther is only possible at an angle.
+     */
+    public static String RPM_DISTANCES_IN = "42,49,50.2,62.5,69";
+    public static String RPM_VALUES = "2275,2275,2300,2425,2475";
+    public static double FIRE_TOLERANCE_NEAR_RPM = 100;
+    public static double FIRE_TOLERANCE_FAR_RPM = 50;
+    public static double TOLERANCE_NEAR_IN = 52;
+    public static double TOLERANCE_FAR_IN = 60;
     /** 4 balls, plus 2 extra indexer steps in case a ball comes late. */
     public static int INDEXER_STEPS_PER_VOLLEY = 6;
     /** Time between two balls (200-250 ms worked in the Mechanism Test; 150 ms missed 1 in 4). */
@@ -61,6 +73,7 @@ public class Shooter {
     private boolean stuck;
     private double distance = Double.NaN;
     private double trimRpm;
+    private Double rpmOverride;
     private String status = "idle";
     private String event;
 
@@ -78,8 +91,25 @@ public class Shooter {
     public void setDistance(double inches) {
         distance = inches;
         if (feed == Feed.IDLE || feed == Feed.SPIN_UP) {
-            flywheel.setTargetRpm(rpmFor(inches) + trimRpm);
+            flywheel.setTargetRpm(rpmOverride != null ? rpmOverride : rpmFor(inches) + trimRpm);
         }
+    }
+
+    /** A fixed speed instead of the table (null: the table again); setDistance() still sets the tolerance. */
+    public void setRpmOverride(Double rpm) {
+        rpmOverride = rpm;
+    }
+
+    /** The fire tolerance for a distance (FIRE_TOLERANCE_NEAR_RPM / FAR_RPM; near without a distance). */
+    public static double fireToleranceRpm(double distance) {
+        if (Double.isNaN(distance) || distance <= TOLERANCE_NEAR_IN) {
+            return FIRE_TOLERANCE_NEAR_RPM;
+        }
+        if (distance >= TOLERANCE_FAR_IN) {
+            return FIRE_TOLERANCE_FAR_RPM;
+        }
+        double f = (distance - TOLERANCE_NEAR_IN) / (TOLERANCE_FAR_IN - TOLERANCE_NEAR_IN);
+        return FIRE_TOLERANCE_NEAR_RPM + f * (FIRE_TOLERANCE_FAR_RPM - FIRE_TOLERANCE_NEAR_RPM);
     }
 
     /** Driver's correction added to the table speed (e.g. for the battery). */
@@ -144,7 +174,8 @@ public class Shooter {
 
     private void updateFeed() {
         boolean ready = !paused
-                && (flywheel.closedLoop() ? flywheel.atSpeed() : flywheel.onSeconds() * 1000.0 >= OPEN_LOOP_SPIN_UP_MS);
+                && (flywheel.closedLoop() ? flywheel.within(fireToleranceRpm(distance))
+                : flywheel.onSeconds() * 1000.0 >= OPEN_LOOP_SPIN_UP_MS);
         switch (feed) {
             case SPIN_UP:
                 if (ready) {
