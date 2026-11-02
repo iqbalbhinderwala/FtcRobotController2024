@@ -80,7 +80,8 @@ import java.util.Locale;
  *    the way the CELL opening faces), it first drives to the nearest spot inside it, around the
  *    HIVE frame if needed (MOVE_SPEED_IPS), the shooter turning toward the CELL on the way
  *    (Aimer.facingTarget). Blocked or pushed on the way (PathWatcher), it stops.
- *    The flywheel spins up when the shot starts.
+ *    The flywheel spins up when the shot starts, or earlier: PRE-SPIN keeps it at speed while John is
+ *    in or near the shooting zone of either CELL (PRESPIN_IN_ZONE).
  *  - Aimer refines with the camera, then Shooter fires a volley at the speed for the distance (plus
  *    the dpad trim), with the indexer's jam handling. Knocked off aim during the volley, it holds
  *    fire until back on aim; pushed away, it aims again from there (Aimer.keepAim).
@@ -235,6 +236,20 @@ public class JohnTeleOp extends LinearOpMode {
     public static double ZONE_TOLERANCE_DEG = 2.0;
     public static double MOVE_TIMEOUT_MS = 6000;
 
+    // ---- Flywheel pre-spin ----
+    /**
+     * Spin the flywheel up to the table speed while John is in (or near) the shooting zone of either
+     * CELL of our HIVE, so A fires without the 1.45 s spin-up (2026-10-25 matches: in 2 of 3 shots from
+     * inside the zone John had been there 1.5 s or more). Either CELL: it does not depend on the camera
+     * knowing which is up, and covers the moment after a tip. Holding speed takes about 2.3 A.
+     */
+    public static boolean PRESPIN_IN_ZONE = true;
+    /** "Near": this much closer than the zone's minimum distance / wider than its angle still counts. */
+    public static double PRESPIN_MARGIN_IN = 6.0;
+    public static double PRESPIN_MARGIN_DEG = 10.0;
+    /** Keep spinning this long after leaving the zone (driving along its edge). */
+    public static double PRESPIN_HOLD_S = 3.0;
+
     private enum Shot { IDLE, MOVE, AIM, FIRE }
 
     private enum Start { AUTO, WALL }
@@ -258,6 +273,8 @@ public class JohnTeleOp extends LinearOpMode {
     private Pose moveGoal;
     private final ElapsedTime moveTimer = new ElapsedTime();
     private String shotStatus = "";
+    private boolean prespin;
+    private double prespinUntilS = -1;
 
     @Override
     public void runOpMode() {
@@ -863,7 +880,11 @@ public class JohnTeleOp extends LinearOpMode {
             if (!lost) {
                 shooter.setDistance(distance);
             }
-            shooter.setSpin(shot != Shot.IDLE || visionShot);
+            String spinEvent = updatePrespin(pose, watchdog.lost(), clock.seconds());
+            if (spinEvent != null) {
+                event = event == null ? spinEvent : event + "; " + spinEvent;
+            }
+            shooter.setSpin(shot != Shot.IDLE || visionShot || prespin);
             String shooterEvent = shooter.update();
             if (shooterEvent != null) {
                 event = event == null ? shooterEvent : event + "; " + shooterEvent;
@@ -906,7 +927,8 @@ public class JohnTeleOp extends LinearOpMode {
             telemetry.addData("Shot (hold A)", "%s%s", shot, shotStatus.isEmpty() ? "" : ": " + shotStatus);
             telemetry.addData("Target", "%s %s CELL at (%.1f, %.1f), %.1f in away (%s)", red ? "red" : "blue",
                     tracker.upCellName(), target[0], target[1], distance, tracker.source());
-            telemetry.addData("Shooter", "%s, trim %+.0f (dpad)", shooter.status(), shooter.trimRpm());
+            telemetry.addData("Shooter", "%s, trim %+.0f (dpad)%s", shooter.status(), shooter.trimRpm(),
+                    prespin && shot == Shot.IDLE ? "; PRE-SPIN (in the zone)" : "");
             telemetry.addData("Intakes (bumper toggles, B reverse)", intake.status());
             telemetry.addData("Drive", ROBOT_CENTRIC ? "ROBOT-centric, forward = intake " + (forwardIsB ? "B" : "A")
                     + " (left stick button switches)" : "field-centric");
@@ -1044,6 +1066,30 @@ public class JohnTeleOp extends LinearOpMode {
         }
         Path p = legs.length == 1 ? legs[0] : path(legs);
         return MOVE_SPEED_IPS > 0 ? p.with(foresight.maxVelocityConstraint.at(MOVE_SPEED_IPS)) : p;
+    }
+
+    /**
+     * Pre-spin: on while John is in or near the shooting zone of either CELL of our HIVE (PRESPIN_IN_ZONE),
+     * and PRESPIN_HOLD_S after leaving it; off once the odometry is LOST. Returns an event when it changes.
+     */
+    private String updatePrespin(Pose pose, boolean noOdometry, double nowS) {
+        boolean near = false;
+        if (PRESPIN_IN_ZONE && !noOdometry) {
+            double y = HiveTags.hiveY(red);
+            for (boolean audience : new boolean[]{true, false}) {
+                near |= ShootingZone.problem(pose.x(), pose.y(), HiveTags.cellX(audience, true), y, audience,
+                        PRESPIN_MARGIN_IN, PRESPIN_MARGIN_DEG) == null;
+            }
+        }
+        if (near) {
+            prespinUntilS = nowS + PRESPIN_HOLD_S;
+        }
+        boolean on = PRESPIN_IN_ZONE && !noOdometry && nowS <= prespinUntilS;
+        if (on == prespin) {
+            return null;
+        }
+        prespin = on;
+        return on ? "flywheel pre-spin: in the shooting zone" : "flywheel pre-spin off: out of the zone";
     }
 
     private String startAim() {
