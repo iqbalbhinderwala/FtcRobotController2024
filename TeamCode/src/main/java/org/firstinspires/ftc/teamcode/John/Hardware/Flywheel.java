@@ -79,8 +79,11 @@ public class Flywheel {
      * Learned 2026-10-23 with [John] Flywheel Calibration (r0042): 20.45 / 20.17 / 20.86 at 12 V from
      * runs at 11.3 / 12.3 / 13.3 V, so the voltage compensation holds. The old 12 supplied only about
      * 60% of the holding power and left the rest to the I term (slow, overshooting).
+     * Relearned 2026-11-01 (r0267, 11.5 V): 18.76. Holding 2300 RPM took 7.4 V (power x battery)
+     * against 7.9-8.2 V on 10/23, so the flywheel itself got about 9% easier to turn (not the
+     * battery); 20.5 held it 100-190 RPM fast, outside the "at speed" band, and stalled volleys.
      */
-    public static double F = 20.5;
+    public static double F = 18.76;
 
     private final DcMotorEx motor;
     private final HardwareMap hardwareMap;
