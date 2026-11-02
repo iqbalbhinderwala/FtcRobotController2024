@@ -95,7 +95,8 @@ public class ShotCalibration extends LinearOpMode {
     private static final String LOG_HEADER = "t_s,state,x,y,h_deg,cell,distance,off_axis_deg,spot,"
             + "rpm_set,fw_rpm,fw_mode,fw_amps,battery_v,idx_steps,tags,hive,up_height_in,event";
     private static final String RESULT_HEADER = "volley,t_s,alliance,cell,x,y,h_deg,distance_in,cam_distance_in,"
-            + "off_axis_deg,spot,rpm_set,table_rpm,fire_tol_rpm,rpm_at_balls,min_rpm,steps_done,tipped,made,balls,"
+            + "off_axis_deg,spot,rpm_set,table_rpm,fire_tol_rpm,rpm_at_balls,min_rpm,shot_interval_ms,step_ms,gap_ms,"
+            + "steps_done,tipped,made,balls,"
             + "miss,battery_v,fw_f,aim";
 
     private boolean red = true;
@@ -199,6 +200,11 @@ public class ShotCalibration extends LinearOpMode {
         int stepsAtStart = 0, lastSteps = 0;
         List<Long> rpmAtBalls = new ArrayList<>();
         double minRpm = Double.NaN;
+        // Per ball: how long the indexer step took (start to not busy) and the time from one step to the next
+        List<Long> stepMs = new ArrayList<>(), gapMs = new ArrayList<>();
+        double stepStartMs = Double.NaN;
+        boolean stepTimed = true;
+        double shotIntervalMs = Shooter.SHOT_INTERVAL_MS;
         int stepsDone = 0;
         int made = 0, miss = 0;
 
@@ -362,6 +368,11 @@ public class ShotCalibration extends LinearOpMode {
                         tipped = false;
                         rpmAtBalls.clear();
                         minRpm = Double.NaN;
+                        stepMs.clear();
+                        gapMs.clear();
+                        stepStartMs = Double.NaN;
+                        stepTimed = true;
+                        shotIntervalMs = Shooter.SHOT_INTERVAL_MS;
                         stepsAtStart = shooter.indexer().stepCount();
                         lastSteps = stepsAtStart;
                         shooter.startVolley(BALLS + SPARE_STEPS);
@@ -380,9 +391,18 @@ public class ShotCalibration extends LinearOpMode {
                         if (aimer.event() != null) event = aimer.event();
                     }
                     int steps = shooter.indexer().stepCount();
+                    double nowMs = clock.milliseconds();
                     if (steps != lastSteps) {
                         lastSteps = steps;
                         rpmAtBalls.add(Math.round(flywheel.rpm()));
+                        if (!Double.isNaN(stepStartMs)) gapMs.add(Math.round(nowMs - stepStartMs));
+                        stepStartMs = nowMs;
+                        stepTimed = false;
+                    }
+                    // busy() needs a moment to come on after a new target (as in Shooter)
+                    if (!stepTimed && nowMs - stepStartMs > 50 && !shooter.indexer().busy()) {
+                        stepMs.add(Math.round(nowMs - stepStartMs));
+                        stepTimed = true;
                     }
                     if (steps != stepsAtStart) {
                         minRpm = Double.isNaN(minRpm) ? flywheel.rpm() : Math.min(minRpm, flywheel.rpm());
@@ -422,14 +442,15 @@ public class ShotCalibration extends LinearOpMode {
                                 Double.isNaN(shotCamDistance) ? null : shotCamDistance, shotOffAxis,
                                 shotSpot == null ? null : shotSpot.number, rpmSet, shotTable,
                                 Shooter.fireToleranceRpm(shotDistance), join(rpmAtBalls),
-                                Double.isNaN(minRpm) ? null : Math.round(minRpm), stepsDone, tipped, made, BALLS,
+                                Double.isNaN(minRpm) ? null : Math.round(minRpm), shotIntervalMs, join(stepMs), join(gapMs), stepsDone, tipped, made, BALLS,
                                 MISSES[miss], flywheel.voltage(), flywheel.effectiveF(), shotAim);
                         results.flush();
                         if (stepsDone > 0) {
                             coverage.add(shotDistance, shotOffAxis, rpmSet, made, BALLS);
                         }
                         String line = String.format(Locale.US, "#%d  %.0f in %.0f deg  %.0f RPM -> %d/%d %s", volley,
-                                shotDistance, shotOffAxis, rpmSet, made, BALLS, miss == 0 ? "" : MISSES[miss]);
+                                shotDistance, shotOffAxis, rpmSet, made, BALLS, miss == 0 ? "" : MISSES[miss])
+                                + (shotIntervalMs != 250 ? String.format(Locale.US, "  (pause %.0f ms)", shotIntervalMs) : "");
                         history.add(0, line);
                         while (history.size() > 3) history.remove(history.size() - 1);
                         if (shotSpot != null) {
