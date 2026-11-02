@@ -7,6 +7,7 @@ import com.pedropathing.math.Velocity;
 import com.qualcomm.robotcore.util.ElapsedTime;
 
 import java.util.ArrayDeque;
+import java.util.Locale;
 
 /**
  * Our HIVE's up CELL: which one it is (audience or far) and where it is, from the camera. FTC field
@@ -22,6 +23,10 @@ import java.util.ArrayDeque;
  *  - Confirmed: the last time a frame agreed with the current up CELL (msSinceConfirmed()).
  *  - Tipping: the up CELL's tags measured TIP_DROP_IN lower than a baseline (its height when a
  *    volley started) in TIP_FRAMES frames in a row: the HIVE has started to tip (tipping()).
+ *  - The HIVE state: STEADY (one CELL up, the camera keeps it current) or TIPPING (startTip(): the
+ *    swing is under way, the other CELL is taken as up and the camera may not change that for
+ *    TIP_SWING_MS; then STEADY again). Mid-swing the camera's up / down call is not reliable: a
+ *    CELL reads up until it has dropped halfway (about 7"), while the tip alarm fires at 3".
  *
  * Seeing the tags at all: all 4 tags of a HIVE face the same way, down and toward the end that is
  * up. From the side of the up end they are easy to read; from the side of the down end they are
@@ -37,18 +42,22 @@ public class CellTracker {
     public static double TIP_DROP_IN = 3.0;
     public static int TIP_FRAMES = 2;
     /**
-     * After a tip is seen (holdUpCell), the camera may not switch the up CELL back for this long:
-     * mid-swing the old CELL still looks up (2026-10-31, r0240: 0.06 s after the tipping alarm it
-     * switched back, and the last 2 balls went into the tipping CELL).
+     * How long a tip takes (TIPPING): the camera may not change the up CELL meanwhile (2026-10-31,
+     * r0240: 0.06 s after the tipping alarm it switched back, and the last 2 balls went into the
+     * tipping CELL).
      */
-    public static double HOLD_AFTER_TIP_MS = 2500;
+    public static double TIP_SWING_MS = 2500;
+
+    /** STEADY: one CELL up, kept current by the camera. TIPPING: swinging over (startTip()). */
+    public enum HiveState { STEADY, TIPPING }
     /** An up CELL height older than this is not used. */
     public static double HEIGHT_MAX_AGE_MS = 300;
 
     private final boolean red;
     private boolean upAudience;
     private int disagreeFrames;
-    private double holdUntilMs = Double.NEGATIVE_INFINITY;
+    private HiveState hiveState = HiveState.STEADY;
+    private double tipStartMs;
     private final ArrayDeque<double[]> sightings = new ArrayDeque<>();   // {time ms, x, y}
     private final ElapsedTime clock = new ElapsedTime();
     private final ElapsedTime stillFor = new ElapsedTime();
@@ -84,6 +93,11 @@ public class CellTracker {
      */
     public boolean update(HiveCamera.Frame frame, Pose pose, boolean nowStill) {
         event = null;
+        if (hiveState == HiveState.TIPPING && clock.milliseconds() - tipStartMs >= TIP_SWING_MS) {
+            hiveState = HiveState.STEADY;
+            disagreeFrames = 0;
+            event = "the HIVE has tipped: the " + upCellName() + " CELL is up";
+        }
         if (nowStill && !still) {
             stillFor.reset();
         }
@@ -98,8 +112,8 @@ public class CellTracker {
         }
         lastSeenMs = clock.milliseconds();
         if (cell.audience != upAudience) {
-            if (clock.milliseconds() < holdUntilMs) {
-                return true;   // the HIVE is still swinging over
+            if (hiveState == HiveState.TIPPING) {
+                return true;   // still swinging over: the camera's up / down call is not reliable yet
             }
             if (++disagreeFrames < UP_CELL_FRAMES) {
                 return true;
@@ -207,8 +221,9 @@ public class CellTracker {
         return upAudience;
     }
 
-    /** Sets the up CELL by hand (or from an assumption); the camera still corrects it. */
+    /** Sets the up CELL by hand (or from an assumption), STEADY; the camera still corrects it. */
     public void setUpAudience(boolean audience) {
+        hiveState = HiveState.STEADY;
         if (audience != upAudience) {
             sightings.clear();
             upHeight = Double.NaN;
@@ -219,10 +234,22 @@ public class CellTracker {
         lowFrames = 0;
     }
 
-    /** The HIVE was seen tipping: the {@code audience} CELL is up, and the camera may not undo that for HOLD_AFTER_TIP_MS. */
-    public void holdUpCell(boolean audience) {
+    /** The HIVE was seen tipping: TIPPING, the {@code audience} CELL ends up, for TIP_SWING_MS. */
+    public void startTip(boolean audience) {
         setUpAudience(audience);
-        holdUntilMs = clock.milliseconds() + HOLD_AFTER_TIP_MS;
+        hiveState = HiveState.TIPPING;
+        tipStartMs = clock.milliseconds();
+    }
+
+    public HiveState hiveState() {
+        return hiveState;
+    }
+
+    /** For logs and telemetry: "STEADY" or "TIPPING 1.2 s". */
+    public String hiveStateName() {
+        return hiveState == HiveState.TIPPING
+                ? String.format(Locale.US, "TIPPING %.1f s", (clock.milliseconds() - tipStartMs) / 1000.0)
+                : "STEADY";
     }
 
     public String upCellName() {

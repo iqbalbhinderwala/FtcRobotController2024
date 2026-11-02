@@ -256,7 +256,8 @@ public class JohnAuto extends LinearOpMode {
     // public static boolean STEP_MODE = true;   // TEST: press Y to start each stage
 
     private static final String LOG_HEADER = "t_s,step,x,y,h_deg,follower,shooter,intake,target_x,target_y,"
-            + "target_src,up_cell,tags,watchdog,idx_deg,idx_target_deg,idx_amps,cam_x,cam_y,cam_err_in,event";
+            + "target_src,up_cell,tags,watchdog,idx_deg,idx_target_deg,idx_amps,cam_x,cam_y,cam_err_in,"
+            + "hive,up_height_in,event";
 
     private Follower follower;
     private ForesightConfig foresight;
@@ -675,7 +676,7 @@ public class JohnAuto extends LinearOpMode {
                             logEvent(name + ": tipped again, no more side switches");
                         });
                     }
-                    tracker.holdUpCell(!wasAudience[0]);   // trust the tip; the camera must not undo it mid-swing
+                    tracker.startTip(!wasAudience[0]);   // TIPPING: the camera may not undo this mid-swing
                     logEvent(name + ": going to the other side, the " + tracker.upCellName() + " CELL");
                     return sequential(
                             label(name + ": to the other side"),
@@ -1166,7 +1167,8 @@ public class JohnAuto extends LinearOpMode {
         log.row(clock.seconds(), step, p.x(), p.y(), Math.toDegrees(p.heading()), follower.mode(),
                 shooter.status(), intake.status(), t[0], t[1], tracker.source(), tracker.upCellName(),
                 frame == null ? null : frame.ids(), watchdog.state(), shooter.indexer().degrees(),
-                shooter.indexer().targetDegrees(), shooter.indexer().amps(), cam[0], cam[1], cam[2], event);
+                shooter.indexer().targetDegrees(), shooter.indexer().amps(), cam[0], cam[1], cam[2],
+                tracker.hiveStateName(), Double.isNaN(tracker.upHeight()) ? null : tracker.upHeight(), event);
     }
 
     private void logEvent(String event) {
