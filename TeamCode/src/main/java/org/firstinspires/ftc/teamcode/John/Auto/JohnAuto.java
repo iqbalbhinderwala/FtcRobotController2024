@@ -27,6 +27,7 @@ import com.qualcomm.robotcore.util.ElapsedTime;
 
 import org.firstinspires.ftc.teamcode.John.Aimer;
 import org.firstinspires.ftc.teamcode.John.Dashboard.Drawing;
+import org.firstinspires.ftc.teamcode.John.Hardware.Flywheel;
 import org.firstinspires.ftc.teamcode.John.Hardware.Intake;
 import org.firstinspires.ftc.teamcode.John.Hardware.Shooter;
 import org.firstinspires.ftc.teamcode.John.Pedro.Constants;
@@ -257,7 +258,7 @@ public class JohnAuto extends LinearOpMode {
 
     private static final String LOG_HEADER = "t_s,step,x,y,h_deg,follower,shooter,intake,target_x,target_y,"
             + "target_src,up_cell,tags,watchdog,idx_deg,idx_target_deg,idx_amps,cam_x,cam_y,cam_err_in,"
-            + "hive,up_height_in,event";
+            + "hive,up_height_in,fw_rpm,fw_target,fw_mode,fw_amps,fw_f,battery_v,event";
 
     private Follower follower;
     private ForesightConfig foresight;
@@ -1164,11 +1165,14 @@ public class JohnAuto extends LinearOpMode {
         Pose p = follower.pose();
         double[] t = tracker.target();
         Object[] cam = TagLocalizer.logCheck(frame, p);   // odometry check (camera position, odometry heading)
+        Flywheel fw = shooter.flywheel();
         log.row(clock.seconds(), step, p.x(), p.y(), Math.toDegrees(p.heading()), follower.mode(),
                 shooter.status(), intake.status(), t[0], t[1], tracker.source(), tracker.upCellName(),
                 frame == null ? null : frame.ids(), watchdog.state(), shooter.indexer().degrees(),
                 shooter.indexer().targetDegrees(), shooter.indexer().amps(), cam[0], cam[1], cam[2],
-                tracker.hiveStateName(), Double.isNaN(tracker.upHeight()) ? null : tracker.upHeight(), event);
+                tracker.hiveStateName(), Double.isNaN(tracker.upHeight()) ? null : tracker.upHeight(),
+                fw.rpm(), fw.isOn() ? fw.targetRpm() : 0.0, fw.mode(), fw.isOn() ? fw.amps() : null,
+                fw.effectiveF(), fw.voltage(), event);
     }
 
     private void logEvent(String event) {
