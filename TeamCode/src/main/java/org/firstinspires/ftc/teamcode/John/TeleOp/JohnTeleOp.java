@@ -878,7 +878,7 @@ public class JohnTeleOp extends LinearOpMode {
             double[] target = tracker.target();
             double distance = Math.hypot(target[0] - pose.x(), target[1] - pose.y());
             if (!lost) {
-                shooter.setDistance(distance);
+                shooter.setDistance(ShootingZone.shotDistance(pose.x(), pose.y(), tracker.upAudience(), red));
             }
             String spinEvent = updatePrespin(pose, watchdog.lost(), clock.seconds());
             if (spinEvent != null) {

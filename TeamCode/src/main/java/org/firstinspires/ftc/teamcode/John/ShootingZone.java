@@ -58,6 +58,15 @@ public class ShootingZone {
 
     private ShootingZone() {}
 
+    /**
+     * Shooting distance: from the robot center (odometry) to the up CELL's NOMINAL place (HiveTags),
+     * what the speed table is fitted on. Not the camera's CELL: it read 2-5 deg off and up to 3" short
+     * at steep angles (2026-11-02, 119 volleys), while from the wall start it matched the drawing.
+     */
+    public static double shotDistance(double x, double y, boolean audienceCell, boolean red) {
+        return distance(x, y, HiveTags.cellX(audienceCell, true), HiveTags.hiveY(red));
+    }
+
     /** Horizontal distance from the robot center to the CELL. */
     public static double distance(double x, double y, double cellX, double cellY) {
         return Math.hypot(cellX - x, cellY - y);

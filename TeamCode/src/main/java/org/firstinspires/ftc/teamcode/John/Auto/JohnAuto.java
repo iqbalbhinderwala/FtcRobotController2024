@@ -460,7 +460,7 @@ public class JohnAuto extends LinearOpMode {
                         SPIN_LEAD_S));
             }
             double[] target = tracker.target();
-            shooter.setDistance(Math.hypot(target[0] - pose.x(), target[1] - pose.y()));
+            shooter.setDistance(ShootingZone.shotDistance(pose.x(), pose.y(), tracker.upAudience(), !blue));
             String shooterEvent = shooter.update();
             if (shooterEvent != null) {
                 logEvent(shooterEvent);

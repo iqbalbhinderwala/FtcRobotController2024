@@ -32,13 +32,14 @@ import java.util.Locale;
 public class Shooter {
 
     /**
-     * [John] Shot Calibration 2026-11-01 (r0273, 77 volleys, F 18.76, 12.4-12.8 V): the middle of the
-     * speeds that scored at least 90%: 42" 4 deg off axis 2225-2325, 49" 0 deg 2200-2350, 50" 25 deg
-     * 2275-2325, 62" 45 deg only 2425 (2400 short, 2450 long). 69" is extrapolated (not tested).
-     * Straight in front of a CELL the wall stops John at about 49"; farther is only possible at an angle.
+     * [John] Shot Calibration 2026-11-01 and 11-02 (r0273-r0278, 16 spots, F 18.76), distances from
+     * odometry to the nominal CELL (ShootingZone.shotDistance): the middle of the speeds that scored at
+     * least 90%, averaged over the angles at each distance (no angle effect showed: at 50" 15 / 30 / 45
+     * deg gave 2300 / 2288 / 2288). 42" 2225-2275 (0-30 deg; at 45 deg nothing reached 60%), 46" 2275,
+     * 49" 2275, 50" 2290, 54" 2320, 58" 2375 (83%), 66" 2425 (84%; the farthest the field allows).
      */
-    public static String RPM_DISTANCES_IN = "42,49,50.2,62.5,69";
-    public static String RPM_VALUES = "2275,2275,2300,2425,2475";
+    public static String RPM_DISTANCES_IN = "42,46,49,50,54,58,66";
+    public static String RPM_VALUES = "2250,2275,2275,2290,2320,2375,2425";
     public static double FIRE_TOLERANCE_NEAR_RPM = 100;
     public static double FIRE_TOLERANCE_FAR_RPM = 50;
     public static double TOLERANCE_NEAR_IN = 52;
