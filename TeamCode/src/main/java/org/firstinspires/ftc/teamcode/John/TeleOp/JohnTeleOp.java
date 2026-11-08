@@ -127,6 +127,7 @@ import java.util.Locale;
  *                          sideways) both
  *   left stick button      robot-centric: switch the stick's forward end (intake B / intake A)
  *   Y                      indexer one step (90 deg) backward, to clear a jam by hand (not while firing)
+ *   X                      flywheel pre-spin on / off (off at the start; see PRESPIN_IN_ZONE)
  *
  * ROBOT_CENTRIC (off by default; field-centric is preferred): the left stick drives relative to the robot, "forward" toward the intake
  * B end or the intake A end (left stick button switches); turning is the same. The automatic shot is unchanged.
@@ -243,7 +244,8 @@ public class JohnTeleOp extends LinearOpMode {
      * inside the zone John had been there 1.5 s or more). Either CELL: it does not depend on the camera
      * knowing which is up, and covers the moment after a tip. Holding speed takes about 2.3 A.
      */
-    public static boolean PRESPIN_IN_ZONE = true;
+    /** Off at the start (2026-11-07); X toggles it during the match. */
+    public static boolean PRESPIN_IN_ZONE = false;
     /** "Near": this much closer than the zone's minimum distance / wider than its angle still counts. */
     public static double PRESPIN_MARGIN_IN = 6.0;
     public static double PRESPIN_MARGIN_DEG = 10.0;
@@ -880,6 +882,10 @@ public class JohnTeleOp extends LinearOpMode {
             if (!lost) {
                 shooter.setDistance(ShootingZone.shotDistance(pose.x(), pose.y(), tracker.upAudience(), red));
             }
+            if (gamepad1.xWasPressed()) {
+                PRESPIN_IN_ZONE = !PRESPIN_IN_ZONE;
+                event = "flywheel pre-spin " + (PRESPIN_IN_ZONE ? "ON" : "OFF") + " (X)";
+            }
             String spinEvent = updatePrespin(pose, watchdog.lost(), clock.seconds());
             if (spinEvent != null) {
                 event = event == null ? spinEvent : event + "; " + spinEvent;
@@ -928,7 +934,7 @@ public class JohnTeleOp extends LinearOpMode {
             telemetry.addData("Target", "%s %s CELL at (%.1f, %.1f), %.1f in away (%s)", red ? "red" : "blue",
                     tracker.upCellName(), target[0], target[1], distance, tracker.source());
             telemetry.addData("Shooter", "%s, trim %+.0f (dpad)%s", shooter.status(), shooter.trimRpm(),
-                    prespin && shot == Shot.IDLE ? "; PRE-SPIN (in the zone)" : "");
+                    !PRESPIN_IN_ZONE ? "; pre-spin off (X)" : prespin && shot == Shot.IDLE ? "; PRE-SPIN (in the zone)" : "; pre-spin on (X)");
             telemetry.addData("Intakes (bumper toggles, B reverse)", intake.status());
             telemetry.addData("Drive", ROBOT_CENTRIC ? "ROBOT-centric, forward = intake " + (forwardIsB ? "B" : "A")
                     + " (left stick button switches)" : "field-centric");
@@ -948,7 +954,7 @@ public class JohnTeleOp extends LinearOpMode {
             telemetry.addData("IMU check", "%s, offset %.1f deg (must stay the same while turning)",
                     fallback.status(), fallback.offsetDeg());
             telemetry.addLine("HOLD: A shoot, RS button aim assist, Back vision mode (Start: odometry), B intakes reverse. "
-                    + "Bumpers: intakes on/off. Y: indexer back 90. Dpad: trim");
+                    + "Bumpers: intakes on/off. Y: indexer back 90. Dpad: trim. X: pre-spin");
             telemetry.update();
 
             Pose aimPose = shot == Shot.AIM || shot == Shot.FIRE ? aimer.aimPose() : null;
