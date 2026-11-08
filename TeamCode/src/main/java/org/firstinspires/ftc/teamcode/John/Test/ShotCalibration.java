@@ -78,6 +78,9 @@ public class ShotCalibration extends LinearOpMode {
     public static double STICK_DEADBAND = 0.05;
     public static double CANCEL_STICK = 0.3;
     public static double DRIVE_TIMEOUT_MS = 8000;
+    /** Y does nothing this close to the spot (a tiny path only makes the robot shake). */
+    public static double ARRIVED_IN = 1.5;
+    public static double ARRIVED_DEG = 3.0;
     public static int START_SAMPLES = 60;
     public static int MIN_SAMPLES = 5;
     public static double RELOCALIZE_MS = 1000;
@@ -95,7 +98,7 @@ public class ShotCalibration extends LinearOpMode {
     private static final String LOG_HEADER = "t_s,state,x,y,h_deg,cell,distance,off_axis_deg,spot,"
             + "rpm_set,fw_rpm,fw_mode,fw_amps,battery_v,idx_steps,tags,hive,up_height_in,event";
     private static final String RESULT_HEADER = "volley,t_s,alliance,cell,x,y,h_deg,distance_in,cam_distance_in,"
-            + "off_axis_deg,spot,rpm_set,table_rpm,fire_tol_rpm,rpm_at_balls,min_rpm,shot_interval_ms,step_ms,gap_ms,"
+            + "off_axis_deg,nom_distance_in,nom_off_axis_deg,spot,rpm_set,table_rpm,fire_tol_rpm,rpm_at_balls,min_rpm,shot_interval_ms,step_ms,gap_ms,"
             + "steps_done,tipped,made,balls,"
             + "miss,battery_v,fw_f,aim";
 
@@ -177,6 +180,7 @@ public class ShotCalibration extends LinearOpMode {
 
         State state = State.IDLE;
         boolean aLatched = false;
+        boolean yLatched = false;   // Y must be let go before the next drive (else it re-drives on arrival)
         boolean intakeOn = false;
         double rpmSet = Double.NaN;   // NaN: not set yet (A uses the suggestion)
         int volley = 0;
@@ -193,6 +197,7 @@ public class ShotCalibration extends LinearOpMode {
         Pose shotPose = null;
         ShotCoverage.Spot shotSpot = null;
         double shotDistance = Double.NaN, shotCamDistance = Double.NaN, shotOffAxis = Double.NaN, shotTable = Double.NaN;
+        double[] shotNominal = {Double.NaN, Double.NaN};
         boolean shotAudience = true;
         String shotAim = "";
         double baseline = Double.NaN;
@@ -233,10 +238,14 @@ public class ShotCalibration extends LinearOpMode {
             double[] target = tracker.target();
             double distance = Math.hypot(target[0] - pose.x(), target[1] - pose.y());
             double offAxis = ShootingZone.offAxisDeg(pose.x(), pose.y(), target[0], target[1], tracker.upAudience());
-            double table = Shooter.rpmFor(distance);
-            ShotCoverage.Spot here = coverage.spotAt(distance, offAxis);
+            double table = Shooter.rpmFor(nomFirst(pose, tracker.upAudience(), red));
+            // Spots: odometry to the nominal CELL (the camera's CELL drifts at steep angles)
+            double[] nom = ShotCoverage.nominal(pose.x(), pose.y(), tracker.upAudience(), red);
+            ShotCoverage.Spot here = coverage.spotAt(nom[0], nom[1]);
             ShotCoverage.Suggestion hereSuggestion = here == null ? null : coverage.suggest(here, table);
             double suggested = hereSuggestion != null ? hereSuggestion.rpm : Math.round(table / RPM_STEP) * RPM_STEP;
+            // The CELL where the camera sees it (the same point the distance is measured to), so a spot
+            // driven to is the spot credited; the nominal place can be inches off on a real field
             double cellX = HiveTags.cellX(tracker.upAudience(), true), cellY = HiveTags.hiveY(red);
             if (selected == null || nextSpot || coverage.covered(selected)) {
                 ShotCoverage.Spot next = coverage.nextUncovered(nextSpot ? selected : null);
@@ -298,13 +307,24 @@ public class ShotCalibration extends LinearOpMode {
                         }
                         status = event;
                     }
-                    if (gamepad1.y && selected != null && watchdog.ok() && !relocalizing) {
+                    if (!gamepad1.y) {
+                        yLatched = false;
+                    }
+                    if (gamepad1.y && !yLatched && selected != null && watchdog.ok() && !relocalizing) {
+                        yLatched = true;
                         driveGoal = ShotCoverage.pose(selected, cellX, cellY, tracker.upAudience(), red);
-                        follower.follow(routePath(follower.pose(), ShootingZone.route(follower.pose(), driveGoal, red),
-                                driveGoal, aimer));
-                        driveTimer.reset();
-                        state = State.DRIVE;
-                        event = "driving to " + selected.name() + " at " + Drawing.format(driveGoal);
+                        double away = Math.hypot(driveGoal.x() - pose.x(), driveGoal.y() - pose.y());
+                        double turn = Math.abs(normalize(driveGoal.heading() - pose.heading()));
+                        if (away < ARRIVED_IN && turn < Math.toRadians(ARRIVED_DEG)) {
+                            status = "already at #" + selected.number;   // a zero-length path only shakes
+                            event = status;
+                        } else {
+                            follower.follow(routePath(follower.pose(), ShootingZone.route(follower.pose(), driveGoal, red),
+                                    driveGoal, aimer));
+                            driveTimer.reset();
+                            state = State.DRIVE;
+                            event = "driving to " + selected.name() + " at " + Drawing.format(driveGoal);
+                        }
                     }
                     if (gamepad1.a && !aLatched && !relocalizing) {
                         aLatched = true;
@@ -330,7 +350,9 @@ public class ShotCalibration extends LinearOpMode {
                         event = status;
                     } else if (driveTimer.milliseconds() > 100 && !follower.following()) {
                         state = State.IDLE;
-                        ShotCoverage.Spot at = coverage.spotAt(distance, offAxis);
+                        double[] atNom = ShotCoverage.nominal(follower.pose().x(), follower.pose().y(),
+                                tracker.upAudience(), red);
+                        ShotCoverage.Spot at = coverage.spotAt(atNom[0], atNom[1]);
                         rpmSet = at != null ? coverage.suggest(at, table).rpm : suggested;
                         status = "at " + (at != null ? at.name() : "the spot");
                         event = String.format(Locale.US, "%s; speed %.0f RPM", status, rpmSet);
@@ -360,8 +382,9 @@ public class ShotCalibration extends LinearOpMode {
                         VisionAim va = VisionAim.solve(frame == null ? camera.last() : frame, red, shotAudience, p.heading());
                         shotCamDistance = va == null ? Double.NaN : va.distance;
                         shotOffAxis = ShootingZone.offAxisDeg(p.x(), p.y(), t[0], t[1], shotAudience);
-                        shotSpot = coverage.spotAt(shotDistance, shotOffAxis);
-                        shotTable = Shooter.rpmFor(shotDistance);
+                        shotNominal = ShotCoverage.nominal(p.x(), p.y(), shotAudience, red);
+                        shotSpot = coverage.spotAt(shotNominal[0], shotNominal[1]);
+                        shotTable = Shooter.rpmFor(shotNominal[0]);
                         shotAim = aimer.status();
                         baseline = tracker.upHeight();
                         tracker.tipping(Double.NaN);
@@ -440,24 +463,23 @@ public class ShotCalibration extends LinearOpMode {
                         results.row(volley, clock.seconds(), red ? "red" : "blue", shotAudience ? "audience" : "far",
                                 shotPose.x(), shotPose.y(), Math.toDegrees(shotPose.heading()), shotDistance,
                                 Double.isNaN(shotCamDistance) ? null : shotCamDistance, shotOffAxis,
-                                shotSpot == null ? null : shotSpot.number, rpmSet, shotTable,
-                                Shooter.fireToleranceRpm(shotDistance), join(rpmAtBalls),
+                                shotNominal[0], shotNominal[1], shotSpot == null ? null : shotSpot.number, rpmSet, shotTable,
+                                Shooter.fireToleranceRpm(shotNominal[0]), join(rpmAtBalls),
                                 Double.isNaN(minRpm) ? null : Math.round(minRpm), shotIntervalMs, join(stepMs), join(gapMs), stepsDone, tipped, made, BALLS,
                                 MISSES[miss], flywheel.voltage(), flywheel.effectiveF(), shotAim);
                         results.flush();
                         if (stepsDone > 0) {
-                            coverage.add(shotDistance, shotOffAxis, rpmSet, made, BALLS);
+                            coverage.add(shotNominal[0], shotNominal[1], rpmSet, made, BALLS);
                         }
-                        String line = String.format(Locale.US, "#%d  %.0f in %.0f deg  %.0f RPM -> %d/%d %s", volley,
+                        String line = String.format(Locale.US, "#%d %.0fin %.0fdeg %.0f: %d/%d %s", volley,
                                 shotDistance, shotOffAxis, rpmSet, made, BALLS, miss == 0 ? "" : MISSES[miss])
-                                + (shotIntervalMs != 250 ? String.format(Locale.US, "  (pause %.0f ms)", shotIntervalMs) : "");
+                                + (shotIntervalMs != 250 ? String.format(Locale.US, " %.0fms", shotIntervalMs) : "");
                         history.add(0, line);
                         while (history.size() > 3) history.remove(history.size() - 1);
                         if (shotSpot != null) {
                             ShotCoverage.Suggestion s = coverage.suggest(shotSpot, shotTable);
                             rpmSet = s.rpm;
-                            status = s.covered ? shotSpot.name() + " is COVERED: Y drives to the next spot"
-                                    : "next: " + s.why;
+                            status = s.covered ? "#" + shotSpot.number + " COVERED: hold Y for the next" : "";
                         } else {
                             status = "saved";
                         }
@@ -492,7 +514,7 @@ public class ShotCalibration extends LinearOpMode {
 
             // ---- Shooter and intakes ----
             shooter.setRpmOverride(Double.isNaN(rpmSet) ? suggested : rpmSet);
-            shooter.setDistance(state == State.FIRE ? shotDistance : distance);   // also the fire tolerance
+            shooter.setDistance(state == State.FIRE ? shotNominal[0] : nom[0]);   // also the fire tolerance
             shooter.setSpin(state == State.AIM);
             String shooterEvent = shooter.update();
             if (shooterEvent != null) {
@@ -501,37 +523,45 @@ public class ShotCalibration extends LinearOpMode {
             intake.set(gamepad1.b && state != State.RESULT ? -Intake.POWER : intakeOn ? Intake.POWER : 0.0);
 
             // ---- Telemetry: what to do now first ----
-            telemetry.addLine(headline(state, volley, made, miss, status, here, selected, stepsDone, shooter));
+            // Short lines: the Driver Station wraps anything much over 40 characters
+            telemetry.addLine(headline(state, volley, made, miss, here, selected));
             if (state == State.RESULT) {
-                telemetry.addLine("dpad up/down: how many in  |  X: miss type  |  A: save  |  Back: discard");
+                telemetry.addLine("dpad: # in | X: miss | A: save | Back: drop");
+            }
+            if (!status.isEmpty() && state == State.IDLE) {
+                telemetry.addLine(status);
             }
             if (!watchdog.ok()) {
-                telemetry.addLine("!!! ODOMETRY " + watchdog.state() + ": " + watchdog.reason());
+                telemetry.addLine("!!! ODOMETRY " + watchdog.state());
             }
             if (tracker.msSinceSeen() > NO_TAGS_WARN_MS && state != State.DRIVE) {
-                telemetry.addLine("!!! The camera does not see our HIVE: the distance is a guess");
+                telemetry.addLine("!!! NO HIVE TAGS: distance is a guess");
             }
-            telemetry.addData("Speed", "%.0f RPM   (suggested %.0f%s)", Double.isNaN(rpmSet) ? suggested : rpmSet, suggested,
-                    hereSuggestion == null ? ", the table's" : ": " + hereSuggestion.why);
-            telemetry.addData("Here", "%.1f in, %.0f deg off axis, %s CELL  ->  %s", distance, offAxis, tracker.upCellName(),
-                    here == null ? "not a test spot" : here.name() + ": " + here.speeds());
+            telemetry.addData("Speed", "%.0f (suggest %.0f)", Double.isNaN(rpmSet) ? suggested : rpmSet, suggested);
+            telemetry.addData("Why", hereSuggestion == null ? "table speed" : hereSuggestion.why);
+            telemetry.addData("Here", "%.1fin %.0fdeg %s", nom[0], nom[1], here == null ? "(no spot)" : here.name());
+            telemetry.addData("Camera", "%.1fin %.0fdeg %s CELL", distance, offAxis, tracker.upCellName());
+            if (here != null) {
+                telemetry.addData("Done", here.speeds());
+            }
             if (selected != null) {
                 Pose goal = ShotCoverage.pose(selected, cellX, cellY, tracker.upAudience(), red);
-                telemetry.addData("Next spot", "%s, %.0f in away   (Y drive, RS next; %d of %d to do)", selected.name(),
-                        Math.hypot(goal.x() - pose.x(), goal.y() - pose.y()), coverage.uncoveredCount(), coverage.spotCount());
+                telemetry.addData("Next", "%s, %.0fin away", selected.name(),
+                        Math.hypot(goal.x() - pose.x(), goal.y() - pose.y()));
+                telemetry.addData("Left", "%d of %d spots", coverage.uncoveredCount(), coverage.spotCount());
             } else {
-                telemetry.addData("Next spot", "ALL %d SPOTS COVERED", coverage.spotCount());
+                telemetry.addData("Next", "ALL SPOTS COVERED");
             }
             if (state == State.AIM || state == State.FIRE) {
-                telemetry.addData("Flywheel", "%.0f / %.0f RPM (fire within %.0f)", flywheel.rpm(), flywheel.targetRpm(),
-                        Shooter.fireToleranceRpm(state == State.FIRE ? shotDistance : distance));
+                telemetry.addData("Flywheel", "%.0f / %.0f (+-%.0f)", flywheel.rpm(), flywheel.targetRpm(),
+                        Shooter.fireToleranceRpm(state == State.FIRE ? shotNominal[0] : nom[0]));
             }
             for (String h : history) {
                 telemetry.addLine(h);
             }
             if (state == State.IDLE) {
-                telemetry.addLine("A shoot | dpad speed | X suggested | Y drive to spot | RS next spot | bumpers intake, "
-                        + "B reverse | Back re-position");
+                telemetry.addLine("A shoot | Y go | RS skip | X suggest");
+                telemetry.addLine("dpad speed | bumpers intake | B rev");
             }
             telemetry.update();
 
@@ -561,22 +591,20 @@ public class ShotCalibration extends LinearOpMode {
     }
 
     /** The first telemetry line: what is happening and what to do. */
-    private static String headline(State state, int volley, int made, int miss, String status, ShotCoverage.Spot here,
-                                   ShotCoverage.Spot selected, int stepsDone, Shooter shooter) {
+    private static String headline(State state, int volley, int made, int miss, ShotCoverage.Spot here,
+                                   ShotCoverage.Spot selected) {
         switch (state) {
             case DRIVE:
-                return ">>> DRIVING to " + (selected == null ? "the spot" : selected.name()) + "   (let go of Y: stop)";
+                return ">>> DRIVING to " + (selected == null ? "spot" : "#" + selected.number) + " (let go: stop)";
             case AIM:
-                return ">>> AIMING   (let go of A: cancel)";
+                return ">>> AIMING (let go of A: cancel)";
             case FIRE:
-                return ">>> FIRING: " + shooter.status();
+                return ">>> FIRING";
             case RESULT:
-                return String.format(Locale.US, ">>> VOLLEY %d: %d of %d IN, miss: %s%s", volley, made, BALLS, MISSES[miss],
-                        stepsDone == 0 ? "   (nothing fired: Back discards)" : "");
+                return String.format(Locale.US, ">>> VOLLEY %d: %d/%d IN, %s", volley, made, BALLS, MISSES[miss]);
             default:
-                String what = here == null ? "NOT AT A TEST SPOT: hold Y to drive to the next one"
-                        : String.format(Locale.US, "AT %s: load %d balls, hold A to shoot", here.name(), BALLS);
-                return ">>> " + what + (status.isEmpty() ? "" : "   [" + status + "]");
+                return here == null ? ">>> NOT AT A SPOT: hold Y"
+                        : String.format(Locale.US, ">>> AT #%d: load %d, hold A", here.number, BALLS);
         }
     }
 
@@ -589,6 +617,11 @@ public class ShotCalibration extends LinearOpMode {
             legs[i] = line(a, b).heading(aimer.facingTarget(i == 0 ? start.heading() : null));
         }
         return legs.length == 1 ? legs[0] : path(legs);
+    }
+
+    /** Shooting distance as the matches use it: odometry to the nominal up CELL. */
+    private static double nomFirst(Pose pose, boolean audience, boolean red) {
+        return ShootingZone.shotDistance(pose.x(), pose.y(), audience, red);
     }
 
     private Pose startPose(WallFinder walls, List<Pose> vision, AutoSettings settings) {
