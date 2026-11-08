@@ -14,6 +14,11 @@
             <goBILDA5201SeriesMotor name="backRight" port="3" />
             <ControlHubImuBHI260AP name="imu" port="0" bus="0" />
             <goBILDAPinpoint name="pinpoint" port="0" bus="1" />
+            <Servo name="defender" port="0" />
+            <Led name="led0" port="0" />
+            <Led name="led1" port="1" />
+            <Led name="led2" port="2" />
+            <Led name="led3" port="3" />
         </LynxModule>
     </LynxUsbDevice>
     <EthernetDevice name="limelight" serialNumber="EthernetOverUsb:eth0:172.29.2.29" name="limelight" port="-1" ipAddress="172.29.2.1" />
