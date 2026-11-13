@@ -50,8 +50,8 @@ public class Shooter {
     public static double SHOT_INTERVAL_MS = 250;
     /** Flywheel without its encoder (open-loop): wait this long after switching it on. */
     public static double OPEN_LOOP_SPIN_UP_MS = 1500;
-    /** Long enough for the indexer's jam recovery (see Indexer). */
-    public static double STEP_TIMEOUT_MS = 4000;
+    /** Long enough for the indexer's jam recovery (see Indexer: 2 tries, about 2.4 s). Was 4000. */
+    public static double STEP_TIMEOUT_MS = 3000;
     /**
      * A step this long that is within STEP_CLOSE_DEG of its target counts as done (2026-10-31, r0240:
      * an empty step crept the last degrees for 3.6 s and cost the second volley). The next step's
@@ -200,7 +200,9 @@ public class Shooter {
                     add(String.format(Locale.US, "indexer step slow: %.0f deg short after %.0f ms, moving on",
                             shortDeg, feedTimer.milliseconds()));
                 }
-                if ((feedTimer.milliseconds() > 50 && !indexer.busy()) || slowButClose
+                // Done once the step got there (Indexer.arrived(): it overshoots, then creeps back for
+                // 0.4-0.5 s with the ball already through), or the motor stopped
+                if ((feedTimer.milliseconds() > 50 && (indexer.arrived() || !indexer.busy())) || slowButClose
                         || feedTimer.milliseconds() > STEP_TIMEOUT_MS) {
                     stepsDone++;
                     if (stepsDone >= steps) {

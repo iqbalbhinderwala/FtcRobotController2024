@@ -29,6 +29,18 @@ import java.util.Locale;
  *    up (STUCK): the motor is unpowered until the next step() call, so the ball can be freed by hand.
  *  - Steps do not pile up: the target is never more than MAX_AHEAD_STEPS ahead of where the indexer
  *    really is, so after a jam it only goes to the next position.
+ *
+ * 2026-11-08, from every log since Oct 22 (15 jams, 32 back-offs, 57 logged steps):
+ *  - A jammed indexer draws 2.1-4.0 A, a turning one at most 0.67 A in its first 100 ms and 0.37 A
+ *    after: JAM_AMPS over JAM_AMPS_MS catches a jam in about 0.2 s at any angle (the progress check
+ *    needed 0.4 s and missed a ball stopping it 20-30 deg short). The progress check stays as a
+ *    backup (one jam drew only 0.3 A), now from JAM_MIN_ERROR_DEG 12.
+ *  - A 45 deg back-off freed 3 of 28 jams and the 3rd try never did: each try stopped at the same
+ *    angle. Now the 1st back-off is a full step (BACKOFF_DEG 90), the 2nd deeper (BACKOFF2_DEG) with
+ *    a longer wait, then STUCK (MAX_RETRIES 2).
+ *  - 51 of 57 steps overshot by about 21 deg and crept back: the step reached its target in 0.33 s
+ *    but counted as done only after the creep (next step after 0.80 s). arrived(): done once it is
+ *    within ARRIVE_DEG of the target or past it (the shooter moves on; the motor still settles).
  */
 @Config("JohnIndexer")
 public class Indexer {
@@ -41,15 +53,30 @@ public class Indexer {
 
     // ---- Jam handling ----
     public static boolean JAM_DETECTION = true;
-    public static double JAM_MIN_ERROR_DEG = 30;
+    public static double JAM_MIN_ERROR_DEG = 12;
+    /** Current-based jam: above JAM_AMPS for JAM_AMPS_MS, after JAM_AMPS_GRACE_MS of a step (start-up surge). */
+    public static boolean JAM_BY_CURRENT = true;
+    public static double JAM_AMPS = 1.5;
+    public static double JAM_AMPS_MS = 100;
+    public static double JAM_AMPS_GRACE_MS = 100;
     public static double JAM_PROGRESS_DEG = 5;
     public static double JAM_MS = 250;
     public static double JAM_GRACE_MS = 150;
-    public static double BACKOFF_DEG = 45;
-    public static double BACKOFF_POWER = 0.6;
-    public static double BACKOFF_MS = 300;
-    public static double SETTLE_MS = 200;
-    public static int MAX_RETRIES = 3;
+    /** 1st back-off: a full step back (45 deg freed 3 of 28 jams). */
+    public static double BACKOFF_DEG = 90;
+    /** 2nd and later back-offs: deeper, and a longer wait for the ball to roll into place. */
+    public static double BACKOFF2_DEG = 135;
+    /**
+     * 1.0 (was 0.6): in every logged jam (32 back-offs) the 0.6 back-off ran out its time limit, and
+     * the retry made no progress at all: the pinched ball held the indexer both ways.
+     */
+    public static double BACKOFF_POWER = 1.0;
+    public static double BACKOFF_MS = 450;
+    public static double SETTLE_MS = 300;
+    public static double SETTLE2_MS = 500;
+    public static int MAX_RETRIES = 2;
+    /** arrived(): within this of the target, or past it. */
+    public static double ARRIVE_DEG = 10;
     /** The target may be at most this many steps ahead of the indexer's real position. */
     public static int MAX_AHEAD_STEPS = 1;
 
@@ -65,6 +92,8 @@ public class Indexer {
     private double targetSetMs;
     private double checkDeg;
     private double checkMs = -1;
+    private double highAmpsSinceMs = -1;
+    private double jamDeg;
     // Recovery
     private int retries;
     private int jams;
@@ -115,44 +144,72 @@ public class Indexer {
                 if (Math.abs(error) < JAM_PROGRESS_DEG) {
                     retries = 0;   // got there
                 }
+                boolean jam = false;
+                String how = "";
+                // Current: read only while a step is under way (each read costs a hub call)
+                if (JAM_DETECTION && JAM_BY_CURRENT && error > ARRIVE_DEG && now - targetSetMs >= JAM_AMPS_GRACE_MS) {
+                    double a = amps();
+                    if (a < JAM_AMPS) {
+                        highAmpsSinceMs = -1;
+                    } else if (highAmpsSinceMs < 0) {
+                        highAmpsSinceMs = now;
+                    } else if (now - highAmpsSinceMs >= JAM_AMPS_MS) {
+                        jam = true;
+                        how = String.format(Locale.US, "%.1f A", a);
+                    }
+                } else {
+                    highAmpsSinceMs = -1;
+                }
+                // Backup: no progress
                 if (JAM_DETECTION && error > JAM_MIN_ERROR_DEG && now - targetSetMs >= JAM_GRACE_MS) {
                     if (checkMs < 0 || degrees - checkDeg >= JAM_PROGRESS_DEG) {
                         checkDeg = degrees;
                         checkMs = now;
                     } else if (now - checkMs >= JAM_MS) {
-                        jams++;
-                        retries++;
-                        checkMs = -1;
-                        if (retries > MAX_RETRIES) {
-                            state = State.STUCK;
-                            event = String.format(Locale.US, "indexer STUCK at %.0f deg (target %.0f) after %d tries: "
-                                    + "clear the ball", degrees, targetDegrees(), MAX_RETRIES);
-                        } else {
-                            state = State.BACKING_OFF;
-                            backoffTargetDeg = degrees - BACKOFF_DEG;
-                            phaseStartMs = now;
-                            event = String.format(Locale.US, "indexer jam at %.0f deg (target %.0f, %.1f A): backing off, try %d",
-                                    degrees, targetDegrees(), amps(), retries);
-                        }
+                        jam = true;
+                        if (how.isEmpty()) how = "no progress";
                     }
                 } else {
                     checkMs = -1;
+                }
+                if (jam) {
+                    jams++;
+                    retries++;
+                    checkMs = -1;
+                    highAmpsSinceMs = -1;
+                    if (retries > MAX_RETRIES) {
+                        state = State.STUCK;
+                        event = String.format(Locale.US, "indexer STUCK at %.0f deg (target %.0f) after %d tries: "
+                                + "clear the ball", degrees, targetDegrees(), MAX_RETRIES);
+                    } else {
+                        double back = retries == 1 ? BACKOFF_DEG : BACKOFF2_DEG;
+                        state = State.BACKING_OFF;
+                        backoffTargetDeg = degrees - back;
+                        jamDeg = degrees;
+                        phaseStartMs = now;
+                        event = String.format(Locale.US, "indexer jam at %.0f deg (target %.0f, %s): backing off %.0f deg, try %d",
+                                degrees, targetDegrees(), how, back, retries);
+                    }
                 }
                 drive(target, POWER);
                 break;
             case BACKING_OFF:
                 drive(ticks(backoffTargetDeg), BACKOFF_POWER);
                 if (degrees <= backoffTargetDeg + JAM_PROGRESS_DEG || now - phaseStartMs >= BACKOFF_MS) {
+                    // How far it really went: a pinched ball can hold it both ways
+                    event = String.format(Locale.US, "indexer backed off %.0f of %.0f deg in %.0f ms", jamDeg - degrees,
+                            jamDeg - backoffTargetDeg, now - phaseStartMs);
                     state = State.SETTLING;
                     phaseStartMs = now;
                 }
                 break;
             case SETTLING:
                 drive(ticks(backoffTargetDeg), BACKOFF_POWER);
-                if (now - phaseStartMs >= SETTLE_MS) {
+                if (now - phaseStartMs >= (retries <= 1 ? SETTLE_MS : SETTLE2_MS)) {
                     state = State.RUNNING;
                     targetSetMs = now;   // a new grace period for the retry
                     checkMs = -1;
+                    highAmpsSinceMs = -1;
                     event = "indexer retry";
                 }
                 break;
@@ -200,6 +257,14 @@ public class Indexer {
     /** Still moving to the target, or recovering from a jam (false when STUCK). */
     public boolean busy() {
         return state == State.BACKING_OFF || state == State.SETTLING || (state == State.RUNNING && motor.isBusy());
+    }
+
+    /**
+     * The current step got there: within ARRIVE_DEG of the target, or past it (it overshoots about 20
+     * deg and then creeps back; the ball is already through). False while recovering from a jam.
+     */
+    public boolean arrived() {
+        return state == State.RUNNING && targetDegrees() - degrees <= ARRIVE_DEG;
     }
 
     /** Gave up on a jam: clear the ball, then step() again. */
