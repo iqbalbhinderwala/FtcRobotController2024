@@ -96,7 +96,7 @@ public class ShotCalibration extends LinearOpMode {
     private enum State { IDLE, DRIVE, AIM, FIRE, RESULT }
 
     private static final String LOG_HEADER = "t_s,state,x,y,h_deg,cell,distance,off_axis_deg,spot,"
-            + "rpm_set,fw_rpm,fw_mode,fw_amps,battery_v,idx_steps,tags,hive,up_height_in,event";
+            + "rpm_set,fw_rpm,fw_mode,fw_amps,battery_v,idx_steps,idx_deg,idx_target_deg,idx_state,tags,hive,up_height_in,event";
     private static final String RESULT_HEADER = "volley,t_s,alliance,cell,x,y,h_deg,distance_in,cam_distance_in,"
             + "off_axis_deg,nom_distance_in,nom_off_axis_deg,spot,rpm_set,table_rpm,fire_tol_rpm,rpm_at_balls,min_rpm,shot_interval_ms,step_ms,gap_ms,"
             + "steps_done,tipped,made,balls,"
@@ -579,7 +579,8 @@ public class ShotCalibration extends LinearOpMode {
             log.row(clock.seconds(), state, pose.x(), pose.y(), Math.toDegrees(pose.heading()), tracker.upCellName(),
                     distance, offAxis, here == null ? null : here.number, Double.isNaN(rpmSet) ? null : rpmSet,
                     flywheel.rpm(), flywheel.mode(), flywheel.isOn() ? flywheel.amps() : null, flywheel.voltage(),
-                    shooter.indexer().stepCount(), frame == null ? null : frame.ids(), tracker.hiveStateName(),
+                    shooter.indexer().stepCount(), shooter.indexer().degrees(), shooter.indexer().targetDegrees(),
+                    shooter.indexer().state(), frame == null ? null : frame.ids(), tracker.hiveStateName(),
                     Double.isNaN(tracker.upHeight()) ? null : tracker.upHeight(), event);
         }
         shooter.stop();

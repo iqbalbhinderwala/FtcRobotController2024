@@ -42,6 +42,8 @@ public class DefenderCalibration extends LinearOpMode {
     public static int BALLS = 4;
 
     private static final String LOG_HEADER = "volley,t_s,defender_pos,rpm_set,rpm_at_balls,steps_done,event";
+    /** Every loop while firing: the indexer, for jam analysis. */
+    private static final String LOOP_HEADER = "t_s,volley,fw_rpm,idx_steps,idx_deg,idx_target_deg,idx_state,event";
 
     @Override
     public void runOpMode() {
@@ -49,7 +51,9 @@ public class DefenderCalibration extends LinearOpMode {
         Defender defender = new Defender(hardwareMap);
         Shooter shooter = new Shooter(hardwareMap);
         StatusLights lights = new StatusLights(hardwareMap);
-        CsvLog log = new CsvLog("john_defender_shots", LOG_HEADER);
+        int run = CsvLog.nextRunNumber();
+        CsvLog log = new CsvLog("john_defender_shots", LOG_HEADER, run);
+        CsvLog loopLog = new CsvLog("john_defender_loop", LOOP_HEADER, run);
         lights.off();
 
         while (opModeInInit()) {
@@ -194,11 +198,16 @@ public class DefenderCalibration extends LinearOpMode {
             if (shooterEvent != null) {
                 event = event == null ? shooterEvent : event + "; " + shooterEvent;
             }
+            if (shooter.firing() || event != null) {
+                loopLog.row(clock.seconds(), volley, shooter.flywheel().rpm(), shooter.indexer().stepCount(),
+                        shooter.indexer().degrees(), shooter.indexer().targetDegrees(), shooter.indexer().state(), event);
+            }
             telemetry.update();
         }
         shooter.stop();
         lights.off();
         log.close();
+        loopLog.close();
     }
 
     private static String fmt(double v) {
