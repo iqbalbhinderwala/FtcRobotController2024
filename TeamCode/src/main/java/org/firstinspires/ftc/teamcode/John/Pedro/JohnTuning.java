@@ -29,20 +29,36 @@ public class JohnTuning {
     /**
      * Forward / strafe position controllers are piecewise: the SMALL P below
      * TRANSLATIONAL_THRESHOLD_IN of error, the LARGE P above it (tuner values).
+     * John v2 (2026-11-13): the average of two Foresight tuner runs (v1: forward 0.152 / 0.411, strafe
+     * 0.250 / 0.677), except the strafe P: the tuner gave 1.1894 / 3.2191 (the lowest-speed strafe
+     * stage stalled and was pushed by hand), which buzzed while holding after strafes; [John] Hold
+     * Test r1037 settled on 0.4 / 1.5.
      */
-    public static double FORWARD_P_SMALL = 0.1519286847113561;
-    public static double FORWARD_P_LARGE = 0.41120344321980973;
-    public static double STRAFE_P_SMALL = 0.25006492204134684;
-    public static double STRAFE_P_LARGE = 0.676814632913156;
+    public static double FORWARD_P_SMALL = 0.2387;
+    public static double FORWARD_P_LARGE = 0.6462;
+    public static double STRAFE_P_SMALL = 0.4;
+    public static double STRAFE_P_LARGE = 1.5;
     public static double TRANSLATIONAL_THRESHOLD_IN = 2.5;
     /**
      * Static friction push added to the forward / strafe output: KS * sign(error) while that error
      * is larger than TRANSLATIONAL_KS_DEADBAND_IN. Lets the robot finish a move instead of stopping
      * short (it stops about 0.4" short forward and 0.6" short sideways without it).
+     * John v2 (Hold Test r1037): with the 0.1" deadband the forward push flipped sign every loop
+     * around the target after a strafe (an 11-14 Hz buzz); 0.25" and forward KS 0.03 hold quietly,
+     * stopping about 0.2-0.3" short.
+     * r1039: a strafe KS of 0.15 or more still shook while holding (Pedro holds the predicted stop,
+     * position + 0.179 x speed, so a small shudder crossed the deadband and flipped the push);
+     * 0.10 holds quietly, about 0.3" short sideways.
      */
-    public static double FORWARD_KS = 0.06;
-    public static double STRAFE_KS = 0.15;
-    public static double TRANSLATIONAL_KS_DEADBAND_IN = 0.1;
+    public static double FORWARD_KS = 0.03;
+    public static double STRAFE_KS = 0.10;
+    public static double TRANSLATIONAL_KS_DEADBAND_IN = 0.25;
+    /**
+     * The friction push grows from 0 at the deadband to the full KS over this many more inches,
+     * instead of switching fully on at the deadband (0 = the old on/off step). A small wobble in
+     * the predicted stop then gives a small push, not a full flip.
+     */
+    public static double TRANSLATIONAL_KS_RAMP_IN = 0.25;
 
     private JohnTuning() {}
 }

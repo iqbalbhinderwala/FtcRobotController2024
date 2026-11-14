@@ -74,26 +74,32 @@ public class Constants {
 
                 c.forwardTranslational.set(Controller.sum(
                         Controller.piecewise(secondaryTranslationalForward).put(g.translationalThresholdIn, primaryTranslationalForward),
-                        staticFeedforward(g.forwardKs, g.translationalKsDeadbandIn)));
+                        staticFeedforward(g.forwardKs, g.translationalKsDeadbandIn, g.translationalKsRampIn)));
                 c.strafeTranslational.set(Controller.sum(
                         Controller.piecewise(secondaryTranslationalLateral).put(g.translationalThresholdIn, primaryTranslationalLateral),
-                        staticFeedforward(g.strafeKs, g.translationalKsDeadbandIn)));
+                        staticFeedforward(g.strafeKs, g.translationalKsDeadbandIn, g.translationalKsRampIn)));
 
-                c.coast.set(Controller.proportionalFeedforward(0.010186903129938));
-                c.brake.set(Controller.proportionalFeedforward(0.0086588676604473));
+                // John v2 (2026-11-13): the average of two Foresight tuner runs (v1 values in the
+                // comments). The strafe braking values are provisional: the lowest-speed strafe brake
+                // stage stalled and was pushed by hand. Heading KP / brake stay in JohnTuning (our
+                // Heading Calibration; the tuner gave KP 14.9, brake 0.116 / 0.0063).
+                c.coast.set(Controller.proportionalFeedforward(0.012946));   // v1 0.010187
+                c.brake.set(Controller.proportionalFeedforward(0.011004));   // v1 0.008659
 
                 c.headingFeedback.set(Controller.sum(
                         Controller.proportional(g.headingKp),
-                        staticFeedforward(g.headingKs, Math.toRadians(g.headingKsDeadbandDeg))));
+                        staticFeedforward(g.headingKs, Math.toRadians(g.headingKsDeadbandDeg), 0)));
                 c.headingBrakeCoefficients.set(Vector2D.cartesian(g.headingBrakeA, g.headingBrakeB));
 
-                c.linearBrakeCoefficients.set(Matrix.diag(0.15218656729826474, 0.11945174018596512));
-                c.quadraticBrakeCoefficients.set(Matrix.diag(0.0014714148194534546, 0.0012325337662412374));
+                // Strafe: [John] Brake Calibration r1050 + r1051 (12 trials, fresh battery; the tuner
+                // gave 0.087859 / 0.0023155 with a stalled trial). Forward: tuner, to be measured.
+                c.linearBrakeCoefficients.set(Matrix.diag(0.179222, 0.081280));         // v1 0.152187, 0.119452
+                c.quadraticBrakeCoefficients.set(Matrix.diag(0.0022750, 0.0028440));    // v1 0.0014714, 0.0012325
 
-                c.maxAchievableForwardVelocity.set(88.62593753486438);
-                c.maxAchievableStrafeVelocity.set(69.59926334249484);
-                c.naturalForwardDeceleration.set(30.482755979464184);
-                c.naturalStrafeDeceleration.set(68.61843691164408);
+                c.maxAchievableForwardVelocity.set(73.234);   // v1 88.63
+                c.maxAchievableStrafeVelocity.set(51.489);    // v1 69.60
+                c.naturalForwardDeceleration.set(27.300);     // v1 30.48
+                c.naturalStrafeDeceleration.set(75.029);      // v1 68.62
             }
         );
     }
@@ -102,9 +108,17 @@ public class Constants {
      * Static friction feedforward: ks * sign(error), but 0 within deadband of the target so it does
      * not chatter around zero error (Pedro's Controller.staticFeedforward has no deadband). The
      * deadband is in the controller's error units (radians for heading, inches for translation).
+     * With ramp > 0 the push grows linearly from 0 at the deadband to the full ks at deadband + ramp
+     * (no on/off step for a small wobble to flip: Pedro feeds the predicted-stop error, which moves
+     * with every bit of speed noise). ramp 0 = the plain step.
      */
-    private static Controller staticFeedforward(double ks, double deadband) {
-        return (target, error) -> Math.abs(error) > deadband ? ks * Math.signum(error) : 0.0;
+    private static Controller staticFeedforward(double ks, double deadband, double ramp) {
+        return (target, error) -> {
+            double beyond = Math.abs(error) - deadband;
+            if (beyond <= 0) return 0.0;
+            double scale = ramp > 0 ? Math.min(1.0, beyond / ramp) : 1.0;
+            return ks * scale * Math.signum(error);
+        };
     }
 
     public static Follower create(HardwareMap h) {

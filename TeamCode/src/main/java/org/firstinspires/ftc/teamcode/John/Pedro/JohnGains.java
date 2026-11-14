@@ -11,7 +11,7 @@ public class JohnGains {
 
     public double headingKp, headingKs, headingKsDeadbandDeg, headingBrakeA, headingBrakeB;
     public double forwardPSmall, forwardPLarge, strafePSmall, strafePLarge, translationalThresholdIn;
-    public double forwardKs, strafeKs, translationalKsDeadbandIn;
+    public double forwardKs, strafeKs, translationalKsDeadbandIn, translationalKsRampIn;
 
     /** The values currently in JohnTuning (live from the Dashboard). */
     public static JohnGains current() {
@@ -29,6 +29,7 @@ public class JohnGains {
         g.forwardKs = JohnTuning.FORWARD_KS;
         g.strafeKs = JohnTuning.STRAFE_KS;
         g.translationalKsDeadbandIn = JohnTuning.TRANSLATIONAL_KS_DEADBAND_IN;
+        g.translationalKsRampIn = JohnTuning.TRANSLATIONAL_KS_RAMP_IN;
         return g;
     }
 
@@ -47,6 +48,7 @@ public class JohnGains {
         JohnTuning.FORWARD_KS = forwardKs;
         JohnTuning.STRAFE_KS = strafeKs;
         JohnTuning.TRANSLATIONAL_KS_DEADBAND_IN = translationalKsDeadbandIn;
+        JohnTuning.TRANSLATIONAL_KS_RAMP_IN = translationalKsRampIn;
     }
 
     public JohnGains copy() {
@@ -64,6 +66,7 @@ public class JohnGains {
         g.forwardKs = forwardKs;
         g.strafeKs = strafeKs;
         g.translationalKsDeadbandIn = translationalKsDeadbandIn;
+        g.translationalKsRampIn = translationalKsRampIn;
         return g;
     }
 
@@ -71,14 +74,14 @@ public class JohnGains {
     public double[] toArray() {
         return new double[]{headingKp, headingKs, headingKsDeadbandDeg, headingBrakeA, headingBrakeB,
                 forwardPSmall, forwardPLarge, strafePSmall, strafePLarge, translationalThresholdIn,
-                forwardKs, strafeKs, translationalKsDeadbandIn};
+                forwardKs, strafeKs, translationalKsDeadbandIn, translationalKsRampIn};
     }
 
     public String summary() {
         return String.format(Locale.US, "heading KP %.3f KS %.3f/%.2fdeg brake %.4f/%.5f; "
-                        + "forward P %.4f/%.4f KS %.3f; strafe P %.4f/%.4f KS %.3f; threshold %.2fin, KS deadband %.2fin",
+                        + "forward P %.4f/%.4f KS %.3f; strafe P %.4f/%.4f KS %.3f; threshold %.2fin, KS deadband %.2fin ramp %.2fin",
                 headingKp, headingKs, headingKsDeadbandDeg, headingBrakeA, headingBrakeB,
                 forwardPSmall, forwardPLarge, forwardKs, strafePSmall, strafePLarge, strafeKs,
-                translationalThresholdIn, translationalKsDeadbandIn);
+                translationalThresholdIn, translationalKsDeadbandIn, translationalKsRampIn);
     }
 }

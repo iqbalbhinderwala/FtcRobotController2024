@@ -10,6 +10,7 @@ import com.pedropathing.math.Pose;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 import com.qualcomm.robotcore.hardware.DcMotor;
+import com.qualcomm.robotcore.hardware.VoltageSensor;
 import com.qualcomm.robotcore.util.ElapsedTime;
 
 import org.firstinspires.ftc.teamcode.John.Dashboard.Drawing;
@@ -54,7 +55,7 @@ public class HoldTest extends LinearOpMode {
 
     private static final String LOG_HEADER = "t_s,target_x,target_y,target_h_deg,x,y,h_deg,"
             + "heading_err_deg,position_err_in,swing_pp_deg,swing_hz,loop_ms,kp,brake_a,brake_b,ks,ks_deadband_deg,watchdog,pinpoint_status,pinpoint_loop_us,"
-            + "p_fl,p_fr,p_bl,p_br,event";
+            + "p_fl,p_fr,p_bl,p_br,battery_v,event";
 
     @Override
     public void runOpMode() {
@@ -70,6 +71,9 @@ public class HoldTest extends LinearOpMode {
                 hardwareMap.get(DcMotor.class, Constants.drivetrainConfig.frontRightName.get()),
                 hardwareMap.get(DcMotor.class, Constants.drivetrainConfig.backLeftName.get()),
                 hardwareMap.get(DcMotor.class, Constants.drivetrainConfig.backRightName.get())};
+        // Battery voltage, logged every loop: a sagging battery shows up next to each move
+        VoltageSensor battery = hardwareMap.voltageSensor.iterator().next();
+        double minVolts = Double.POSITIVE_INFINITY;
         follower.setPose(new Pose(START_X_IN, START_Y_IN, Math.toRadians(START_HEADING_DEG)));
         watchdog.poseSet();
 
@@ -86,9 +90,10 @@ public class HoldTest extends LinearOpMode {
         follower.hold(target);
         double[] applied = tuning();
         double[] appliedAll = JohnGains.current().toArray();
+        double volts = battery.getVoltage();
         log.row(clock.seconds(), null, null, null, null, null, null, null, null, null, null, null,
                 applied[0], applied[1], applied[2], applied[3], applied[4], watchdog.state(), watchdog.status(), watchdog.pinpointLoopUs(),
-                motors[0].getPower(), motors[1].getPower(), motors[2].getPower(), motors[3].getPower(), "start holding: " + JohnGains.current().summary());
+                motors[0].getPower(), motors[1].getPower(), motors[2].getPower(), motors[3].getPower(), volts, "start holding: " + JohnGains.current().summary());
 
         ArrayDeque<double[]> history = new ArrayDeque<>();   // {t, heading error deg}
 
@@ -104,7 +109,7 @@ public class HoldTest extends LinearOpMode {
                 log.row(clock.seconds(), null, null, null, null, null, null, null, null, null, null, null,
                         applied[0], applied[1], applied[2], applied[3], applied[4], watchdog.state(), watchdog.status(),
                         watchdog.pinpointLoopUs(),
-                        motors[0].getPower(), motors[1].getPower(), motors[2].getPower(), motors[3].getPower(), "new tuning applied: " + JohnGains.current().summary());
+                        motors[0].getPower(), motors[1].getPower(), motors[2].getPower(), motors[3].getPower(), volts, "new tuning applied: " + JohnGains.current().summary());
             }
 
             // Step tests (one per press; every button is read each loop)
@@ -146,10 +151,12 @@ public class HoldTest extends LinearOpMode {
                 log.row(clock.seconds(), null, null, null, null, null, null, null, null, null, null, null,
                         applied[0], applied[1], applied[2], applied[3], applied[4], watchdog.state(), watchdog.status(),
                         watchdog.pinpointLoopUs(),
-                        motors[0].getPower(), motors[1].getPower(), motors[2].getPower(), motors[3].getPower(), step);
+                        motors[0].getPower(), motors[1].getPower(), motors[2].getPower(), motors[3].getPower(), volts, step);
             }
 
             follower.update();
+            volts = battery.getVoltage();
+            if (volts > 0) minVolts = Math.min(minVolts, volts);
             double loopMs = loopTimer.milliseconds();
             loopTimer.reset();
 
@@ -173,7 +180,7 @@ public class HoldTest extends LinearOpMode {
                 log.row(clock.seconds(), null, null, null, null, null, null, null, null, null, null, null,
                         applied[0], applied[1], applied[2], applied[3], applied[4], watchdog.state(), watchdog.status(),
                         watchdog.pinpointLoopUs(),
-                        motors[0].getPower(), motors[1].getPower(), motors[2].getPower(), motors[3].getPower(), change);
+                        motors[0].getPower(), motors[1].getPower(), motors[2].getPower(), motors[3].getPower(), volts, change);
             }
 
             // Heading swing over the last WINDOW_S: peak to peak and zero-crossing frequency
@@ -218,6 +225,7 @@ public class HoldTest extends LinearOpMode {
             telemetry.addData("Tuning", "KP %.3f  KS %.3f (deadband %.2f deg)  brake A %.4f  B %.5f",
                     applied[0], applied[3], applied[4], applied[1], applied[2]);
             telemetry.addData("Loop", "%.1f ms", loopMs);
+            telemetry.addData("Battery", "%.2f V (lowest %.2f V)", volts, minVolts);
             telemetry.addData("Controls", "bumpers turn %.0f deg, dpad move / strafe %.0f in, A hold here",
                     STEP_DEG, STEP_IN);
             telemetry.update();
@@ -235,7 +243,7 @@ public class HoldTest extends LinearOpMode {
                     Math.toDegrees(pose.heading()), headingErr, positionErr, swing, hz, loopMs,
                     applied[0], applied[1], applied[2], applied[3], applied[4], watchdog.state(), watchdog.status(),
                     watchdog.pinpointLoopUs(),
-                        motors[0].getPower(), motors[1].getPower(), motors[2].getPower(), motors[3].getPower(), null);
+                        motors[0].getPower(), motors[1].getPower(), motors[2].getPower(), motors[3].getPower(), volts, null);
         }
         log.close();
         watchdog.close();
