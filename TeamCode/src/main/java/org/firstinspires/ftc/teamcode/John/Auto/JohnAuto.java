@@ -258,7 +258,8 @@ public class JohnAuto extends LinearOpMode {
     /** Kept in hand on top of the park estimate. */
     public static double PARK_MARGIN_S = 1.5;
     /** Estimates: average speed along a route, plus this per drive (speeding up / slowing down). */
-    public static double AVG_DRIVE_IPS = 30.0;
+    /** John v2: 40 (was 30): shot 2 was estimated at 8.9 s and took ~7.1 s (r1076); r1084 skipped volley 2 by 0.1 s. */
+    public static double AVG_DRIVE_IPS = 40.0;
     public static double DRIVE_OVERHEAD_S = 0.6;
     public static double PARK_OVERHEAD_S = 1.0;
     public static double AIM_S = 1.2;

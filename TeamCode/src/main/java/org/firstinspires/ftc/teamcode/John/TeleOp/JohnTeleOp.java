@@ -55,7 +55,10 @@ import java.util.Locale;
  *  - WALL against either back wall (WallFinder: the tags tell which, no odometry or alliance
  *    needed), else the VISION pose (TagLocalizer.solvePose, median over INIT), else the alliance's
  *    start wall at the Game Setup tile. The autonomous pose is also rejected when the vision
- *    heading differs by more than AUTO_CHECK_DEG. The old description follows:
+ *    heading differs by more than AUTO_CHECK_DEG. An OLDER autonomous pose is used when the camera
+ *    confirms it, or, as the last resort, when nothing else is known (no back wall, no vision pose,
+ *    no tag fix): 2026-11-14 r1082 started 13 min after the Auto, still where it parked, took the
+ *    start-wall default 90 deg off, and field-centric was wrong. The old description follows:
  *  - WALL: John's camera wall flush on the alliance's start wall (red: the audience wall; blue: the
  *    far wall), shooter facing the field, anywhere along the wall. The camera reads the HIVE tags; a
  *    tag's field Y never changes when the HIVE tips, so each tag gives the position along the wall
@@ -426,13 +429,18 @@ public class JohnTeleOp extends LinearOpMode {
             double autoHeadingError = autoPose != null && visionStart != null
                     ? Math.abs(Math.toDegrees(normalize(visionStart.heading() - autoPose.heading()))) : Double.NaN;
             // A vision heading ~180 deg off is the flipped fit (r0188), not a reason to distrust the pose
-            boolean autoOk = autoFresh && (Double.isNaN(autoError) || autoError <= AUTO_CHECK_IN)
-                    && (Double.isNaN(autoHeadingError) || autoHeadingError <= AUTO_CHECK_DEG
-                    || autoHeadingError > FLIP_HEADING_DEG);
-            if (!startOverridden) {
-                startFrom = autoOk ? Start.AUTO : Start.WALL;
-            }
+            boolean headingAgrees = Double.isNaN(autoHeadingError) || autoHeadingError <= AUTO_CHECK_DEG
+                    || autoHeadingError > FLIP_HEADING_DEG;
+            boolean autoConfirmed = !Double.isNaN(autoError) && autoError <= AUTO_CHECK_IN;
+            boolean autoOk = autoPossible && (autoFresh || autoConfirmed)
+                    && (Double.isNaN(autoError) || autoError <= AUTO_CHECK_IN) && headingAgrees;
             Pose wallFound = walls.found(MIN_START_SAMPLES);
+            // Old and unchecked, but better than the start-wall default when nothing else is known
+            boolean nothingElse = wallFound == null && visionStart == null && startFix.count() < MIN_START_SAMPLES;
+            boolean autoLastResort = !autoOk && autoPossible && Double.isNaN(autoError) && headingAgrees && nothingElse;
+            if (!startOverridden) {
+                startFrom = autoOk || autoLastResort ? Start.AUTO : Start.WALL;
+            }
             Pose start = startFrom == Start.AUTO ? autoPose
                     : wallFound != null ? wallFound
                     : visionStart != null ? visionStart
@@ -447,6 +455,11 @@ public class JohnTeleOp extends LinearOpMode {
             telemetry.addData("Alliance", haveSetup ? "%s   (from %s; drivers at the %s wall)"
                             : "%s   (%sno Game Setup saved: B red, X blue; drivers at the %s wall)",
                     red ? "RED" : "BLUE", haveSetup ? setupSource : "", red ? "red" : "blue");
+            if (startFrom == Start.AUTO && autoLastResort) {
+                telemetry.addLine(String.format(Locale.US, "!!! Using the autonomous end pose from %.0f s ago (no tags to "
+                        + "check it): right only if John was not moved since. Else dpad left / right or Back after START. !!!",
+                        autoAgeS));
+            }
             telemetry.addData("Start from", "%s   (dpad left / right)%s", startFrom,
                     autoPose == null ? ": no autonomous pose"
                             : !autoPossible ? ": the autonomous pose " + Drawing.format(autoPose) + " is impossible, not used"
