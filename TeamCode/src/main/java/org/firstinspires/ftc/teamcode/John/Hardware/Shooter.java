@@ -21,7 +21,7 @@ import java.util.Locale;
  *    +/-100 the balls of one volley left up to 129 RPM apart.
  *  - setSpin(true) keeps the flywheel at that speed (e.g. while driving or aiming); a volley spins
  *    it anyway.
- *  - startVolley(): one ball per indexer step, INDEXER_STEPS_PER_VOLLEY steps (4 balls + 2 spare):
+ *  - startVolley(): one ball per indexer step, INDEXER_STEPS_PER_VOLLEY steps (4 balls + 1 spare):
  *    waits for the flywheel to be at speed (open-loop: OPEN_LOOP_SPIN_UP_MS after switching on),
  *    then after each step SHOT_INTERVAL_MS and the flywheel back at speed (as in the Mechanism Test).
  *    The indexer handles jams itself (back off, retry); a STUCK indexer ends the volley (stuck()).
@@ -48,10 +48,26 @@ public class Shooter {
     public static String RPM_VALUES = "2250,2225,2200,2250,2275,2350,2400";
     public static double FIRE_TOLERANCE_NEAR_RPM = 100;
     public static double FIRE_TOLERANCE_FAR_RPM = 50;
+    /**
+     * ... but at most this much ABOVE the target. Shot Calibration (r1071) fired each volley from a
+     * fresh spin-up, the balls leaving at or just under the set speed; in Auto r1072 / r1076 volley 2
+     * the flywheel was already up and still overshooting (2271-2314 for 2200), and half the balls went
+     * long. Readings come in ~43 RPM steps, so there is always one within the window.
+     */
+    public static double FIRE_ABOVE_RPM = 30;
+    /**
+     * ... unless it has waited this long above that window (still within the normal tolerance): a
+     * slightly fast ball beats a stalled volley (Auto r1083: no ball left to pull it down, the flywheel
+     * sat 70-115 fast and the volley hung 5.9 s on its spare step).
+     */
+    public static double FIRE_ABOVE_WAIT_MS = 500;
     public static double TOLERANCE_NEAR_IN = 52;
     public static double TOLERANCE_FAR_IN = 60;
-    /** 4 balls, plus 2 extra indexer steps in case a ball comes late. */
-    public static int INDEXER_STEPS_PER_VOLLEY = 6;
+    /**
+     * 4 balls, plus 1 extra indexer step in case a ball comes late (was 2 extra; each empty step
+     * costs ~0.6 s, and the GARDEN gives at most 4 balls).
+     */
+    public static int INDEXER_STEPS_PER_VOLLEY = 5;
     /** Time between two balls (200-250 ms worked in the Mechanism Test; 150 ms missed 1 in 4). */
     public static double SHOT_INTERVAL_MS = 250;
     /** Flywheel without its encoder (open-loop): wait this long after switching it on. */
@@ -71,6 +87,8 @@ public class Shooter {
     private final Flywheel flywheel;
     private final Indexer indexer;
     private final ElapsedTime feedTimer = new ElapsedTime();
+    /** How long the flywheel has been above the firing window but within the normal tolerance. */
+    private final ElapsedTime fastTimer = new ElapsedTime();
     private boolean spin;
     private boolean paused;
     private Feed feed = Feed.IDLE;
@@ -187,8 +205,14 @@ public class Shooter {
             add("volley skipped: flywheel stalled");
             return;
         }
+        double tolerance = fireToleranceRpm(distance);
+        boolean inWindow = flywheel.within(tolerance, Math.min(FIRE_ABOVE_RPM, tolerance));
+        boolean fastButClose = !inWindow && flywheel.within(tolerance);
+        if (!fastButClose) {
+            fastTimer.reset();
+        }
         boolean ready = !paused
-                && (flywheel.closedLoop() ? flywheel.within(fireToleranceRpm(distance))
+                && (flywheel.closedLoop() ? inWindow || fastTimer.milliseconds() >= FIRE_ABOVE_WAIT_MS
                 : flywheel.onSeconds() * 1000.0 >= OPEN_LOOP_SPIN_UP_MS);
         switch (feed) {
             case SPIN_UP:

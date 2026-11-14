@@ -44,6 +44,13 @@ public class PathWatcher {
     public static double MIN_REMAINING_IN = 3.0;
     public static double PUSHED_IN = 5.0;
     public static double PUSHED_MS = 200;
+    /**
+     * Above this speed the PUSHED limit is PUSHED_FAST_IN: at 70 in/s John drifts ~5" across a path
+     * corner while turning onto the next leg (Auto r1085: 5.2" with the cross-track measure, stopped
+     * dead from full speed); another robot does not shove him aside at that speed.
+     */
+    public static double PUSHED_FAST_IPS = 40.0;
+    public static double PUSHED_FAST_IN = 12.0;
     public static double START_GRACE_MS = 400;
     public static int RETRIES = 2;
     /** A follow() that has not reached its end after this long gives up (it must never hang). */
@@ -106,7 +113,7 @@ public class PathWatcher {
         }
 
         double off = crossTrack(pose);
-        if (off <= PUSHED_IN) {
+        if (off <= (speed > PUSHED_FAST_IPS ? PUSHED_FAST_IN : PUSHED_IN)) {
             offSinceMs = -1;
         } else if (offSinceMs < 0) {
             offSinceMs = now;

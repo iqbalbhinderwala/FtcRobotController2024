@@ -148,6 +148,14 @@ public class JohnAuto extends LinearOpMode {
     public static double GARDEN_RUN_GAP_IN = 1.0;
     public static double GARDEN_RUN_SPEED_IPS = 30.0;
     /**
+     * Where the slow collect ends: John's intake A end this far from the alliance wall in the GARDEN
+     * corner; negative = into the wall, so he creeps until he touches it and stalls there ("as far as
+     * it goes", PathWatcher). 2026-11-14 (r1083), with WALL_GAP 0.5: the odometry said 1.1" from the
+     * wall, the real gap was 6-7 cm (2.4-2.8"); John is 43.2 cm (17.0") intake to intake, as in
+     * RobotGeometry, so that was odometry error, which varies run to run (r1070 stopped 3.1" short).
+     */
+    public static double GARDEN_END_GAP_IN = -2.5;
+    /**
      * Park: partly inside the red LOADING ZONE (A5: X -48 to -24, Y -72 to -60.4), camera wall on the
      * wall, never driving through it (a partner may be in it). John comes in from the end nearer his
      * route: from the audience side (X > the zone's middle, e.g. from A2 or the look spot) he parks
@@ -769,7 +777,7 @@ public class JohnAuto extends LinearOpMode {
         Pose atWall = new Pose(runX, here.y(), heading);
         // Intake A is at the robot's -X end, which points toward the red wall (-Y) at heading 90
         double slowY = GARDEN_FIRST_BALL_Y + BALL_RADIUS + halfLength + SLOW_BEFORE_BALL_IN;
-        double endY = RED_WALL_Y + halfLength + WALL_GAP;
+        double endY = RED_WALL_Y + halfLength + GARDEN_END_GAP_IN;
         Pose slowStart = new Pose(runX, Math.min(here.y(), slowY), heading);
         Pose end = new Pose(wallX, endY, heading);
         logEvent(String.format(Locale.US, "garden: wall at x %.1f, slow from y %.1f to %.1f at %.0f in/s",

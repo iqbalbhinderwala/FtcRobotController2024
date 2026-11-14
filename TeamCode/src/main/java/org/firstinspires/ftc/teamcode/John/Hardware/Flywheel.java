@@ -83,7 +83,11 @@ public class Flywheel {
      * The hub's velocity PIDF (F about 32767 / max ticks per second). F is for NOMINAL_VOLTAGE (see
      * VOLTAGE_COMPENSATION); [John] Flywheel Calibration learns it.
      */
-    public static double P = 10.0;
+    /**
+     * John v2: 25 (v1 10), so an overshoot or a slow drift comes back faster; with only F and P 10 a
+     * spin-up overshoot of ~100 RPM took seconds to fade, and Shooter.FIRE_ABOVE_RPM now waits for it.
+     */
+    public static double P = 25.0;
     /** Small: F does the holding; I only corrects slow drift (r0046: 0 / 0.5 / 1 all fine, 3 once overshot). */
     /**
      * John v2: 0. The calibration (r1057, no balls) picked 1.0, but in Auto r1061 / r1063 the I term
@@ -106,8 +110,11 @@ public class Flywheel {
     public static double F = 23.31;
     /** Holding trim on F (see the class comment). */
     public static boolean TRIM = true;
-    /** Trim change per second per fractional speed error (0.5: a 10% error is mostly gone in ~2 s). */
-    public static double TRIM_GAIN = 0.5;
+    /**
+     * Trim change per second per fractional speed error. 1.5: a few % error fades in under a second.
+     * 0.5 was too slow (Auto r1083: after the last ball the flywheel sat 70-115 RPM fast for 5 s).
+     */
+    public static double TRIM_GAIN = 1.5;
     /** Frozen while more than this below the target (a ball dip) and TRIM_HOLDOFF_MS after it / a boost. */
     public static double TRIM_FREEZE_BELOW_RPM = 60;
     public static double TRIM_HOLDOFF_MS = 500;
@@ -365,7 +372,12 @@ public class Flywheel {
 
     /** Within {@code toleranceRpm} of the target (encoder mode only). */
     public boolean within(double toleranceRpm) {
-        return closedLoop() && on && !boosting && Math.abs(rpm - targetRpm) <= toleranceRpm;
+        return within(toleranceRpm, toleranceRpm);
+    }
+
+    /** At most {@code belowRpm} under and {@code aboveRpm} over the target (encoder mode only). */
+    public boolean within(double belowRpm, double aboveRpm) {
+        return closedLoop() && on && !boosting && rpm >= targetRpm - belowRpm && rpm <= targetRpm + aboveRpm;
     }
 
     public boolean isOn() {
