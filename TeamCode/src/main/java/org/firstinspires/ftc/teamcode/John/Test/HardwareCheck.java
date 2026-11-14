@@ -137,8 +137,30 @@ public class HardwareCheck extends LinearOpMode {
         boolean deployed = false;
         com.qualcomm.robotcore.util.ElapsedTime clock = new com.qualcomm.robotcore.util.ElapsedTime();
         int lastAt = -1;
+        double peakRpm = 0;   // the flywheel's highest speed in its step (it coasts down after RT is let go)
 
         while (opModeIsActive()) {
+            if (at >= steps.size()) {
+                // Summary (after the last answer); dpad left goes back to the last step
+                for (DcMotorEx m : drive) m.setPower(0);
+                intake.off();
+                flywheel.setManualPower(0.0);
+                flywheel.update();
+                telemetry.addLine(">>> SUMMARY (dpad left: back)");
+                int ok = 0;
+                for (Step s : steps) if (s.answer == Answer.OK) ok++;
+                telemetry.addLine(ok + " of " + steps.size() + " right");
+                for (Step s : steps) {
+                    if (s.answer == Answer.WRONG) {
+                        telemetry.addLine("WRONG " + s.name + ": " + s.ifWrong);
+                    } else if (s.answer != Answer.OK) {
+                        telemetry.addLine("not checked: " + s.name);
+                    }
+                }
+                telemetry.update();
+                if (gamepad1.dpadLeftWasPressed()) at = steps.size() - 1;
+                continue;
+            }
             Step step = steps.get(at);
             boolean rt = gamepad1.right_trigger > 0.5;
             boolean rtPressed = rt && !triggerWas;
@@ -148,6 +170,7 @@ public class HardwareCheck extends LinearOpMode {
                 for (int i = 0; i < 4; i++) driveStart[i] = drive[i].getCurrentPosition();
                 startA = intakeA.getCurrentPosition();
                 startB = intakeB.getCurrentPosition();
+                peakRpm = 0;
                 lastAt = at;
             }
             String reading = "";
@@ -194,7 +217,9 @@ public class HardwareCheck extends LinearOpMode {
                         indexer.targetDegrees(), indexer.amps(), indexer.state());
             } else if (step.name.equals("Flywheel")) {
                 if (rt) flywheel.setManualPower(FLYWHEEL_POWER);
-                reading = String.format(Locale.US, "%.0f RPM (motor %.0f ticks/s)", flywheel.rpm(), flywheel.ticksPerSecond());
+                if (Math.abs(flywheel.rpm()) > Math.abs(peakRpm)) peakRpm = flywheel.rpm();
+                reading = String.format(Locale.US, "%.0f RPM now, peak %.0f RPM (motor %.0f ticks/s)", flywheel.rpm(), peakRpm,
+                        flywheel.ticksPerSecond());
             } else if (step.name.equals("Defender")) {
                 if (rtPressed) {
                     deployed = !deployed;
@@ -227,24 +252,7 @@ public class HardwareCheck extends LinearOpMode {
             if (gamepad1.dpadLeftWasPressed()) at = Math.max(0, at - 1);
 
             if (at >= steps.size()) {
-                // Summary
-                for (DcMotorEx m : drive) m.setPower(0);
-                intake.off();
-                flywheel.setManualPower(0.0);
-                flywheel.update();
-                telemetry.addLine(">>> SUMMARY (dpad left: back)");
-                int ok = 0;
-                for (Step s : steps) if (s.answer == Answer.OK) ok++;
-                telemetry.addLine(ok + " of " + steps.size() + " right");
-                for (Step s : steps) {
-                    if (s.answer == Answer.WRONG) {
-                        telemetry.addLine("WRONG " + s.name + ": " + s.ifWrong);
-                    } else if (s.answer != Answer.OK) {
-                        telemetry.addLine("not checked: " + s.name);
-                    }
-                }
-                telemetry.update();
-                continue;   // dpad left (above) goes back to the last step
+                continue;   // the summary shows from the next loop
             }
             telemetry.addLine(String.format(Locale.US, ">>> %d/%d %s%s", at + 1, steps.size(), step.name,
                     step.answer == Answer.NONE ? "" : " [" + step.answer + "]"));
