@@ -129,6 +129,7 @@ import java.util.Locale;
  *   left stick button      robot-centric: switch the stick's forward end (intake B / intake A)
  *   Y                      indexer one step (90 deg) backward, to clear a jam by hand (not while firing)
  *   X                      flywheel pre-spin on / off (off at the start; see PRESPIN_IN_ZONE)
+ *   left trigger           sticks linear / curved (linear at the start; see CURVED_DRIVE)
  *
  * ROBOT_CENTRIC (off by default; field-centric is preferred): the left stick drives relative to the robot, "forward" toward the intake
  * B end or the intake A end (left stick button switches); turning is the same. The automatic shot is unchanged.
@@ -161,6 +162,11 @@ public class JohnTeleOp extends LinearOpMode {
     public static double STICK_DEADBAND = 0.05;
     /** Telemetry: the short driver view only (false), or also pose, camera, Pinpoint, IMU and controls. */
     public static boolean TELEMETRY_DETAILS = false;
+    /**
+     * Stick feel: false = linear (stick x DRIVE_SCALE, as before 2026-11-13), true = the response curve
+     * and friction floors below. Off at the start; the left trigger toggles it during the match.
+     */
+    public static boolean CURVED_DRIVE = false;
     /**
      * Stick response (2026-11-13): out = (1 - k) * x + k * x^3 on the stick's length (so a diagonal
      * keeps its direction), then times DRIVE_SCALE. 0 = linear (as before), 1 = fully cubic. At k 0.6 a
@@ -295,10 +301,23 @@ public class JohnTeleOp extends LinearOpMode {
     private final ElapsedTime moveTimer = new ElapsedTime();
     private String shotStatus = "";
     private boolean prespin;
+    private boolean leftTriggerWas;
     private double prespinUntilS = -1;
 
     @Override
     public void runOpMode() {
+        // The match toggles (left trigger, X) change these; put them back at the end, so the next
+        // run starts from the defaults again (they would otherwise last until the app restarts)
+        final boolean curvedDefault = CURVED_DRIVE, prespinDefault = PRESPIN_IN_ZONE;
+        try {
+            runTeleOp();
+        } finally {
+            CURVED_DRIVE = curvedDefault;
+            PRESPIN_IN_ZONE = prespinDefault;
+        }
+    }
+
+    private void runTeleOp() {
         FtcDashboard dashboard = FtcDashboard.getInstance();
         telemetry = new MultipleTelemetry(telemetry, dashboard.getTelemetry());
 
@@ -903,6 +922,12 @@ public class JohnTeleOp extends LinearOpMode {
             if (!lost) {
                 shooter.setDistance(ShootingZone.shotDistance(pose.x(), pose.y(), tracker.upAudience(), red));
             }
+            boolean leftTrigger = gamepad1.left_trigger > 0.5;
+            if (leftTrigger && !leftTriggerWas) {
+                CURVED_DRIVE = !CURVED_DRIVE;
+                event = "sticks " + (CURVED_DRIVE ? "CURVED" : "LINEAR") + " (left trigger)";
+            }
+            leftTriggerWas = leftTrigger;
             if (gamepad1.xWasPressed()) {
                 PRESPIN_IN_ZONE = !PRESPIN_IN_ZONE;
                 event = "flywheel pre-spin " + (PRESPIN_IN_ZONE ? "ON" : "OFF") + " (X)";
@@ -966,6 +991,7 @@ public class JohnTeleOp extends LinearOpMode {
                     shooter.trimRpm() == 0 ? "" : String.format(Locale.US, " trim %+.0f", shooter.trimRpm()),
                     PRESPIN_IN_ZONE ? " | pre-spin" : "");
             telemetry.addData("Intakes", intake.status());
+            telemetry.addData("Sticks", CURVED_DRIVE ? "CURVED (LT)" : "linear (LT)");
             if (ROBOT_CENTRIC) {
                 telemetry.addData("Drive", "ROBOT-centric, fwd = intake " + (forwardIsB ? "B" : "A"));
             }
@@ -991,6 +1017,7 @@ public class JohnTeleOp extends LinearOpMode {
                 telemetry.addData("IMU check", "%s, offset %.1f deg", fallback.status(), fallback.offsetDeg());
                 telemetry.addLine("A shoot | RS aim assist | bumpers intake");
                 telemetry.addLine("B reverse | Y indexer back | X pre-spin");
+                telemetry.addLine("LT sticks linear / curved");
                 telemetry.addLine("dpad trim | Back re-position | Start odom");
             }
             telemetry.update();
@@ -1240,16 +1267,19 @@ public class JohnTeleOp extends LinearOpMode {
         if (len < 1e-6) {
             return new double[]{0.0, 0.0};
         }
-        double f = curve(len, DRIVE_EXPO) * DRIVE_SCALE / len;
+        double f = curve(len, CURVED_DRIVE ? DRIVE_EXPO : 0.0) * DRIVE_SCALE / len;
         return new double[]{fwd * f, left * f};
     }
 
     private static double shapeTurn(double turn) {
-        return Math.signum(turn) * curve(Math.min(1.0, Math.abs(turn)), TURN_EXPO) * TURN_SCALE;
+        return Math.signum(turn) * curve(Math.min(1.0, Math.abs(turn)), CURVED_DRIVE ? TURN_EXPO : 0.0) * TURN_SCALE;
     }
 
     /** Lifts each robot-axis power that is not zero above its friction floor (DRIVE_MIN_*, TURN_MIN). */
     private static DrivePowers withFloor(DrivePowers p) {
+        if (!CURVED_DRIVE) {
+            return p;   // linear: no floors, as before
+        }
         return new DrivePowers(floor(p.forward(), DRIVE_MIN_FORWARD), floor(p.strafe(), DRIVE_MIN_STRAFE),
                 floor(p.turn(), TURN_MIN));
     }
