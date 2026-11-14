@@ -66,7 +66,9 @@ import java.util.Locale;
  *
  * DRIVING: field-centric from the driver's view (red drivers face +Y, blue -Y): pushing the stick
  * away from you drives away from you, whatever way John faces. Pedro's ManualDrive.driveOrHold
- * holds the pose when the sticks are released (HOLD_WHEN_RELEASED).
+ * holds the pose when the sticks are released (HOLD_WHEN_RELEASED). HEADING_HOLD: while driving with
+ * the turn stick centered, the heading is held where it was when the turn ended (John v2 turns by
+ * itself when strafing: +9 deg/s toward the shooter, -12 deg/s toward the camera).
  *
  * HOLD TO RUN (as on Vex): every automated action runs only while its button is held, step by
  * step; letting go cancels it and gives the robot back to the sticks. Moving a stick also cancels.
@@ -184,6 +186,15 @@ public class JohnTeleOp extends LinearOpMode {
     public static double DRIVE_MIN_STRAFE = 0.15;
     public static double TURN_MIN = 0.05;
     public static boolean HOLD_WHEN_RELEASED = true;
+    /**
+     * Heading hold while driving: with the turn stick centered, keep the heading John had when the
+     * turn ended (taken once he turns slower than HEADING_HOLD_SETTLE_DPS, so he does not snap back
+     * after a fast turn). Turn power per radian of error, at most HEADING_HOLD_MAX_TURN.
+     */
+    public static boolean HEADING_HOLD = true;
+    public static double HEADING_HOLD_KP = 1.5;
+    public static double HEADING_HOLD_MAX_TURN = 0.3;
+    public static double HEADING_HOLD_SETTLE_DPS = 20.0;
     /** A stick moved this far cancels an aim / volley. */
     public static double CANCEL_STICK = 0.3;
     /** Aim assist: turn power per radian of heading error, at most AIM_ASSIST_MAX_TURN. */
@@ -283,7 +294,7 @@ public class JohnTeleOp extends LinearOpMode {
 
     private static final String LOG_HEADER = "t_s,shot,x,y,h_deg,aim_deg,target_x,target_y,target_src,"
             + "distance,rpm_target,rpm,flywheel_mode,indexer_step,tags,up_cell,watchdog,"
-            + "stick_fwd,stick_left,stick_turn,battery_v,cam_x,cam_y,cam_err_in,event";
+            + "stick_fwd,stick_left,stick_turn,heading_hold_deg,battery_v,cam_x,cam_y,cam_err_in,event";
 
     private Follower follower;
     private ForesightConfig foresight;
@@ -515,6 +526,7 @@ public class JohnTeleOp extends LinearOpMode {
         Pose relocalizeWall = null;       // the wall pose when re-localizing against a wall
         ElapsedTime relocalizeTimer = new ElapsedTime();
         boolean holdMode = HOLD_WHEN_RELEASED;
+        double headingHold = Double.NaN;   // field heading held while driving (NaN = none yet)
         boolean intakeOn = false;
         boolean forwardIsB = true;
         // Without odometry
@@ -769,6 +781,7 @@ public class JohnTeleOp extends LinearOpMode {
                         follower.setPose(fixed);
                         watchdog.poseSet();
                         follower.manual(DrivePowers.zero());   // drop a hold in the old coordinates
+                        headingHold = Double.NaN;
                         fallback.alignTo(fixed.heading());
                         autoCorrect = true;
                         correctWindow.clear();
@@ -821,6 +834,7 @@ public class JohnTeleOp extends LinearOpMode {
                         follower.setPose(new Pose(now.x() + sx, now.y() + sy, normalize(now.heading() + sh)));
                         watchdog.poseSet();
                         follower.manual(DrivePowers.zero());   // re-hold at the corrected pose
+                        headingHold = Double.NaN;
                         correctedIn += Math.hypot(sx, sy);
                     }
                 }
@@ -837,6 +851,9 @@ public class JohnTeleOp extends LinearOpMode {
                 // Pedro gets no command meanwhile, so it does not drive back to an old hold on RESUMED
                 follower.manual(DrivePowers.zero());
             }
+            if (shot != Shot.IDLE || degraded) {
+                headingHold = Double.NaN;   // aiming / the IMU drive turns John: take the heading again after
+            }
             if (shot == Shot.IDLE && !degraded) {
                 double[] drv = shapeDrive(stickFwd, stickLeft);   // response curve, times DRIVE_SCALE
                 double turnCmd = shapeTurn(stickTurn);
@@ -844,6 +861,21 @@ public class JohnTeleOp extends LinearOpMode {
                         ? new DrivePowers(ends * drv[0], ends * drv[1], turnCmd)
                         : ManualDrive.fieldCentric(drv[0], drv[1], turnCmd,
                                 pose.heading(), -driverFacing()));   // Pedro turns the sticks by -(heading + offset)
+                // Heading hold: forget it while the driver turns (or aim assist owns the heading); take
+                // the heading again once the turn has settled
+                boolean translating = stickFwd != 0.0 || stickLeft != 0.0;
+                if (!HEADING_HOLD || stickTurn != 0.0 || assistHeld) {
+                    headingHold = Double.NaN;
+                } else if (Double.isNaN(headingHold)
+                        && Math.abs(follower.velocity().omega) < Math.toRadians(HEADING_HOLD_SETTLE_DPS)) {
+                    headingHold = pose.heading();
+                }
+                if (!assistHeld && translating && !Double.isNaN(headingHold)) {
+                    DrivePowers locked = ManualDrive.headingLock(follower,
+                            Controller.proportional(HEADING_HOLD_KP), powers, headingHold);
+                    double turn = Math.max(-HEADING_HOLD_MAX_TURN, Math.min(HEADING_HOLD_MAX_TURN, locked.turn()));
+                    powers = new DrivePowers(locked.forward(), locked.strafe(), turn);
+                }
                 if (assistHeld) {
                     // Aim assist: the driver drives, the heading locks onto the CELL
                     DrivePowers locked = ManualDrive.headingLock(follower,
@@ -991,7 +1023,8 @@ public class JohnTeleOp extends LinearOpMode {
                     shooter.trimRpm() == 0 ? "" : String.format(Locale.US, " trim %+.0f", shooter.trimRpm()),
                     PRESPIN_IN_ZONE ? " | pre-spin" : "");
             telemetry.addData("Intakes", intake.status());
-            telemetry.addData("Sticks", CURVED_DRIVE ? "CURVED (LT)" : "linear (LT)");
+            telemetry.addData("Sticks", (CURVED_DRIVE ? "CURVED (LT)" : "linear (LT)")
+                    + (HEADING_HOLD ? ", heading hold" : ""));
             if (ROBOT_CENTRIC) {
                 telemetry.addData("Drive", "ROBOT-centric, fwd = intake " + (forwardIsB ? "B" : "A"));
             }
@@ -1041,7 +1074,8 @@ public class JohnTeleOp extends LinearOpMode {
                     aimPose == null ? null : Math.toDegrees(aimPose.heading()), target[0], target[1], tracker.source(),
                     distance, shooter.flywheel().isOn() ? shooter.flywheel().targetRpm() : 0.0, shooter.flywheel().rpm(),
                     shooter.flywheel().mode(), shooter.indexer().stepCount(), frame == null ? null : frame.ids(),
-                    tracker.upCellName(), state, stickFwd, stickLeft, stickTurn, shooter.flywheel().voltage(),
+                    tracker.upCellName(), state, stickFwd, stickLeft, stickTurn,
+                    Double.isNaN(headingHold) ? null : Math.toDegrees(headingHold), shooter.flywheel().voltage(),
                     cam[0], cam[1], cam[2], event);
         }
         shooter.stop();
