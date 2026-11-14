@@ -236,9 +236,10 @@ public class JohnAuto extends LinearOpMode {
      * estimated drive left is SPIN_LEAD_S (was at the end of the drive: about 1.0 s aimed). Not from
      * the start of that drive, so the full-power boost (8.5 A) does not add to the drive's hardest
      * acceleration. Holding speed takes about 2.3 A.
+     * John v2 (gear belt): spin-up about 2.1 s; with 1.6 the volley 2 still waited 1.25 s aimed (r1061).
      */
     public static boolean SPIN_AT_START = true;
-    public static double SPIN_LEAD_S = 1.6;
+    public static double SPIN_LEAD_S = 2.8;
     public static double PARK_SPEED_IPS = 15.0;
     /** Turning back to the wall before the GARDEN. */
     public static double TURN_TOLERANCE_DEG = 1.5;

@@ -32,12 +32,14 @@ public class JohnTuning {
      * John v2 (2026-11-13): the average of two Foresight tuner runs (v1: forward 0.152 / 0.411, strafe
      * 0.250 / 0.677), except the strafe P: the tuner gave 1.1894 / 3.2191 (the lowest-speed strafe
      * stage stalled and was pushed by hand), which buzzed while holding after strafes; [John] Hold
-     * Test r1037 settled on 0.4 / 1.5.
+     * Test r1037 settled on 0.4 / 1.5. The LARGE P (beyond 2.5" off) did not change the hold and keeps
+     * John on a path: back to the tuner's 3.2191 after Auto r1063 drifted 10" off a path at 70 in/s
+     * with 1.5 (the path watcher took it for a push).
      */
     public static double FORWARD_P_SMALL = 0.2387;
     public static double FORWARD_P_LARGE = 0.6462;
     public static double STRAFE_P_SMALL = 0.4;
-    public static double STRAFE_P_LARGE = 1.5;
+    public static double STRAFE_P_LARGE = 3.2191;
     public static double TRANSLATIONAL_THRESHOLD_IN = 2.5;
     /**
      * Static friction push added to the forward / strafe output: KS * sign(error) while that error

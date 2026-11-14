@@ -20,7 +20,11 @@ import java.util.function.Supplier;
  *  - BLOCKED: slower than BLOCKED_SPEED_IPS (and turning slower than BLOCKED_TURN_DPS) for
  *    BLOCKED_MS while more than MIN_REMAINING_IN of the path is left (Pedro's remainingDistance:
  *    of the current leg, so not near a leg's end): something stops it;
- *  - PUSHED: more than PUSHED_IN from the path for PUSHED_MS: something shoves it aside.
+ *  - PUSHED: more than PUSHED_IN to the side of the path for PUSHED_MS: something shoves it aside.
+ *    Only the distance across the path counts (along Pedro's normal at the closest point): at full
+ *    speed John runs a few inches past the end of a leg before Pedro moves on to the next one, and
+ *    the plain distance to that end point tripped PUSHED in every v2 Auto (r1063, r1070, r1072, r1076:
+ *    9-12" at 70 in/s, about 1.6" from the next leg), stopping him dead from full speed.
  * Not in the first START_GRACE_MS of a path (it is still speeding up).
  *
  * follow(): drives a path and, when it trips, stops pushing (zero power, braking), waits
@@ -101,8 +105,7 @@ public class PathWatcher {
             return Trip.BLOCKED;
         }
 
-        Pose closest = follower.closestPose();
-        double off = closest == null ? 0.0 : Math.hypot(pose.x() - closest.x(), pose.y() - closest.y());
+        double off = crossTrack(pose);
         if (off <= PUSHED_IN) {
             offSinceMs = -1;
         } else if (offSinceMs < 0) {
@@ -112,6 +115,20 @@ public class PathWatcher {
             return Trip.PUSHED;
         }
         return Trip.NONE;
+    }
+
+    /** Distance from the path, across it (Pedro's normal at the closest point); 0 without a path. */
+    private double crossTrack(Pose pose) {
+        Pose closest = follower.closestPose();
+        if (closest == null) {
+            return 0.0;
+        }
+        double dx = pose.x() - closest.x(), dy = pose.y() - closest.y();
+        com.pedropathing.math.Vector2D n = follower.closestNormal();
+        if (n == null || Math.hypot(n.x(), n.y()) < 0.5) {
+            return Math.hypot(dx, dy);
+        }
+        return Math.abs(dx * n.x() + dy * n.y()) / Math.hypot(n.x(), n.y());
     }
 
     /**
