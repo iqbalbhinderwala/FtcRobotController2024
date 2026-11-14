@@ -37,9 +37,15 @@ public class Shooter {
      * least 90%, averaged over the angles at each distance (no angle effect showed: at 50" 15 / 30 / 45
      * deg gave 2300 / 2288 / 2288). 42" 2225-2275 (0-30 deg; at 45 deg nothing reached 60%), 46" 2275,
      * 49" 2275, 50" 2290, 54" 2320, 58" 2375 (83%), 66" 2425 (84%; the farthest the field allows).
+     * John v2 (gear belt, F 23.31): Shot Calibration r1071, 2026-11-14 (100 volleys, 13 spots), each
+     * volley from a fresh spin-up. 50-100 RPM below v1 (the old slip belt let the flywheel lag the
+     * motor). Windows (>= 90%): 48.5"/0 2150-2350; 50"/15 2175-2325, /30 2200, /38 2200-2250, /45
+     * 2150-2200; 54"/30 2225-2275, /38 2225, /45 2275; 58"/38 2225-2275, /45 2275-2325; 62"/45 2350;
+     * 42"/0 2250 (90%), /30 2250 (79%). 45 deg needs ~25-50 more than 38 at 54-58". 46" interpolated,
+     * 66" extrapolated (not tested).
      */
-    public static String RPM_DISTANCES_IN = "42,46,49,50,54,58,66";
-    public static String RPM_VALUES = "2250,2275,2275,2290,2320,2375,2425";
+    public static String RPM_DISTANCES_IN = "42,46,50,54,58,62,66";
+    public static String RPM_VALUES = "2250,2225,2200,2250,2275,2350,2400";
     public static double FIRE_TOLERANCE_NEAR_RPM = 100;
     public static double FIRE_TOLERANCE_FAR_RPM = 50;
     public static double TOLERANCE_NEAR_IN = 52;

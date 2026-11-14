@@ -37,23 +37,25 @@ import java.util.TreeMap;
 public class ShotCoverage {
 
     /**
-     * The test spots {distance in, angle off the CELL axis deg, tier}, most useful first (numbered in
-     * this order):
-     *  1 = where the matches shoot from: 50-54" at 15-45 deg (the autonomous' volley 2 is about 49" at
-     *      43 deg; the TeleOp's drive into range stops at about 50" at the zone's edges);
-     *  2 = the long range at 45 deg, where the speed rises fastest and the window is narrowest;
-     *  3 = 42" at an angle, before lowering ShootingZone.MIN_DISTANCE_IN to about 42";
-     *  4 = 46" fill-ins (between spots that are already known): least new information.
-     * The last four were covered on 2026-11-01 (r0273).
+     * The test spots {distance in, angle off the CELL axis deg, tier, rank}. The spot numbers follow
+     * this list's order (kept from v1); Shot Calibration offers the uncovered spots by rank.
+     * John v2 (2026-11-14), ranked by where the 2026-10-25 matches shot from (77 TeleOp balls: 48"/30
+     * deg 43, 52"/30 deg 15, 60"/45 deg 6, 48"/15 deg 5; 10th-90th percentile 47-56", 23-43 deg; Auto
+     * volley 1 from the wall start at about 48" straight on, volley 2 about 49" at 43 deg):
+     *  1 = the match spots: 48.5"/0 (Auto volley 1), 50"/45 (Auto volley 2), 50"/30, 54"/30 (TeleOp);
+     *  2 = around them: 50"/38, 50"/15, 54"/45, 54"/38;
+     *  3 = the long range at 38-45 deg, where the speed rises fastest, and 42"/0 (the close end of the
+     *      speed table);
+     *  4 = 42" at an angle, 66"/45 and the 46" fill-ins ("opt"): least needed.
      */
     private static final double[][] SPOTS = {
-            {50, 45, 1}, {54, 30, 1}, {54, 45, 1}, {50, 15, 1},
-            {58, 45, 2}, {66, 45, 2},
-            {42, 15, 3}, {42, 30, 3}, {42, 45, 3},
-            {46, 0, 4}, {46, 15, 4}, {46, 30, 4}, {46, 45, 4},
-            {42, 0, 0}, {48.5, 0, 0}, {50, 30, 0}, {62, 45, 0},
+            {50, 45, 1, 2}, {54, 30, 1, 4}, {54, 45, 2, 7}, {50, 15, 2, 6},
+            {58, 45, 3, 9}, {66, 45, 4, 14},
+            {42, 15, 4, 16}, {42, 30, 4, 13}, {42, 45, 4, 17},
+            {46, 0, 4, 18}, {46, 15, 4, 19}, {46, 30, 4, 15}, {46, 45, 4, 20},
+            {42, 0, 3, 12}, {48.5, 0, 1, 1}, {50, 30, 1, 3}, {62, 45, 3, 10},
             // Added 2026-11-02 between 30 and 45 deg; at the end so the numbers above stay the same
-            {50, 38, 1}, {54, 38, 1}, {58, 38, 2}, {46, 38, 4}};
+            {50, 38, 2, 5}, {54, 38, 2, 8}, {58, 38, 3, 11}, {46, 38, 4, 21}};
     /** A volley belongs to a spot within these. */
     public static double MATCH_IN = 2.0;
     public static double MATCH_DEG = 7.5;
@@ -65,16 +67,19 @@ public class ShotCoverage {
     public static final class Spot {
         public final int number;
         public final double distance, angleDeg;
-        /** 1 most useful .. 4 least (see SPOTS); 0 = covered before this list. */
+        /** 1 most useful .. 4 least (see SPOTS). */
         public final int tier;
+        /** Order in which the uncovered spots are offered (1 first). */
+        public final int rank;
         /** {made, balls, volleys} per speed (rounded to 25 RPM). */
         final TreeMap<Integer, int[]> bySpeed = new TreeMap<>();
 
-        Spot(int number, double distance, double angleDeg, int tier) {
+        Spot(int number, double distance, double angleDeg, int tier, int rank) {
             this.number = number;
             this.distance = distance;
             this.angleDeg = angleDeg;
             this.tier = tier;
+            this.rank = rank;
         }
 
         public String name() {
@@ -121,7 +126,7 @@ public class ShotCoverage {
         // reach about 12" out). 2026-11-02: 66" / 45 deg put his corners 5" past the blue wall.
         int n = 1;
         for (double[] s : SPOTS) {
-            Spot spot = new Spot(n, s[0], s[1], (int) s[2]);
+            Spot spot = new Spot(n, s[0], s[1], (int) s[2], (int) s[3]);
             if (place(spot, HiveTags.cellX(false, true), HiveTags.hiveY(false), false, false)[3] <= MAX_SHIFT_IN) {
                 spots.add(spot);
                 n++;
@@ -303,8 +308,8 @@ public class ShotCoverage {
             if (!covered(s)) open.add(s);
         }
         if (open.isEmpty()) return null;
-        // Most useful first: by tier (1 first; 0, the spots covered before the list, last), then list order
-        open.sort((p, q) -> Integer.compare(p.tier == 0 ? 9 : p.tier, q.tier == 0 ? 9 : q.tier));
+        // Most useful first (rank)
+        open.sort((p, q) -> Integer.compare(p.rank, q.rank));
         if (after == null) return open.get(0);
         int i = open.indexOf(after);
         return open.get((i + 1) % open.size());
