@@ -180,6 +180,13 @@ public class Shooter {
     }
 
     private void updateFeed() {
+        if (feed != Feed.IDLE && flywheel.stalled()) {
+            feed = Feed.IDLE;
+            volleys++;
+            status = String.format(Locale.US, "SKIPPED after %d / %d: the flywheel does not turn", stepsDone, steps);
+            add("volley skipped: flywheel stalled");
+            return;
+        }
         boolean ready = !paused
                 && (flywheel.closedLoop() ? flywheel.within(fireToleranceRpm(distance))
                 : flywheel.onSeconds() * 1000.0 >= OPEN_LOOP_SPIN_UP_MS);
