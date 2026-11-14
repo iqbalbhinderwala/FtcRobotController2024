@@ -158,6 +158,22 @@ public class JohnTeleOp extends LinearOpMode {
     public static double DRIVE_SCALE = 0.8;
     public static double TURN_SCALE = 0.6;
     public static double STICK_DEADBAND = 0.05;
+    /**
+     * Stick response (2026-11-13): out = (1 - k) * x + k * x^3 on the stick's length (so a diagonal
+     * keeps its direction), then times DRIVE_SCALE. 0 = linear (as before), 1 = fully cubic. At k 0.6 a
+     * half stick gives 0.22 power instead of 0.40, and a full stick still DRIVE_SCALE.
+     */
+    public static double DRIVE_EXPO = 0.6;
+    /** The same for turning; aiming by hand wants fine turns, so it is curved more. */
+    public static double TURN_EXPO = 0.7;
+    /**
+     * Least power once the stick is past the deadband, per robot axis, so the first touch creeps
+     * instead of doing nothing (drive tuning: about 0.06 to start moving forward, 0.15 sideways). The
+     * rest of the range is scaled above it.
+     */
+    public static double DRIVE_MIN_FORWARD = 0.06;
+    public static double DRIVE_MIN_STRAFE = 0.15;
+    public static double TURN_MIN = 0.05;
     public static boolean HOLD_WHEN_RELEASED = true;
     /** A stick moved this far cancels an aim / volley. */
     public static double CANCEL_STICK = 0.3;
@@ -800,11 +816,12 @@ public class JohnTeleOp extends LinearOpMode {
                 follower.manual(DrivePowers.zero());
             }
             if (shot == Shot.IDLE && !degraded) {
-                DrivePowers powers = ROBOT_CENTRIC
-                        ? new DrivePowers(ends * stickFwd * DRIVE_SCALE, ends * stickLeft * DRIVE_SCALE, stickTurn * TURN_SCALE)
-                        : ManualDrive.fieldCentric(stickFwd * DRIVE_SCALE,
-                                stickLeft * DRIVE_SCALE, stickTurn * TURN_SCALE,
-                                pose.heading(), -driverFacing());   // Pedro turns the sticks by -(heading + offset)
+                double[] drv = shapeDrive(stickFwd, stickLeft);   // response curve, times DRIVE_SCALE
+                double turnCmd = shapeTurn(stickTurn);
+                DrivePowers powers = withFloor(ROBOT_CENTRIC
+                        ? new DrivePowers(ends * drv[0], ends * drv[1], turnCmd)
+                        : ManualDrive.fieldCentric(drv[0], drv[1], turnCmd,
+                                pose.heading(), -driverFacing()));   // Pedro turns the sticks by -(heading + offset)
                 if (assistHeld) {
                     // Aim assist: the driver drives, the heading locks onto the CELL
                     DrivePowers locked = ManualDrive.headingLock(follower,
@@ -838,16 +855,17 @@ public class JohnTeleOp extends LinearOpMode {
                     }
                 }
                 boolean fresh = lastAim != null && clock.milliseconds() - lastAimMs <= VISION_MAX_AGE_MS;
-                double turn = stickTurn * TURN_SCALE;
+                double turn = shapeTurn(stickTurn);
+                double[] drv = shapeDrive(stickFwd, stickLeft);
                 double error = Double.NaN;
                 if (lost && (visionShot || assistHeld) && !Double.isNaN(visionTarget)) {
                     error = normalize(visionTarget - fallback.heading());
                     turn = Math.max(-FALLBACK_MAX_TURN, Math.min(FALLBACK_MAX_TURN, FALLBACK_KP * error));
                 }
                 if (ROBOT_CENTRIC) {
-                    fallback.drive(ends * stickFwd * DRIVE_SCALE, ends * stickLeft * DRIVE_SCALE, turn);
+                    fallback.drive(ends * drv[0], ends * drv[1], turn);
                 } else {
-                    fallback.driveFieldCentric(stickFwd * DRIVE_SCALE, stickLeft * DRIVE_SCALE, turn, driverFacing());
+                    fallback.driveFieldCentric(drv[0], drv[1], turn, driverFacing());
                 }
 
                 if (lost && visionShot) {
@@ -1189,6 +1207,38 @@ public class JohnTeleOp extends LinearOpMode {
     /** Field direction the driver looks along (FTC, radians): red +90 deg, blue -90 deg. */
     private double driverFacing() {
         return Math.toRadians(red ? 90.0 : -90.0);
+    }
+
+    /** The response curve: (1 - k) x + k x^3, for x in [0, 1]. */
+    private static double curve(double x, double k) {
+        return (1.0 - k) * x + k * x * x * x;
+    }
+
+    /** {forward, left} sticks after the curve (on the vector's length) and DRIVE_SCALE. */
+    private static double[] shapeDrive(double fwd, double left) {
+        double len = Math.min(1.0, Math.hypot(fwd, left));
+        if (len < 1e-6) {
+            return new double[]{0.0, 0.0};
+        }
+        double f = curve(len, DRIVE_EXPO) * DRIVE_SCALE / len;
+        return new double[]{fwd * f, left * f};
+    }
+
+    private static double shapeTurn(double turn) {
+        return Math.signum(turn) * curve(Math.min(1.0, Math.abs(turn)), TURN_EXPO) * TURN_SCALE;
+    }
+
+    /** Lifts each robot-axis power that is not zero above its friction floor (DRIVE_MIN_*, TURN_MIN). */
+    private static DrivePowers withFloor(DrivePowers p) {
+        return new DrivePowers(floor(p.forward(), DRIVE_MIN_FORWARD), floor(p.strafe(), DRIVE_MIN_STRAFE),
+                floor(p.turn(), TURN_MIN));
+    }
+
+    private static double floor(double v, double min) {
+        if (Math.abs(v) < 1e-6) {
+            return 0.0;
+        }
+        return Math.signum(v) * (min + (1.0 - min) * Math.min(1.0, Math.abs(v)));
     }
 
     private static double deadband(double v) {
