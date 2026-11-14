@@ -146,7 +146,7 @@ import java.util.Locale;
  * back wall re-aligns the IMU heading to it.
  *
  * OdometryWatchdog stops Pedro's drive on bad Pinpoint reads. Logged to
- * /sdcard/FIRST/john_logs/r<run>_john_teleop_<time>.csv.
+ * /sdcard/FIRST/john_v2_logs/r<run>_john_teleop_<time>.csv.
  */
 @Config("JohnTeleOp")
 @TeleOp(name = "[John] TeleOp", group = "John")

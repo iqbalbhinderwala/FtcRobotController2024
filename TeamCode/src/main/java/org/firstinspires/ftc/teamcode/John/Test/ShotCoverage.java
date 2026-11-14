@@ -2,9 +2,10 @@ package org.firstinspires.ftc.teamcode.John.Test;
 
 import com.pedropathing.math.Pose;
 
-import org.firstinspires.ftc.robotcore.internal.system.AppUtil;
+
 import org.firstinspires.ftc.teamcode.John.RobotGeometry;
 import org.firstinspires.ftc.teamcode.John.ShootingZone;
+import org.firstinspires.ftc.teamcode.John.Util.CsvLog;
 import org.firstinspires.ftc.teamcode.John.Vision.HiveTags;
 
 import java.io.BufferedReader;
@@ -140,7 +141,7 @@ public class ShotCoverage {
 
     /** Reads every r*_john_shot_results_*.csv in the robot's log folder. */
     public void loadLogs() {
-        File[] files = new File(AppUtil.FIRST_FOLDER, "john_logs").listFiles();
+        File[] files = CsvLog.logDir().listFiles();   // this robot version's logs only
         if (files == null) return;
         Arrays.sort(files);
         for (File f : files) {

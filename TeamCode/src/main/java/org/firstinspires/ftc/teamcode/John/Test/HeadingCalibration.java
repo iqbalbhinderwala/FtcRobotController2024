@@ -42,7 +42,7 @@ import java.util.Locale;
  * The robot only turns in place: give it room to spin. OdometryWatchdog pauses the drive on bad
  * Pinpoint reads; turns that saw a pause are not scored, and a LOST odometry aborts the sweep.
  *
- * Logs (/sdcard/FIRST/john_logs/), sharing one run number: r<run>_john_heading_cal_samples (every
+ * Logs (/sdcard/FIRST/john_v2_logs/), sharing one run number: r<run>_john_heading_cal_samples (every
  * loop), _turns (one row per turn), _ranking (per combination and per combination x angle).
  */
 @Config
@@ -324,7 +324,7 @@ public class HeadingCalibration extends LinearOpMode {
             }
             telemetry.addLine(applied ? "Best values applied to JohnTuning (until the app restarts)."
                     : "X: apply the best values to JohnTuning (until the app restarts).");
-            telemetry.addData("Logs", "john_logs/%s (+ _turns, _ranking)", samples.fileName());
+            telemetry.addData("Logs", "john_v2_logs/%s (+ _turns, _ranking)", samples.fileName());
             telemetry.update();
         }
         watchdog.close();

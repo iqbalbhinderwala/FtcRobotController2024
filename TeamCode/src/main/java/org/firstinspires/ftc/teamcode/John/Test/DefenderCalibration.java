@@ -32,7 +32,7 @@ import java.util.Locale;
  * Back switches to LED mode: A / B / X / Y toggle ports 0 / 1 / 2 / 3; note the color each lights.
  *
  * Saved values last until the app restarts: copy them into Defender.java (telemetry shows them).
- * Each volley is logged with the brace position to /sdcard/FIRST/john_logs/r<run>_john_defender_shots_<time>.csv.
+ * Each volley is logged with the brace position to /sdcard/FIRST/john_v2_logs/r<run>_john_defender_shots_<time>.csv.
  */
 @Config("JohnDefenderCalibration")
 @TeleOp(name = "[John] Defender Calibration", group = "JohnTest")

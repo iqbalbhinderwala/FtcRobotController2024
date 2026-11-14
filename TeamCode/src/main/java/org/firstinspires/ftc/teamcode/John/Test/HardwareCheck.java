@@ -37,7 +37,7 @@ import java.util.Locale;
  *   A  looks right   B  wrong   X  skip      dpad left / right  previous / next step
  * Drive motor steps: John on a stand, wheels off the floor. Pinpoint / IMU steps: on the floor.
  *
- * Logged to /sdcard/FIRST/john_logs/r<run>_john_hardware_check_<time>.csv (one row per answer).
+ * Logged to /sdcard/FIRST/john_v2_logs/r<run>_john_hardware_check_<time>.csv (one row per answer).
  */
 @Config("JohnHardwareCheck")
 @TeleOp(name = "[John] Hardware Check", group = "JohnTest")

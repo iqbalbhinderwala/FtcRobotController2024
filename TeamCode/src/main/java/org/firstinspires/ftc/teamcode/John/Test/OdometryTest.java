@@ -45,7 +45,7 @@ import java.util.Locale;
  *
  * OVERRIDE_OFFSETS with X_POD_OFFSET_IN / Y_POD_OFFSET_IN (set them on the Dashboard before INIT)
  * tries offsets without changing Constants: a right fix makes the next spin's circle near 0.
- * Logged to /sdcard/FIRST/john_logs/r<run>_john_odometry_test_<time>.csv.
+ * Logged to /sdcard/FIRST/john_v2_logs/r<run>_john_odometry_test_<time>.csv.
  */
 @Config
 @TeleOp(name = "[John] Odometry Test", group = "JohnTest")

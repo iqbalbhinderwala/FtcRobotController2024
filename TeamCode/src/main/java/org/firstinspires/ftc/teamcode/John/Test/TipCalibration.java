@@ -48,7 +48,7 @@ import java.util.Locale;
  *   dpad left  forget the trials;  B  stop the shooter
  * The up CELL follows the camera (CellTracker); the TeleOp / Auto use the same.
  *
- * Logged to /sdcard/FIRST/john_logs/r<run>_john_tip_cal_<time>.csv (one row per camera frame and
+ * Logged to /sdcard/FIRST/john_v2_logs/r<run>_john_tip_cal_<time>.csv (one row per camera frame and
  * an event row per trial).
  */
 @Config("JohnTipCalibration")

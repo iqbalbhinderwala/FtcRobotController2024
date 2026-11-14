@@ -41,7 +41,7 @@ import org.firstinspires.ftc.teamcode.John.Util.CsvLog;
  * per device), whose update() refreshes the status.
  *
  * Event log: every bad read, PAUSED, RESUMED and LOST goes to its own file,
- * /sdcard/FIRST/john_logs/r<run>_john_odometry_<opmode>_<time>.csv, with the Pinpoint status, loop
+ * /sdcard/FIRST/john_v2_logs/r<run>_john_odometry_<opmode>_<time>.csv, with the Pinpoint status, loop
  * time, the pose and the last good pose, and the speed and turn rate at the last good read (just
  * before a dropout). The file is only created at the first event (so its mere existence means
  * something happened) and every row is flushed at once (nothing is lost if the app is killed).

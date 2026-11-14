@@ -60,7 +60,7 @@ import java.util.Locale;
  *  4. RESULT: dpad up / down how many went in (starts at BALLS), X the miss type, A saves, Back
  *     discards. The next suggested speed is set.
  *
- * Logged to /sdcard/FIRST/john_logs/r<run>_john_shot_results_<time>.csv (one row per volley) and
+ * Logged to /sdcard/FIRST/john_v2_logs/r<run>_john_shot_results_<time>.csv (one row per volley) and
  * r<run>_john_shot_cal_<time>.csv (every loop).
  */
 @Config("JohnShotCalibration")

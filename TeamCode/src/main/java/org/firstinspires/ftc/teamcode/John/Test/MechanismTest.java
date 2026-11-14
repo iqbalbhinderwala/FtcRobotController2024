@@ -38,7 +38,7 @@ import org.firstinspires.ftc.teamcode.John.Util.CsvLog;
  * step it waits for the step to finish, then SHOT_INTERVAL_MS (and, with the encoder, for the
  * flywheel to be back at speed) before the next ball. Each release is logged ("shot n").
  *
- * Logged to /sdcard/FIRST/john_logs/r<run>_john_mechanism_test_<time>.csv.
+ * Logged to /sdcard/FIRST/john_v2_logs/r<run>_john_mechanism_test_<time>.csv.
  */
 @Config("JohnMechanismTest")
 @TeleOp(name = "[John] Mechanism Test", group = "JohnTest")

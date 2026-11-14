@@ -38,7 +38,7 @@ import java.util.Arrays;
  * Telemetry and the Dashboard graph show the heading / position error, plus the heading swing
  * (peak to peak) and its frequency over the last WINDOW_S: a steady swing that does not die down is
  * oscillation. OdometryWatchdog pauses the drive on bad Pinpoint reads and resumes by itself once they
- * are good again; if they stay bad (reboot, dead link) it stops for good (restart the OpMode). Logged to /sdcard/FIRST/john_logs/r<run>_john_hold_test_<time>.csv.
+ * are good again; if they stay bad (reboot, dead link) it stops for good (restart the OpMode). Logged to /sdcard/FIRST/john_v2_logs/r<run>_john_hold_test_<time>.csv.
  */
 @Config
 @TeleOp(name = "[John] Hold Test", group = "JohnTest")

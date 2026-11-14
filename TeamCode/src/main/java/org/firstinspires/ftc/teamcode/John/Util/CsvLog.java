@@ -14,8 +14,13 @@ import java.util.regex.Pattern;
 
 /**
  * Small CSV logger for reviewing runs offline. Writes to
- * /sdcard/FIRST/john_logs/r<run>_<name>_<time>.csv on the Control Hub; copy with:
- *   adb pull /sdcard/FIRST/john_logs
+ * /sdcard/FIRST/john_v2_logs/r<run>_<name>_<time>.csv on the Control Hub; copy with:
+ *   adb pull /sdcard/FIRST/john_v2_logs
+ *
+ * John v2 (the rebuild for the second competition, 2026-11) logs to its own folder, FOLDER, with run
+ * numbers from FIRST_RUN, so its logs never mix with v1's (/sdcard/FIRST/john_logs, r0001-r0288):
+ * the shooter, intakes and wiring changed, and v1 data (e.g. Shot Calibration coverage) does not
+ * apply. A v3 would get the next folder and FIRST_RUN 2001.
  *
  * The Control Hub has no battery-backed clock: its time restarts at 1969-12-31 on every boot, so
  * times repeat across boots. The run number does not: it is one more than the highest run number
@@ -24,6 +29,11 @@ import java.util.regex.Pattern;
  * Logging never throws: if the file cannot be written, the OpMode keeps running and error() says why.
  */
 public class CsvLog {
+
+    /** This robot version's log folder under /sdcard/FIRST. */
+    public static final String FOLDER = "john_v2_logs";
+    /** Its first run number (v1 ran r0001-r0288). */
+    public static final int FIRST_RUN = 1001;
 
     private static final int FLUSH_EVERY_ROWS = 25;
     private static final Pattern RUN_NUMBER = Pattern.compile("^r(\\d+)_");
@@ -55,11 +65,12 @@ public class CsvLog {
         }
     }
 
-    private static File logDir() {
-        return new File(AppUtil.FIRST_FOLDER, "john_logs");
+    /** The log folder of this robot version. */
+    public static File logDir() {
+        return new File(AppUtil.FIRST_FOLDER, FOLDER);
     }
 
-    /** One more than the highest run number among the files already in the log folder (1 if none). */
+    /** One more than the highest run number among the files already in the log folder (FIRST_RUN if none). */
     public static int nextRunNumber() {
         File dir = logDir();
         int max = 0;
@@ -75,7 +86,7 @@ public class CsvLog {
                 }
             }
         }
-        return max + 1;
+        return Math.max(FIRST_RUN, max + 1);
     }
 
     /** Writes one row; values are joined with commas (numbers use '.' decimals). */

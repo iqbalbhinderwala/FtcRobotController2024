@@ -119,7 +119,7 @@ import java.util.function.Supplier;
  * friction at 12-15 in/s).
  * STEP_MODE (testing) waits for gamepad1 Y before each stage and turns the park deadline off.
  *
- * Every run is logged to /sdcard/FIRST/john_logs/r<run>_john_auto_<time>.csv: one row per loop
+ * Every run is logged to /sdcard/FIRST/john_v2_logs/r<run>_john_auto_<time>.csv: one row per loop
  * and an event row per decision. The last pose and the up CELL go to the blackboard for
  * [John] TeleOp (preselected), which starts from them.
  */

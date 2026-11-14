@@ -45,7 +45,7 @@ import java.util.Locale;
  * OdometryWatchdog pauses the drive on bad Pinpoint reads; moves that saw a pause are not scored,
  * and a LOST odometry aborts the sweep.
  *
- * Logs (/sdcard/FIRST/john_logs/), sharing one run number: r<run>_john_drive_cal_samples (every
+ * Logs (/sdcard/FIRST/john_v2_logs/), sharing one run number: r<run>_john_drive_cal_samples (every
  * loop), _moves (one row per move), _ranking (per combination and per combination x distance).
  */
 @Config
@@ -325,7 +325,7 @@ public class DriveCalibration extends LinearOpMode {
             showRanking("Strafe", strafeRanked, distances);
             telemetry.addLine(applied ? "Best values applied to JohnTuning (until the app restarts)."
                     : "X: apply the best of each axis to JohnTuning (until the app restarts).");
-            telemetry.addData("Logs", "john_logs/%s (+ _moves, _ranking)", samples.fileName());
+            telemetry.addData("Logs", "john_v2_logs/%s (+ _moves, _ranking)", samples.fileName());
             telemetry.update();
         }
         watchdog.close();

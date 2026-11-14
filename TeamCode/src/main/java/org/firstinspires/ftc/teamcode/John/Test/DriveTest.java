@@ -42,7 +42,7 @@ import org.firstinspires.ftc.teamcode.John.Util.CsvLog;
  *                   stopped, it holds that pose (driveOrHold) instead of just braking
  *
  * OdometryWatchdog stops the drive on bad Pinpoint reads (resumes after a short glitch).
- * Logged to /sdcard/FIRST/john_logs/r<run>_john_drive_test_<time>.csv.
+ * Logged to /sdcard/FIRST/john_v2_logs/r<run>_john_drive_test_<time>.csv.
  */
 @Config
 @TeleOp(name = "[John] Drive Test", group = "JohnTest")

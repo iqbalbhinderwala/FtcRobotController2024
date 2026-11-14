@@ -43,7 +43,7 @@ import java.util.Locale;
  * gamepad1: X full calibration (learn F, then sweep), B sweep only (current F), dpad up / down target
  * RPM, Y apply the result, A abort.
  * Uses bulk reads (one read of the hub per loop) so the loop is fast enough to see a short overshoot.
- * Logged to /sdcard/FIRST/john_logs/r<run>_john_flywheel_cal_<time>.csv.
+ * Logged to /sdcard/FIRST/john_v2_logs/r<run>_john_flywheel_cal_<time>.csv.
  */
 @Config("JohnFlywheelCalibration")
 @TeleOp(name = "[John] Flywheel Calibration", group = "JohnTest")
