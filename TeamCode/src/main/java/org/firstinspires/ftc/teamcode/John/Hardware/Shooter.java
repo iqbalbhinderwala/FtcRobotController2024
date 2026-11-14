@@ -61,6 +61,15 @@ public class Shooter {
      * sat 70-115 fast and the volley hung 5.9 s on its spare step).
      */
     public static double FIRE_ABOVE_WAIT_MS = 500;
+    /**
+     * While only spinning (setSpin, no volley) the flywheel waits this far from the table speed; the
+     * volley then raises it to the table speed. Shot Calibration (r1071) spun up from rest for every
+     * volley, so its balls left while the speed was still rising: 29-93 RPM under the set speed
+     * (median 61, 491 balls). A flywheel spun up early and settled at the set speed (Auto volley 2,
+     * TeleOp pre-spin) shot ~60-130 faster: r1088's first ball of volley 2 went long at 2229-2271
+     * for 2200.
+     */
+    public static double PRESPIN_OFFSET_RPM = -60;
     public static double TOLERANCE_NEAR_IN = 52;
     public static double TOLERANCE_FAR_IN = 60;
     /**
@@ -99,6 +108,8 @@ public class Shooter {
     private double distance = Double.NaN;
     private double trimRpm;
     private Double rpmOverride;
+    /** The speed for the distance (table or override, plus the trim), set by setDistance(). */
+    private double baseRpm = Double.NaN;
     private String status = "idle";
     private String event;
 
@@ -116,7 +127,7 @@ public class Shooter {
     public void setDistance(double inches) {
         distance = inches;
         if (feed == Feed.IDLE || feed == Feed.SPIN_UP) {
-            flywheel.setTargetRpm(rpmOverride != null ? rpmOverride : rpmFor(inches) + trimRpm);
+            baseRpm = rpmOverride != null ? rpmOverride : rpmFor(inches) + trimRpm;
         }
     }
 
@@ -188,6 +199,9 @@ public class Shooter {
     /** Flywheel, volley and indexer for this loop. Returns what happened (or null). Call every loop. */
     public String update() {
         event = null;
+        if (!Double.isNaN(baseRpm)) {
+            flywheel.setTargetRpm(feed == Feed.IDLE ? baseRpm + PRESPIN_OFFSET_RPM : baseRpm);
+        }
         flywheel.setOn(spin || feed != Feed.IDLE);
         flywheel.update();
         add(flywheel.event());
