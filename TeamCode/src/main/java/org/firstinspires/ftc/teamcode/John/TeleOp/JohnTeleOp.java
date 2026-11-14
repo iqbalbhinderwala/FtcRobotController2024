@@ -22,6 +22,7 @@ import org.firstinspires.ftc.teamcode.John.Aimer;
 import org.firstinspires.ftc.teamcode.John.Auto.AutoSettings;
 import org.firstinspires.ftc.teamcode.John.Dashboard.Drawing;
 import org.firstinspires.ftc.teamcode.John.Hardware.FallbackDrive;
+import org.firstinspires.ftc.teamcode.John.Hardware.Flywheel;
 import org.firstinspires.ftc.teamcode.John.Hardware.Intake;
 import org.firstinspires.ftc.teamcode.John.Hardware.Shooter;
 import org.firstinspires.ftc.teamcode.John.Pedro.Constants;
@@ -158,6 +159,8 @@ public class JohnTeleOp extends LinearOpMode {
     public static double DRIVE_SCALE = 0.8;
     public static double TURN_SCALE = 0.6;
     public static double STICK_DEADBAND = 0.05;
+    /** Telemetry: the short driver view only (false), or also pose, camera, Pinpoint, IMU and controls. */
+    public static boolean TELEMETRY_DETAILS = false;
     /**
      * Stick response (2026-11-13): out = (1 - k) * x + k * x^3 on the stick's length (so a diagonal
      * keeps its direction), then times DRIVE_SCALE. 0 = linear (as before), 1 = fully cubic. At k 0.6 a
@@ -934,45 +937,62 @@ public class JohnTeleOp extends LinearOpMode {
             }
 
             // ---- Telemetry, Dashboard, log ----
-            if (startUnknown) {
-                telemetry.addLine("!!! START POSE UNKNOWN: field-centric may be wrong. Hold Back with the camera"
-                        + " on the HIVE tags to re-position. !!!");
-            }
-            if (watchdog.lost()) {
-                telemetry.addLine("NO ODOMETRY (LOST): driving on the IMU; A = vision shot. " + watchdog.reason());
-                telemetry.addData("Vision shot (hold A)", visionShot ? (visionStatus == null ? "..." : visionStatus) : "off");
-            } else if (!watchdog.ok()) {
-                telemetry.addLine("ODOMETRY PAUSED: driving on the IMU meanwhile. " + watchdog.reason());
-            }
-            telemetry.addData("Position", autoCorrect
-                    ? String.format(Locale.US, "VISION-CORRECTED (%d samples, %.1f in corrected so far; Start: odometry)",
-                            correctWindow.size(), correctedIn)
-                    : "ODOMETRY (hold Back 1 s: re-position from vision)");
-            telemetry.addData("Shot (hold A)", "%s%s", shot, shotStatus.isEmpty() ? "" : ": " + shotStatus);
-            telemetry.addData("Target", "%s %s CELL at (%.1f, %.1f), %.1f in away (%s)", red ? "red" : "blue",
-                    tracker.upCellName(), target[0], target[1], distance, tracker.source());
-            telemetry.addData("Shooter", "%s, trim %+.0f (dpad)%s", shooter.status(), shooter.trimRpm(),
-                    !PRESPIN_IN_ZONE ? "; pre-spin off (X)" : prespin && shot == Shot.IDLE ? "; PRE-SPIN (in the zone)" : "; pre-spin on (X)");
-            telemetry.addData("Intakes (bumper toggles, B reverse)", intake.status());
-            telemetry.addData("Drive", ROBOT_CENTRIC ? "ROBOT-centric, forward = intake " + (forwardIsB ? "B" : "A")
-                    + " (left stick button switches)" : "field-centric");
+            // Short lines for the drivers (the Driver Station wraps past ~40 characters), the most
+            // important first; warnings only when something is wrong. TELEMETRY_DETAILS adds the rest.
             String zone = ShootingZone.problem(pose.x(), pose.y(), target[0], target[1], tracker.upAudience(),
                     ZONE_TOLERANCE_IN, ZONE_TOLERANCE_DEG);
-            telemetry.addData("Shooting zone", zone == null
-                    ? String.format(Locale.US, "IN RANGE (%.0f deg off the CELL axis)",
-                            ShootingZone.offAxisDeg(pose.x(), pose.y(), target[0], target[1], tracker.upAudience()))
-                    : zone + ": the shot drives into range first");
-            telemetry.addData("Pose (FTC)", Drawing.format(pose));
-            if (relocalizing) {
-                telemetry.addData("Re-positioning", "%d tag readings, %d vision poses; %s", relocalizer.count(),
-                        relocalizeVision.size(), relocalizeWalls.describe(MIN_RELOCALIZE_SAMPLES));
+            if (startUnknown) {
+                telemetry.addLine("!!! START POSE UNKNOWN: hold Back on tags");
             }
-            telemetry.addData("Camera", camera.status());
-            telemetry.addData("Pinpoint", "%s, %s", state, watchdog.status());
-            telemetry.addData("IMU check", "%s, offset %.1f deg (must stay the same while turning)",
-                    fallback.status(), fallback.offsetDeg());
-            telemetry.addLine("HOLD: A shoot, RS button aim assist, Back vision mode (Start: odometry), B intakes reverse. "
-                    + "Bumpers: intakes on/off. Y: indexer back 90. Dpad: trim. X: pre-spin");
+            if (watchdog.lost()) {
+                telemetry.addLine("!!! NO ODOMETRY: IMU drive, A = vision shot");
+                telemetry.addLine("Vision shot: " + (visionShot ? (visionStatus == null ? "..." : visionStatus) : "off"));
+            } else if (!watchdog.ok()) {
+                telemetry.addLine("!!! ODOMETRY PAUSED: IMU drive");
+            }
+            if (shot != Shot.IDLE) {
+                telemetry.addLine(">>> " + shot + (shotStatus.isEmpty() ? "" : ": " + shotStatus));
+            } else if (zone == null) {
+                telemetry.addLine(">>> IN RANGE: hold A to shoot");
+            } else {
+                telemetry.addLine(">>> " + zone);
+            }
+            telemetry.addData("CELL", "%s up, %.0f in%s", tracker.upCellName(), distance,
+                    tracker.recentSightings() > 0 ? "" : " (not seen)");
+            Flywheel fw = shooter.flywheel();
+            telemetry.addData("Flywheel", "%s%s%s",
+                    fw.isOn() ? String.format(Locale.US, "%.0f / %.0f%s", fw.rpm(), fw.targetRpm(), fw.atSpeed() ? " READY" : "")
+                            : "off",
+                    shooter.trimRpm() == 0 ? "" : String.format(Locale.US, " trim %+.0f", shooter.trimRpm()),
+                    PRESPIN_IN_ZONE ? " | pre-spin" : "");
+            telemetry.addData("Intakes", intake.status());
+            if (ROBOT_CENTRIC) {
+                telemetry.addData("Drive", "ROBOT-centric, fwd = intake " + (forwardIsB ? "B" : "A"));
+            }
+            if (autoCorrect) {
+                telemetry.addData("Position", "VISION-CORRECTED (Start: off)");
+            }
+            if (relocalizing) {
+                telemetry.addData("Re-positioning", "%d readings", relocalizer.count());
+            }
+            if (TELEMETRY_DETAILS) {
+                telemetry.addData("Pose (FTC)", Drawing.format(pose));
+                telemetry.addData("Target", "(%.1f, %.1f) %s", target[0], target[1], tracker.source());
+                telemetry.addData("Shooter", shooter.status());
+                if (autoCorrect) {
+                    telemetry.addData("Corrected", "%.1f in, %d samples", correctedIn, correctWindow.size());
+                }
+                if (relocalizing) {
+                    telemetry.addData("Re-position", "%d vision poses; %s", relocalizeVision.size(),
+                            relocalizeWalls.describe(MIN_RELOCALIZE_SAMPLES));
+                }
+                telemetry.addData("Camera", camera.status());
+                telemetry.addData("Pinpoint", "%s, %s", state, watchdog.status());
+                telemetry.addData("IMU check", "%s, offset %.1f deg", fallback.status(), fallback.offsetDeg());
+                telemetry.addLine("A shoot | RS aim assist | bumpers intake");
+                telemetry.addLine("B reverse | Y indexer back | X pre-spin");
+                telemetry.addLine("dpad trim | Back re-position | Start odom");
+            }
             telemetry.update();
 
             Pose aimPose = shot == Shot.AIM || shot == Shot.FIRE ? aimer.aimPose() : null;
