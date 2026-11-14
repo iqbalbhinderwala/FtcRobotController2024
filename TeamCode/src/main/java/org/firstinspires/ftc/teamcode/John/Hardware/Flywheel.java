@@ -56,8 +56,10 @@ public class Flywheel {
      * ... until within this of it. Calibrated 2026-10-23 (r0046, 13.3 V, F 20.5): with the hand-off 50-150
      * below and any I up to 1, cold starts peaked at most 100 above the target (inside the "at speed"
      * band) and were ready in about 1.7-1.8 s; later hand-offs are faster.
+     * John v2 (gear belt, r1057, 13.1 V, F 23.31): 100 below with I 1 never passed +100 in either
+     * pass, ready in 2.2-2.6 s; 200 below overshot 143 in most trials.
      */
-    public static double BOOST_EXIT_RPM = 50;
+    public static double BOOST_EXIT_RPM = 100;
     /** Battery voltage the open-loop power and F are given for. */
     public static double NOMINAL_VOLTAGE = 12.0;
     /**
@@ -73,7 +75,7 @@ public class Flywheel {
      */
     public static double P = 10.0;
     /** Small: F does the holding; I only corrects slow drift (r0046: 0 / 0.5 / 1 all fine, 3 once overshot). */
-    public static double I = 0.5;
+    public static double I = 1.0;   // John v2 r1057 (v1 0.5)
     public static double D = 0.0;
     /**
      * Learned 2026-10-23 with [John] Flywheel Calibration (r0042): 20.45 / 20.17 / 20.86 at 12 V from
@@ -82,8 +84,11 @@ public class Flywheel {
      * Relearned 2026-11-01 (r0267, 11.5 V): 18.76. Holding 2300 RPM took 7.4 V (power x battery)
      * against 7.9-8.2 V on 10/23, so the flywheel itself got about 9% easier to turn (not the
      * battery); 20.5 held it 100-190 RPM fast, outside the "at speed" band, and stalled volleys.
+     * John v2 (gear belt, 1:1 pulleys), r1057 at 13.15 V: RPM = 4767 x power - 1020 (0.3 / 0.4 / 0.5
+     * -> 400 / 905 / 1354), so holding 2300 needs 0.696 -> F 23.31 at 12 V (+24%: the gear belt
+     * takes more power to turn; full power still reaches ~3700 RPM).
      */
-    public static double F = 18.76;
+    public static double F = 23.31;
 
     private final DcMotorEx motor;
     private final HardwareMap hardwareMap;
