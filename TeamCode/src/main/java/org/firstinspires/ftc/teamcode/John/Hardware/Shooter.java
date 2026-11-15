@@ -70,6 +70,13 @@ public class Shooter {
      * for 2200.
      */
     public static double PRESPIN_OFFSET_RPM = -60;
+    /**
+     * ... and the volley raises it to the table speed at this rate, not in one step: the 60 RPM jump
+     * with P 25 made the flywheel overshoot to 70-110 over the target once ball 1 was gone, and ball 2
+     * waited up to 1.1 s for the firing window (Auto r1134). Ball 1 fires as before (within the
+     * tolerance under the target). Lowering is immediate.
+     */
+    public static double PRESPIN_RAMP_RPM_PER_S = 1e9;   // off (instant, as tested) for the competition; JohnAutoTest: 150
     public static double TOLERANCE_NEAR_IN = 52;
     public static double TOLERANCE_FAR_IN = 60;
     /**
@@ -97,7 +104,12 @@ public class Shooter {
     private final Indexer indexer;
     private final ElapsedTime feedTimer = new ElapsedTime();
     /** How long the flywheel has been above the firing window but within the normal tolerance. */
-    private final ElapsedTime fastTimer = new ElapsedTime();
+    private final ElapsedTime fastTimer = new ElapsedTime();   // loop timer for the above-window wait
+    /** Time spent above the firing window since the last ball (cumulative: the readings jump ~43 RPM). */
+    private double aboveMs;
+    /** The flywheel target as ramped (PRESPIN_RAMP_RPM_PER_S); NaN before the first. */
+    private double rampedRpm = Double.NaN;
+    private final ElapsedTime rampTimer = new ElapsedTime();
     private boolean spin;
     private boolean paused;
     private Feed feed = Feed.IDLE;
@@ -200,7 +212,16 @@ public class Shooter {
     public String update() {
         event = null;
         if (!Double.isNaN(baseRpm)) {
-            flywheel.setTargetRpm(feed == Feed.IDLE ? baseRpm + PRESPIN_OFFSET_RPM : baseRpm);
+            double desired = feed == Feed.IDLE ? baseRpm + PRESPIN_OFFSET_RPM : baseRpm;
+            double dt = Math.min(0.1, rampTimer.seconds());
+            rampTimer.reset();
+            // Up gradually only from a spinning flywheel; from rest (or down) straight to the speed
+            if (Double.isNaN(rampedRpm) || !flywheel.isOn() || desired <= rampedRpm) {
+                rampedRpm = desired;
+            } else {
+                rampedRpm = Math.min(desired, rampedRpm + PRESPIN_RAMP_RPM_PER_S * dt);
+            }
+            flywheel.setTargetRpm(rampedRpm);
         }
         flywheel.setOn(spin || feed != Feed.IDLE);
         flywheel.update();
@@ -221,12 +242,17 @@ public class Shooter {
         }
         double tolerance = fireToleranceRpm(distance);
         boolean inWindow = flywheel.within(tolerance, Math.min(FIRE_ABOVE_RPM, tolerance));
-        boolean fastButClose = !inWindow && flywheel.within(tolerance);
-        if (!fastButClose) {
-            fastTimer.reset();
+        boolean above = !inWindow && flywheel.rpm() > flywheel.targetRpm();
+        double loopMs = Math.min(100.0, fastTimer.milliseconds());
+        fastTimer.reset();
+        if (inWindow || feed == Feed.IDLE) {
+            aboveMs = 0.0;
+        } else if (above) {
+            aboveMs += loopMs;   // a reading past the tolerance does not start the wait over
         }
+        boolean fastButClose = above && flywheel.within(tolerance);
         boolean ready = !paused
-                && (flywheel.closedLoop() ? inWindow || fastTimer.milliseconds() >= FIRE_ABOVE_WAIT_MS
+                && (flywheel.closedLoop() ? inWindow || (fastButClose && aboveMs >= FIRE_ABOVE_WAIT_MS)
                 : flywheel.onSeconds() * 1000.0 >= OPEN_LOOP_SPIN_UP_MS);
         switch (feed) {
             case SPIN_UP:
@@ -278,6 +304,7 @@ public class Shooter {
     }
 
     private void step() {
+        aboveMs = 0.0;
         indexer.step(1);
         feed = Feed.STEP;
         feedTimer.reset();

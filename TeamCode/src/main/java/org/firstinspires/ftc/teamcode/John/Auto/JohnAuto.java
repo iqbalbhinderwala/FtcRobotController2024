@@ -156,6 +156,62 @@ public class JohnAuto extends LinearOpMode {
      */
     public static double GARDEN_END_GAP_IN = -2.5;
     /**
+     * GARDEN approach angle (2026-11-14): John runs along the audience wall at 90 + this (red frame),
+     * intake A angled toward the wall, its camera-side corner (tapered in toward the intake) leading
+     * along the wall, so the balls against the wall meet the intake face instead of slipping past its
+     * side; through the slow stretch he turns back to 90 and arrives square at the red wall. The
+     * center is placed so that leading corner stays GARDEN_RUN_GAP_IN / WALL_GAP off the wall.
+     * 0 = the old square approach (r1085 picked up 3 of 4, maybe missing the last one).
+     */
+    /**
+     * 0 for the competition (2026-11-15): the angled approach is untested in its current form; the
+     * [John] Auto TEST OpModes (JohnAutoTest) run it.
+     */
+    public static double GARDEN_ANGLE_DEG = 0.0;
+    /**
+     * Before the balls, still square (90), John strafes gently into the audience wall until he stops
+     * (GARDEN_TOUCH_*): the difference between where he is (wall - half his width) and where the
+     * odometry says he is, up to GARDEN_TOUCH_MAX_FIX_IN, shifts the GARDEN's own targets (the
+     * angled run line and the end), so the leading corner runs the planned gap from the real wall.
+     * The odometry itself is not changed. 2026-11-14: the real gap varied by 1-2".
+     */
+    public static boolean GARDEN_TOUCH = false;   // untested: off for the competition (JohnAutoTest runs it)
+    /**
+     * The touch drives diagonally: forward toward the balls (GARDEN_TOUCH_FORWARD) and sideways into
+     * the wall (GARDEN_TOUCH_POWER). On mecanum a diagonal grips far better than a pure strafe (John v2
+     * barely strafes at 0.3, and turns when strafing). It starts GARDEN_TOUCH_LEAD_IN before the slow
+     * stretch and is over once he has stopped moving sideways (against the wall); reaching the slow
+     * stretch first: not used. It only counts if he moved at least GARDEN_TOUCH_MIN_MOVE_IN toward the
+     * wall first (he starts GARDEN_RUN_GAP_IN off it).
+     */
+    public static double GARDEN_TOUCH_POWER = 0.35;
+    public static double GARDEN_TOUCH_FORWARD = 0.20;
+    public static double GARDEN_TOUCH_LEAD_IN = 12.0;
+    public static double GARDEN_TOUCH_MIN_MOVE_IN = 0.3;
+    /**
+     * After a usable touch the angled run's leading corner runs this close to the wall instead of
+     * GARDEN_RUN_GAP_IN (that margin was for odometry error, which the touch measured): with 1.0 the
+     * corner moved 1" back off the wall right after touching it.
+     */
+    public static double GARDEN_TOUCHED_GAP_IN = 0.3;
+    public static double GARDEN_TOUCH_MAX_S = 1.5;
+    public static double GARDEN_TOUCH_MAX_FIX_IN = 2.5;
+    /** The touch is done once slower than this SIDEWAYS for GARDEN_TOUCH_STILL_MS (after GARDEN_TOUCH_GRACE_MS). */
+    public static double GARDEN_TOUCH_STILL_IPS = 0.8;
+    public static double GARDEN_TOUCH_STILL_MS = 250;
+    public static double GARDEN_TOUCH_GRACE_MS = 250;
+    /** Stalled this close to the collect's end (which lies past the red wall): back off and push again. */
+    public static double GARDEN_NEAR_END_IN = 7.0;
+    public static int GARDEN_END_RETRIES = 0;   // the back-off is untested: 0 for the competition (JohnAutoTest: 1)
+    /**
+     * The turn back to 90 is complete this far before the collect's end (which lies past the red wall).
+     * 8 (was 4): r1135 reached the last two balls, stacked along the wall into the corner, still at
+     * 98 deg; the corner pinned them instead of the intake face taking them.
+     */
+    public static double GARDEN_TURN_DONE_BEFORE_IN = 8.0;
+    /** Which settings this run uses ("competition", or a JohnAutoTest variant): in the start event. */
+    public static String VARIANT = "competition";
+    /**
      * Park: partly inside the red LOADING ZONE (A5: X -48 to -24, Y -72 to -60.4), camera wall on the
      * wall, never driving through it (a partner may be in it). John comes in from the end nearer his
      * route: from the audience side (X > the zone's middle, e.g. from A2 or the look spot) he parks
@@ -408,6 +464,7 @@ public class JohnAuto extends LinearOpMode {
         if (startWarning != null) {
             logEvent("WARNING at START: " + startWarning);
         }
+        logEvent("variant: " + VARIANT);
         logEvent(String.format(Locale.US, "start: %s %s at %s (%s), delay %.0f s", settings.alliance(), settings.tile(),
                 Drawing.format(start), useCamera(startFix)
                         ? String.format(Locale.US, "camera Y, %d readings, tile %+.1f", startFix.count(),
@@ -771,18 +828,30 @@ public class JohnAuto extends LinearOpMode {
     private Command collectGarden() {
         Pose here = red(follower.pose());
         double halfLength = RobotGeometry.LENGTH_IN / 2.0;
-        double wallX = AUDIENCE_WALL_X - RobotGeometry.WIDTH_IN / 2.0 - WALL_GAP;
-        double runX = AUDIENCE_WALL_X - RobotGeometry.WIDTH_IN / 2.0 - GARDEN_RUN_GAP_IN;
         double heading = Math.toRadians(90.0);
+        double runHeading = Math.toRadians(90.0 + GARDEN_ANGLE_DEG);
+        double wallX = AUDIENCE_WALL_X - extentX(heading) - WALL_GAP;
+        // Square along the wall up to the touch; angled from there (the leading, camera-side corner of
+        // intake A nearest the wall)
+        double squareRunX = AUDIENCE_WALL_X - extentX(heading) - GARDEN_RUN_GAP_IN;
+        double runX = AUDIENCE_WALL_X - extentX(runHeading) - GARDEN_RUN_GAP_IN;
+        // Turn in place at 90, then out to the wall line
         Pose turned = here.withHeading(heading);
-        Pose atWall = new Pose(runX, here.y(), heading);
+        Pose atWall = new Pose(squareRunX, here.y(), heading);
         // Intake A is at the robot's -X end, which points toward the red wall (-Y) at heading 90
-        double slowY = GARDEN_FIRST_BALL_Y + BALL_RADIUS + halfLength + SLOW_BEFORE_BALL_IN;
+        double slowY = gardenSlowY(runHeading, runX);
         double endY = RED_WALL_Y + halfLength + GARDEN_END_GAP_IN;
-        Pose slowStart = new Pose(runX, Math.min(here.y(), slowY), heading);
-        Pose end = new Pose(wallX, endY, heading);
-        logEvent(String.format(Locale.US, "garden: wall at x %.1f, slow from y %.1f to %.1f at %.0f in/s",
-                wallX, slowStart.y(), endY, COLLECT_SPEED_IPS));
+        Pose touchAt = new Pose(squareRunX, Math.min(here.y(), slowY + (GARDEN_TOUCH ? GARDEN_TOUCH_LEAD_IN : 0.0)), heading);
+        gardenFixX = 0.0;
+        gardenTouched = false;
+        // The angled run line: from the wall touch when it worked (smaller margin), else the planned one
+        DoubleSupplier angledX = () -> gardenTouched
+                ? AUDIENCE_WALL_X - extentX(runHeading) - GARDEN_TOUCHED_GAP_IN - gardenFixX : runX;
+        DoubleSupplier squareX = () -> gardenTouched
+                ? AUDIENCE_WALL_X - extentX(heading) - GARDEN_TOUCHED_GAP_IN - gardenFixX : wallX;
+        logEvent(String.format(Locale.US, "garden: wall at x %.1f (run x %.1f at %.0f deg), slow from y %.1f to %.1f "
+                        + "at %.0f in/s, turning back to 90%s", wallX, runX, 90.0 + GARDEN_ANGLE_DEG, touchAt.y(), endY,
+                COLLECT_SPEED_IPS, GARDEN_TOUCH ? "; wall touch first" : ""));
         return sequential(
                 instant(() -> follower.hold(field(turned))),
                 race(waitUntil(() -> Math.abs(normalize(field(turned).heading() - follower.pose().heading()))
@@ -790,8 +859,24 @@ public class JohnAuto extends LinearOpMode {
                         waitMs(TURN_TIMEOUT_MS)),
                 watcher.follow("garden: to the wall", () -> around(field(atWall), 0)),
                 intake.start(Intake.Side.A),
-                watcher.follow("garden: along the wall", () -> toward(field(slowStart), true, GARDEN_RUN_SPEED_IPS)),
-                watcher.creep("garden: collect", () -> field(end), COLLECT_SPEED_IPS),
+                watcher.follow("garden: along the wall", () -> toward(field(touchAt), true, GARDEN_RUN_SPEED_IPS)),
+                GARDEN_TOUCH ? touchWall(wallX + WALL_GAP, slowY) : instant(() -> { }),
+                // Angle onto the run line (shifted by the touch), then creep through the balls
+                instant(() -> follower.hold(field(new Pose(angledX.getAsDouble(), Math.min(touchAt.y(), slowY), runHeading)))),
+                race(waitUntil(() -> {
+                            Pose g = field(new Pose(angledX.getAsDouble(), Math.min(touchAt.y(), slowY), runHeading));
+                            Pose p = follower.pose();
+                            return Math.hypot(p.x() - g.x(), p.y() - g.y()) <= 0.75
+                                    && Math.abs(normalize(g.heading() - p.heading())) <= Math.toRadians(TURN_TOLERANCE_DEG);
+                        }),
+                        waitMs(TURN_TIMEOUT_MS)),
+                // Turning back to 90 and onto the square wall line by the same point, so the leading
+                // corner keeps its gap (one straight line drifted it 1" off mid-way), then straight on
+                // A stall anywhere in it (on the first balls): back off, push once more, then on to the next part
+                watcher.creep("garden: turn back", () -> field(new Pose(squareX.getAsDouble(),
+                        endY + GARDEN_TURN_DONE_BEFORE_IN, heading)), COLLECT_SPEED_IPS, 0.0, 1000.0, GARDEN_END_RETRIES),
+                watcher.creep("garden: collect", () -> field(new Pose(squareX.getAsDouble(), endY, heading)),
+                        COLLECT_SPEED_IPS, Double.NaN, GARDEN_NEAR_END_IN, GARDEN_END_RETRIES),
                 // The intake keeps running through the next stages, so the balls work their way to
                 // the indexer while driving; the next volley (or the park) stops it
                 instant(() -> {
@@ -974,13 +1059,117 @@ public class JohnAuto extends LinearOpMode {
         Pose here = follower.pose();
         double wallX = AUDIENCE_WALL_X - RobotGeometry.WIDTH_IN / 2.0 - WALL_GAP;
         Pose atWall = field(new Pose(wallX, red(here).y(), Math.toRadians(90.0)));
-        double slowY = GARDEN_FIRST_BALL_Y + BALL_RADIUS + RobotGeometry.LENGTH_IN / 2.0 + SLOW_BEFORE_BALL_IN;
+        double runHeading = Math.toRadians(90.0 + GARDEN_ANGLE_DEG);
+        double slowY = gardenSlowY(runHeading, AUDIENCE_WALL_X - extentX(runHeading) - GARDEN_RUN_GAP_IN);
         double end = gardenEnd().y();
         double fast = Math.max(0.0, red(here).y() - slowY);
         double slowLength = Math.max(0.0, Math.min(red(here).y(), slowY) - end);
         double runIps = GARDEN_RUN_SPEED_IPS > 0 ? Math.min(AVG_DRIVE_IPS, GARDEN_RUN_SPEED_IPS) : AVG_DRIVE_IPS;
         return 0.5 + driveSeconds(here, atWall) + fast / runIps + slowLength / COLLECT_SPEED_IPS
-                + Intake.SETTLE_MS / 1000.0;
+                + Intake.SETTLE_MS / 1000.0 + (GARDEN_TOUCH ? 1.0 : 0.0);   // the wall touch and the angling
+    }
+
+    /**
+     * Where the GARDEN run slows to the collect speed (red frame Y of the center): SLOW_BEFORE_BALL_IN
+     * before the robot's footprint, in the strip along the audience wall where the balls lie, reaches
+     * the first ball. Angled (120 deg) the farthest-forward corner is the shooter-side one, far from
+     * the wall: measuring from it slowed down 7.6" early (r1129-r1135, slow from y -44.8; this gives
+     * about -52.4).
+     */
+    private static double gardenSlowY(double runHeading, double runX) {
+        double stripX = AUDIENCE_WALL_X - 2.0 * BALL_RADIUS - 0.5;   // balls lie between here and the wall
+        double hl = RobotGeometry.LENGTH_IN / 2.0, hw = RobotGeometry.WIDTH_IN / 2.0;
+        double[][] corners = {{-hl, -hw}, {-hl, hw}, {hl, hw}, {hl, -hw}};
+        double c = Math.cos(runHeading), s = Math.sin(runHeading);
+        double reach = 0.0;   // farthest toward the red wall (-Y) inside the strip, from the center
+        for (int e = 0; e < 4; e++) {
+            double[] a = corners[e], b = corners[(e + 1) % 4];
+            for (int i = 0; i <= 40; i++) {
+                double u = a[0] + (b[0] - a[0]) * i / 40.0, v = a[1] + (b[1] - a[1]) * i / 40.0;
+                double x = runX + u * c - v * s, dy = u * s + v * c;
+                if (x >= stripX) {
+                    reach = Math.max(reach, -dy);
+                }
+            }
+        }
+        return GARDEN_FIRST_BALL_Y + BALL_RADIUS + reach + SLOW_BEFORE_BALL_IN;
+    }
+
+    /** Odometry x minus the real x at the GARDEN wall touch (red frame), 0 without a usable touch. */
+    private double gardenFixX = 0.0;
+    /** The GARDEN wall touch worked (gardenFixX is from it). */
+    private boolean gardenTouched = false;
+
+    /**
+     * Strafes square (90, red frame) toward the audience wall at GARDEN_TOUCH_POWER, the heading held,
+     * until John stops; there his center is at {@code touchX} (wall - half his width). Sets gardenFixX
+     * (ignored beyond GARDEN_TOUCH_MAX_FIX_IN, e.g. a ball in between). The next creep moves him off.
+     */
+    private Command touchWall(double touchX, double stopY) {
+        final ElapsedTime timer = new ElapsedTime();
+        final ElapsedTime still = new ElapsedTime();
+        final boolean[] done = {false};
+        final double[] heading = {0.0};
+        final double[] startX = {0.0};
+        return new CommandBuilder()
+                .setStart(() -> {
+                    timer.reset();
+                    still.reset();
+                    done[0] = false;
+                    heading[0] = follower.pose().heading();
+                    startX[0] = red(follower.pose()).x();
+                })
+                .setExecute(() -> {
+                    if (done[0]) {
+                        return;
+                    }
+                    Pose p = follower.pose();
+                    // Sideways = toward the audience wall (+x in the red frame; blue is rotated 180 deg)
+                    double sideways = blue ? -follower.velocity().vx : follower.velocity().vx;
+                    if (sideways > GARDEN_TOUCH_STILL_IPS || timer.milliseconds() < GARDEN_TOUCH_GRACE_MS) {
+                        still.reset();
+                    }
+                    boolean stopped = still.milliseconds() >= GARDEN_TOUCH_STILL_MS;
+                    boolean atSlow = red(p).y() <= stopY;
+                    if (stopped || atSlow || timer.seconds() >= GARDEN_TOUCH_MAX_S) {
+                        double odomX = red(p).x();
+                        double fix = odomX - touchX;
+                        double moved = odomX - startX[0];   // toward the audience wall (+x, red frame)
+                        if (stopped && moved < GARDEN_TOUCH_MIN_MOVE_IN) {
+                            gardenFixX = 0.0;
+                            logEvent(String.format(Locale.US, "garden: wall touch not used (moved only %.1f in toward "
+                                    + "the wall: no strafe, or already against it)", moved));
+                        } else if (stopped && Math.abs(fix) <= GARDEN_TOUCH_MAX_FIX_IN) {
+                            gardenFixX = fix;
+                            gardenTouched = true;
+                            logEvent(String.format(Locale.US, "garden: wall touch at odometry x %.1f (wall says %.1f): "
+                                    + "GARDEN targets shifted %+.1f in", odomX, touchX, -fix));
+                        } else {
+                            gardenFixX = 0.0;
+                            logEvent(String.format(Locale.US, "garden: wall touch not used (%s, odometry x %.1f, wall says "
+                                    + "%.1f)", stopped ? "too far off" : atSlow ? "reached the balls first" : "did not stop",
+                                    odomX, touchX));
+                        }
+                        follower.hold(p);
+                        done[0] = true;
+                        return;
+                    }
+                    // Diagonal: forward toward the red wall (intake A leads: robot -X) and toward the camera
+                    // side (robot -Y = the audience wall at 90 red), the heading held
+                    double hErr = normalize(heading[0] - p.heading());
+                    follower.manual(new DrivePowers(-GARDEN_TOUCH_FORWARD, -GARDEN_TOUCH_POWER,
+                            Math.max(-0.3, Math.min(0.3, 1.5 * hErr))));
+                })
+                .setDone(() -> done[0]);
+    }
+
+    /** Half the robot's footprint along field X / Y at heading {@code h} (a 17" x 17.25" rectangle). */
+    private static double extentX(double h) {
+        return RobotGeometry.LENGTH_IN / 2.0 * Math.abs(Math.cos(h)) + RobotGeometry.WIDTH_IN / 2.0 * Math.abs(Math.sin(h));
+    }
+
+    private static double extentY(double h) {
+        return RobotGeometry.LENGTH_IN / 2.0 * Math.abs(Math.sin(h)) + RobotGeometry.WIDTH_IN / 2.0 * Math.abs(Math.cos(h));
     }
 
     /** Where the GARDEN run ends (red frame): in the red corner along the audience wall. */

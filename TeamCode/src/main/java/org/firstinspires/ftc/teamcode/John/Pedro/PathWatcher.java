@@ -260,7 +260,35 @@ public class PathWatcher {
      * follow() (gaveUp()).
      */
     public Command creep(String name, Supplier<Pose> end, double speedIps) {
+        return creep(name, end, speedIps, Double.NaN);
+    }
+
+    /**
+     * The same, but the heading turns gradually from the start heading to the end heading along the
+     * line, complete {@code turnDoneBeforeIn} before the end (NaN: aims at the end heading at once).
+     */
+    public Command creep(String name, Supplier<Pose> end, double speedIps, double turnDoneBeforeIn) {
+        return creep(name, end, speedIps, turnDoneBeforeIn, ARRIVE_WITHIN_IN, 0);
+    }
+
+    /** Backing off before one more push at the end (creep endRetries): this far, at this speed, then a pause. */
+    public static double CREEP_BACKOFF_IN = 2.0;
+    public static double CREEP_BACKOFF_IPS = 6.0;
+    public static double CREEP_BACKOFF_PAUSE_MS = 300;
+
+    /**
+     * The same, and a stall within {@code nearEndIn} of the end (e.g. balls pinned against the wall at
+     * the end of the GARDEN) is "as far as it goes" rather than BLOCKED; before giving in, up to
+     * {@code endRetries} times it backs off CREEP_BACKOFF_IN, pauses (the intake gets another grab at
+     * the balls) and pushes again.
+     */
+    public Command creep(String name, Supplier<Pose> end, double speedIps, double turnDoneBeforeIn,
+                         double nearEndIn, int endRetries) {
         final int[] attempt = {0};
+        final int[] endTries = {0};
+        final int[] backoff = {0};   // 0 creeping, 1 backing off, 2 pausing
+        final double[] backoffFrom = {0.0};
+        final ElapsedTime backoffTimer = new ElapsedTime();
         final boolean[] waiting = {false};
         final boolean[] finished = {false};
         final Pose[] from = {null};
@@ -275,6 +303,8 @@ public class PathWatcher {
         return new CommandBuilder()
                 .setStart(() -> {
                     attempt[0] = 0;
+                    endTries[0] = 0;
+                    backoff[0] = 0;
                     waiting[0] = false;
                     finished[0] = false;
                     gaveUp = false;
@@ -299,6 +329,7 @@ public class PathWatcher {
                             prevMs[0] = -1.0;
                             speedAlong[0] = 0.0;
                             stallNearEndMs[0] = -1.0;
+                            running.reset();
                             start();
                         }
                         return;
@@ -328,11 +359,50 @@ public class PathWatcher {
                     }
                     prevAlong[0] = along;
                     prevMs[0] = nowMs;
-                    // Stalled close to the end: as far as it goes
-                    if (CREEP_STALL_NEAR_END_IS_ARRIVED && remaining <= ARRIVE_WITHIN_IN && nowMs >= START_GRACE_MS
+                    // Backing off for one more push at the end, then a pause
+                    if (backoff[0] == 1) {
+                        if (backoffFrom[0] - along >= CREEP_BACKOFF_IN || backoffTimer.milliseconds() > 1500) {
+                            backoff[0] = 2;
+                            backoffTimer.reset();
+                            follower.hold(p);
+                        } else {
+                            double bh = p.heading();
+                            double bvx = -CREEP_BACKOFF_IPS * ux, bvy = -CREEP_BACKOFF_IPS * uy;
+                            double bf = (bvx * Math.cos(bh) + bvy * Math.sin(bh)) / CREEP_FORWARD_IPS_PER_POWER;
+                            double bl = (-bvx * Math.sin(bh) + bvy * Math.cos(bh)) / CREEP_STRAFE_IPS_PER_POWER;
+                            double bm = Math.hypot(bf, bl);
+                            if (bm > 1e-6 && bm < CREEP_MIN_POWER) {
+                                bf *= CREEP_MIN_POWER / bm;
+                                bl *= CREEP_MIN_POWER / bm;
+                            }
+                            follower.manual(new DrivePowers(bf, bl, 0.0));
+                        }
+                        return;
+                    }
+                    if (backoff[0] == 2) {
+                        if (backoffTimer.milliseconds() >= CREEP_BACKOFF_PAUSE_MS) {
+                            backoff[0] = 0;
+                            stallNearEndMs[0] = -1.0;
+                            prevMs[0] = -1.0;
+                            speedAlong[0] = 0.0;
+                            running.reset();
+                            start();
+                        }
+                        return;
+                    }
+                    // Stalled close to the end: one more push (endRetries), else as far as it goes
+                    if (CREEP_STALL_NEAR_END_IS_ARRIVED && remaining <= nearEndIn && nowMs >= START_GRACE_MS
                             && Math.abs(speedAlong[0]) < BLOCKED_SPEED_IPS) {
                         if (stallNearEndMs[0] < 0) {
                             stallNearEndMs[0] = nowMs;
+                        } else if (nowMs - stallNearEndMs[0] >= BLOCKED_MS && endTries[0] < endRetries) {
+                            endTries[0]++;
+                            backoff[0] = 1;
+                            backoffFrom[0] = along;
+                            backoffTimer.reset();
+                            log.accept(String.format(Locale.US, "%s: stalled %.1f in short of the end: backing off %.0f in, "
+                                    + "one more push", name, remaining, CREEP_BACKOFF_IN));
+                            return;
                         } else if (nowMs - stallNearEndMs[0] >= BLOCKED_MS) {
                             follower.hold(p);
                             finished[0] = true;
@@ -371,10 +441,17 @@ public class PathWatcher {
                         fwd *= CREEP_MIN_POWER / magnitude;
                         left *= CREEP_MIN_POWER / magnitude;
                     }
-                    double turn = CREEP_HEADING_P * Math.atan2(Math.sin(e.heading() - h), Math.cos(e.heading() - h));
+                    double goal = e.heading();
+                    if (!Double.isNaN(turnDoneBeforeIn)) {
+                        double rampLength = Math.max(1.0, length - turnDoneBeforeIn);
+                        double f = Math.max(0.0, Math.min(1.0, along / rampLength));
+                        double total = Math.atan2(Math.sin(e.heading() - from[0].heading()), Math.cos(e.heading() - from[0].heading()));
+                        goal = from[0].heading() + f * total;
+                    }
+                    double turn = CREEP_HEADING_P * Math.atan2(Math.sin(goal - h), Math.cos(goal - h));
                     follower.manual(new DrivePowers(fwd, left, Math.max(-0.4, Math.min(0.4, turn))));
 
-                    Trip trip = creepCheck(remaining, cross);
+                    Trip trip = creepCheck(remaining, cross, nearEndIn);
                     if (trip != Trip.NONE) {
                         trips++;
                         follower.manual(DrivePowers.zero());
@@ -399,7 +476,7 @@ public class PathWatcher {
     }
 
     /** BLOCKED / PUSHED for a creep (its own remaining distance and offset from the line). */
-    private Trip creepCheck(double remaining, double cross) {
+    private Trip creepCheck(double remaining, double cross, double nearEndIn) {
         if (!ENABLED) {
             return Trip.NONE;
         }
@@ -410,7 +487,8 @@ public class PathWatcher {
         Pose pose = follower.pose();
         Velocity v = follower.velocity();
         double speed = Math.hypot(v.vx, v.vy);
-        if (speed >= BLOCKED_SPEED_IPS || remaining <= MIN_REMAINING_IN) {
+        // Near the end a stall is the creep's own business ("as far as it goes" / one more push), not BLOCKED
+        if (speed >= BLOCKED_SPEED_IPS || remaining <= Math.max(MIN_REMAINING_IN, nearEndIn)) {
             slowSinceMs = -1;
         } else if (slowSinceMs < 0) {
             slowSinceMs = now;
