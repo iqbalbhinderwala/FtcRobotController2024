@@ -14,7 +14,7 @@
             <goBILDA5201SeriesMotor name="backRight" port="3" />
             <ControlHubImuBHI260AP name="imu" port="0" bus="0" />
             <goBILDAPinpoint name="pinpoint" port="0" bus="1" />
-            <Servo name="defender" port="0" />
+            <Servo name="defender" port="5" />
             <Led name="led0" port="0" />
             <Led name="led1" port="1" />
             <Led name="led2" port="2" />

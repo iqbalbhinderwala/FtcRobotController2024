@@ -74,6 +74,7 @@ public class DefenderCalibration extends LinearOpMode {
         boolean driven = false;
         // Shooting
         boolean aLatched = false;   // after a volley, A must be let go before the next
+        boolean ltWasDown = false;
         boolean volleyOn = false;
         int volley = 0;
         int stepsAtStart = 0, lastSteps = 0;
@@ -138,6 +139,18 @@ public class DefenderCalibration extends LinearOpMode {
                     Defender.EXTENDED_PWM = !Defender.EXTENDED_PWM;
                     defender.applyPwmRange();
                 }
+                // Left trigger: servo signal off (gravity takes the brace) / back on at the last position
+                boolean lt = gamepad1.left_trigger > 0.5;
+                if (lt && !ltWasDown) {
+                    if (defender.relaxed()) {
+                        defender.setPosition(target);
+                        event = String.format(Locale.US, "servo on again at %.3f", target);
+                    } else {
+                        defender.relax();
+                        event = "servo relaxed: no signal, gravity takes the brace";
+                    }
+                }
+                ltWasDown = lt;
 
                 // ---- Shooting: A held ----
                 if (!gamepad1.a) {
@@ -177,7 +190,8 @@ public class DefenderCalibration extends LinearOpMode {
                 if (!note.isEmpty()) {
                     telemetry.addLine("!!! " + note);
                 }
-                telemetry.addData("Brace", driven ? String.format(Locale.US, "%.3f", target) : "not driven yet");
+                telemetry.addData("Brace", defender.relaxed() ? "RELAXED (no signal; LT: back on at %.3f)"
+                        : driven ? "%.3f" : "not driven yet", target);
                 telemetry.addData("Stowed", "%s (X saves)", fmt(Defender.STOWED_POSITION));
                 telemetry.addData("Deployed", "%s (Y saves)", fmt(Defender.DEPLOYED_POSITION));
                 telemetry.addData("Flywheel", "%.0f / %.0f", shooter.flywheel().rpm(), SHOT_RPM);
@@ -186,7 +200,7 @@ public class DefenderCalibration extends LinearOpMode {
                 }
                 telemetry.addLine("A hold shoot | B stow/deploy");
                 telemetry.addLine("dpad +-0.01/0.05 | bumpers +-0.002");
-                telemetry.addLine("X/Y save | RT sweep | Start ext PWM");
+                telemetry.addLine("X/Y save | RT sweep | Start ext PWM | LT relax");
                 telemetry.addData("Port", defender.diagnostics());
             }
 
@@ -194,6 +208,7 @@ public class DefenderCalibration extends LinearOpMode {
             shooter.setRpmOverride(SHOT_RPM);
             shooter.setDistance(Double.NaN);   // applies the speed; near fire tolerance
             shooter.setSpin(gamepad1.a && !ledMode);
+            defender.update();
             String shooterEvent = shooter.update();
             if (shooterEvent != null) {
                 event = event == null ? shooterEvent : event + "; " + shooterEvent;

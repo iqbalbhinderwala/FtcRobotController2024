@@ -23,6 +23,7 @@ import org.firstinspires.ftc.teamcode.John.Auto.AutoSettings;
 import org.firstinspires.ftc.teamcode.John.Dashboard.Drawing;
 import org.firstinspires.ftc.teamcode.John.Hardware.FallbackDrive;
 import org.firstinspires.ftc.teamcode.John.Hardware.Flywheel;
+import org.firstinspires.ftc.teamcode.John.Hardware.Defender;
 import org.firstinspires.ftc.teamcode.John.Hardware.Intake;
 import org.firstinspires.ftc.teamcode.John.Hardware.Shooter;
 import org.firstinspires.ftc.teamcode.John.Pedro.Constants;
@@ -135,6 +136,8 @@ import java.util.Locale;
  *   Y                      indexer one step (90 deg) backward, to clear a jam by hand (not while firing)
  *   X                      flywheel pre-spin on / off (off at the start; see PRESPIN_IN_ZONE)
  *   left trigger           sticks linear / curved (linear at the start; see CURVED_DRIVE)
+ *   right trigger (press)  defender brace out / in (Defender; the first press folds it out). It is not
+ *                          held once there (Defender.RELAX_AFTER_MOVE). Nothing moves until pressed
  *
  * ROBOT_CENTRIC (off by default; field-centric is preferred): the left stick drives relative to the robot, "forward" toward the intake
  * B end or the intake A end (left stick button switches); turning is the same. The automatic shot is unchanged.
@@ -342,6 +345,9 @@ public class JohnTeleOp extends LinearOpMode {
         camera = new HiveCamera(hardwareMap);
         shooter = new Shooter(hardwareMap);
         Intake intake = new Intake(hardwareMap);
+        Defender defender = new Defender(hardwareMap);
+        boolean defenderTriggerDown = false;
+        Boolean defenderOut = null;   // null until the first press
         FallbackDrive fallback = new FallbackDrive(hardwareMap);
 
         AutoSettings settings = new AutoSettings(blackboard);
@@ -583,6 +589,19 @@ public class JohnTeleOp extends LinearOpMode {
                     event = "indexer one step back (unclog)";
                 }
             }
+            boolean defenderTrigger = gamepad1.right_trigger > 0.5;
+            if (defenderTrigger && !defenderTriggerDown) {
+                if (Boolean.TRUE.equals(defenderOut)) {
+                    defender.stow();
+                    defenderOut = false;
+                } else {
+                    defender.deploy();
+                    defenderOut = true;
+                }
+                event = "defender " + (defenderOut ? "OUT" : "in") + " (right trigger)";
+            }
+            defenderTriggerDown = defenderTrigger;
+            defender.update();
             if (gamepad1.leftStickButtonWasPressed()) {
                 forwardIsB = !forwardIsB;
                 event = "forward = intake " + (forwardIsB ? "B" : "A");
@@ -1036,6 +1055,9 @@ public class JohnTeleOp extends LinearOpMode {
                     shooter.trimRpm() == 0 ? "" : String.format(Locale.US, " trim %+.0f", shooter.trimRpm()),
                     PRESPIN_IN_ZONE ? " | pre-spin" : "");
             telemetry.addData("Intakes", intake.status());
+            if (defenderOut != null) {
+                telemetry.addData("Defender", defender.status() + " (RT)");
+            }
             telemetry.addData("Sticks", (CURVED_DRIVE ? "CURVED (LT)" : "linear (LT)")
                     + (HEADING_HOLD ? ", heading hold" : ""));
             if (ROBOT_CENTRIC) {
