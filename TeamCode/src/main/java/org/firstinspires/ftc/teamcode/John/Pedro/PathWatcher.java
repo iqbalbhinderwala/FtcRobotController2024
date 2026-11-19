@@ -11,6 +11,7 @@ import com.pedropathing.paths.Path;
 import com.qualcomm.robotcore.util.ElapsedTime;
 
 import java.util.Locale;
+import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 
@@ -72,6 +73,7 @@ public class PathWatcher {
     private double offSinceMs = -1;
     private String reason = "";
     private int trips;
+    private Pose lastTripPose;
     private boolean gaveUp;
 
     public PathWatcher(Follower follower, Consumer<String> log) {
@@ -143,6 +145,24 @@ public class PathWatcher {
      * at the path's end, or stopped after RETRIES + 1 trips (gaveUp()).
      */
     public Command follow(String name, Supplier<Path> plan) {
+        return follow(name, plan, RETRIES, null);
+    }
+
+    /**
+     * The same, with {@code retries} instead of RETRIES (0: give up at the first trip, e.g. to try
+     * another way at once), and on a trip, if {@code goodHere} (may be null) says where the robot
+     * is will do, it stops and holds there instead (not given up).
+     */
+    public Command follow(String name, Supplier<Path> plan, int retries, BooleanSupplier goodHere) {
+        return follow(name, plan, retries, goodHere, null);
+    }
+
+    /**
+     * The same, and it ends early, holding where the robot is, as soon as {@code doneWhen} (may be
+     * null) is true (e.g. a park drive that is already in the zone on its way).
+     */
+    public Command follow(String name, Supplier<Path> plan, int retries, BooleanSupplier goodHere,
+                          BooleanSupplier doneWhen) {
         final int[] attempt = {0};
         final boolean[] waiting = {false};
         final boolean[] finished = {false};
@@ -177,6 +197,13 @@ public class PathWatcher {
                         finished[0] = true;
                         return;
                     }
+                    if (doneWhen != null && doneWhen.getAsBoolean()) {
+                        follower.hold(follower.pose());
+                        finished[0] = true;
+                        log.accept(String.format(Locale.US, "%s: done early at (%.1f, %.1f), %.1f in of the path left", name,
+                                follower.pose().x(), follower.pose().y(), follower.remainingDistance()));
+                        return;
+                    }
                     // Stalled close to the end: as far as it goes (Pedro would never call it done)
                     Velocity vNow = follower.velocity();
                     double nowMs = timer.milliseconds();
@@ -204,8 +231,13 @@ public class PathWatcher {
                     }
                     if (check() != Trip.NONE) {
                         trips++;
+                        lastTripPose = follower.pose();
                         follower.manual(DrivePowers.zero());   // stop pushing
-                        if (attempt[0] >= RETRIES) {
+                        if (goodHere != null && goodHere.getAsBoolean()) {
+                            follower.hold(follower.pose());
+                            finished[0] = true;
+                            log.accept(name + ": " + reason + "; good enough here: stopping");
+                        } else if (attempt[0] >= retries) {
                             gaveUp = true;
                             finished[0] = true;
                             log.accept(name + ": " + reason + "; gave up after " + (attempt[0] + 1) + " tries");
@@ -454,6 +486,7 @@ public class PathWatcher {
                     Trip trip = creepCheck(remaining, cross, nearEndIn);
                     if (trip != Trip.NONE) {
                         trips++;
+                        lastTripPose = follower.pose();
                         follower.manual(DrivePowers.zero());
                         if (attempt[0] >= RETRIES) {
                             gaveUp = true;
@@ -515,6 +548,11 @@ public class PathWatcher {
     }
 
     /** Trips since the start. */
+    /** Where the robot was (field frame) at the last BLOCKED / PUSHED, or null. */
+    public Pose lastTripPose() {
+        return lastTripPose;
+    }
+
     public int trips() {
         return trips;
     }

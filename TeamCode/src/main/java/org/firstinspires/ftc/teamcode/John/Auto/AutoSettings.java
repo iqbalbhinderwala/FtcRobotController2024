@@ -28,6 +28,8 @@ import java.util.Map;
  *   B / X                red / blue alliance
  *   dpad left / right    previous / next start tile
  *   left / right bumper  start delay - / + 1 s
+ *   dpad up / down       park end: auto / audience end / far end (agree with the partner: SWARM
+ *                        needs both robots parked, in the same 23" LOADING ZONE)
  *
  * The autonomous hands its last pose and which CELL is up to the TeleOp (savePose / loadPose /
  * poseAgeS, saveUpAudience / loadUpAudience); the time stamp lets the TeleOp ignore a pose from an
@@ -59,11 +61,20 @@ public class AutoSettings {
         }
     }
 
+    /**
+     * Which end of the LOADING ZONE John parks at. AUTO: the end nearer his route, or the other one
+     * when a robot blocked him near the nearer one earlier in the Auto. AUDIENCE: the end toward
+     * the audience wall (red: the A4 / A5 seam, blue: F3 / F2); FAR: the other (red A5 / A6, blue
+     * F2 / F1). Either way, blocked on the way there, he goes to the other end.
+     */
+    public enum ParkEnd { AUTO, AUDIENCE, FAR }
+
     public static final double MAX_DELAY_S = 10.0;
 
     private static final String KEY_ALLIANCE = "john.auto.alliance";
     private static final String KEY_TILE = "john.auto.tile";
     private static final String KEY_DELAY = "john.auto.delay";
+    private static final String KEY_PARK_END = "john.auto.parkEnd";
     private static final String KEY_POSE_X = "john.pose.x";
     private static final String KEY_POSE_Y = "john.pose.y";
     private static final String KEY_POSE_H = "john.pose.heading";
@@ -73,6 +84,7 @@ public class AutoSettings {
     private Alliance alliance = Alliance.RED;
     private StartTile tile = StartTile.C1;
     private double delayS = 0.0;
+    private ParkEnd parkEnd = ParkEnd.AUTO;
 
     private boolean firstUpdate = true;
 
@@ -85,6 +97,8 @@ public class AutoSettings {
             if (t instanceof String) tile = StartTile.valueOf((String) t);
             Object d = blackboard.get(KEY_DELAY);
             if (d instanceof Number) delayS = clampDelay(((Number) d).doubleValue());
+            Object e = blackboard.get(KEY_PARK_END);
+            if (e instanceof String) parkEnd = ParkEnd.valueOf((String) e);
         } catch (IllegalArgumentException ignored) {
             // an unknown stored value: keep the defaults
         }
@@ -120,6 +134,19 @@ public class AutoSettings {
         if (pad.dpadRightWasPressed()) tile = tiles[(tile.ordinal() + 1) % tiles.length];
         if (pad.leftBumperWasPressed()) delayS = clampDelay(delayS - 1.0);
         if (pad.rightBumperWasPressed()) delayS = clampDelay(delayS + 1.0);
+        ParkEnd[] ends = ParkEnd.values();
+        if (pad.dpadUpWasPressed()) parkEnd = ends[(parkEnd.ordinal() + ends.length - 1) % ends.length];
+        if (pad.dpadDownWasPressed()) parkEnd = ends[(parkEnd.ordinal() + 1) % ends.length];
+    }
+
+    /** The park end as the drivers see it: with the seam for this alliance. */
+    public String parkEndName() {
+        boolean red = alliance == Alliance.RED;
+        switch (parkEnd) {
+            case AUDIENCE: return red ? "audience end (A4 / A5 seam)" : "audience end (F3 / F2 seam)";
+            case FAR: return red ? "far end (A5 / A6 seam)" : "far end (F2 / F1 seam)";
+            default: return "auto (nearer end; away from a block)";
+        }
     }
 
     /** Shows the settings; withControls adds the button hints (Game Setup). */
@@ -128,6 +155,7 @@ public class AutoSettings {
         telemetry.addData("Alliance", withControls ? "%s   (B red, X blue)" : "%s", alliance);
         telemetry.addData("Start tile", withControls ? "%s   (dpad left / right)" : "%s", tile);
         telemetry.addData("Start delay", withControls ? "%.0f s   (bumpers - / +)" : "%.0f s", delayS);
+        telemetry.addData("Park end", withControls ? "%s   (dpad up / down)" : "%s", parkEndName());
         telemetry.addData("Start pose (FTC)", "(%.1f, %.1f) in, %.0f deg", p.x(), p.y(), Math.toDegrees(p.heading()));
         telemetry.addLine("Place John with the camera wall flush on the audience wall, shooter facing the field.");
     }
@@ -158,16 +186,21 @@ public class AutoSettings {
         return delayS;
     }
 
+    public ParkEnd parkEnd() {
+        return parkEnd;
+    }
+
     /** Keeps the choice for the next INIT. */
     public void save(Map<String, Object> blackboard) {
         blackboard.put(KEY_ALLIANCE, alliance.name());
         blackboard.put(KEY_TILE, tile.name());
         blackboard.put(KEY_DELAY, delayS);
+        blackboard.put(KEY_PARK_END, parkEnd.name());
         String line = alliance.name() + "," + tile.name() + "," + delayS;
-        if (!line.equals(lastWritten)) {   // Game Setup saves every loop: write only on a change
+        if (!(line + parkEnd).equals(lastWritten)) {   // Game Setup saves every loop: write only on a change
             try (FileWriter w = new FileWriter(setupFile())) {
-                w.write(line + "," + System.currentTimeMillis() + "\n");
-                lastWritten = line;
+                w.write(line + "," + System.currentTimeMillis() + "," + parkEnd.name() + "\n");
+                lastWritten = line + parkEnd;
             } catch (IOException ignored) {
                 // the blackboard still has it
             }
@@ -192,6 +225,7 @@ public class AutoSettings {
             s.tile = StartTile.valueOf(parts[1]);
             s.delayS = clampDelay(Double.parseDouble(parts[2]));
             s.fileTimeMs = parts.length > 3 ? Long.parseLong(parts[3]) : 0L;
+            s.parkEnd = parts.length > 4 ? ParkEnd.valueOf(parts[4]) : ParkEnd.AUTO;
             return s;
         } catch (IOException | RuntimeException e) {
             return null;

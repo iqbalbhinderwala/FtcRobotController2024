@@ -44,6 +44,14 @@ public class Aimer {
     public static double BLEND_IN = 12.0;
     /** keepAim(): feed only within this of the aim. */
     public static double FIRE_TOLERANCE_DEG = 2.0;
+    /**
+     * keepAim() after an aim that ended "good enough" (timeout, up to AIM_MAX_ERROR_DEG off): feed
+     * within the error it accepted plus this (never more than AIM_MAX_ERROR_DEG). Match 4 of
+     * 2026-11-15 (r1173): pinned against a partner robot, the aim timed out 2.8 deg off and was
+     * accepted, then the volley held fire for 2 s (2.7 deg off, over FIRE_TOLERANCE_DEG) until the
+     * park, with five balls loaded.
+     */
+    public static double FIRE_MARGIN_AFTER_TIMEOUT_DEG = 0.5;
     /** keepAim(): pushed farther than this from the held spot, aim again from there. */
     public static double HOLD_SHIFT_IN = 2.0;
 
@@ -59,6 +67,8 @@ public class Aimer {
     private String status = "";
     private String event;
     private boolean onAim = true;
+    /** The fire tolerance of the current volley (radians): FIRE_TOLERANCE_DEG, or wider after a timeout. */
+    private double fireToleranceRad = Math.toRadians(FIRE_TOLERANCE_DEG);
 
     /** {@code camera}: a camera is there (worth waiting for a sighting). */
     public Aimer(Follower follower, CellTracker tracker, boolean camera) {
@@ -118,7 +128,7 @@ public class Aimer {
             follower.hold(aimPose);
         }
         double error = Math.abs(normalize(needed - p.heading()));
-        boolean ok = error <= Math.toRadians(FIRE_TOLERANCE_DEG);
+        boolean ok = error <= fireToleranceRad;
         if (ok != onAim && event == null) {
             event = ok ? "back on aim: feeding again"
                     : String.format(Locale.US, "off aim (%.1f deg): holding fire", Math.toDegrees(error));
@@ -134,6 +144,7 @@ public class Aimer {
         aimPose = new Pose(here.x(), here.y(), aimHeading(here));
         follower.hold(aimPose);
         onAim = true;
+        fireToleranceRad = Math.toRadians(FIRE_TOLERANCE_DEG);
         refines = 0;
         alignedSinceMs = -1;
         timer.reset();
@@ -180,7 +191,10 @@ public class Aimer {
         }
         if (now >= AIM_TIMEOUT_MS) {
             if (error <= Math.toRadians(AIM_MAX_ERROR_DEG)) {
-                status = String.format(Locale.US, "aim timeout, %.1f deg off: good enough", Math.toDegrees(error));
+                fireToleranceRad = Math.max(Math.toRadians(FIRE_TOLERANCE_DEG),
+                        Math.min(Math.toRadians(AIM_MAX_ERROR_DEG), error + Math.toRadians(FIRE_MARGIN_AFTER_TIMEOUT_DEG)));
+                status = String.format(Locale.US, "aim timeout, %.1f deg off: good enough (fires within %.1f)",
+                        Math.toDegrees(error), Math.toDegrees(fireToleranceRad));
                 event = status;
                 return Result.AIMED;
             }

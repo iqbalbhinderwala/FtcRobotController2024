@@ -241,6 +241,70 @@ public class JohnAuto extends LinearOpMode {
      * the wall). Parked like this the camera sees the HIVE, which helps the TeleOp's start check.
      */
     public static double PARK_HEADING_DEG = 0.0;
+    /**
+     * The drive to the shot-2 spot is blocked (a partner parked on it: match 4 of 2026-11-15, r1173,
+     * waited 1 s and pushed again for nothing) and John is in range of the CELL with this much
+     * tolerance (ShootingZone.problem): he shoots from there at once.
+     */
+    public static double SHOT2_BLOCKED_TOLERANCE_IN = 2.0;
+    public static double SHOT2_BLOCKED_TOLERANCE_DEG = 3.0;
+    /**
+     * Retries of the drive to the shot-2 spot after a block out of range: 0, he aims and shoots
+     * from where he was stopped. A robot parked on the spot does not move; the two retries (1 s
+     * wait and ~0.95 s pushing each) cost ~3.9 s of volley 2 in the match-4 simulation (partner on
+     * the F2 / F1 seam).
+     */
+    public static int SHOT2_RETRIES = 0;
+    /**
+     * The drive to the park approach is blocked: drive at once to the LOADING ZONE's other end, no
+     * retry of the same way (match 4, r1173: the far-end approach was in F1, where the partner had
+     * parked; two retries into it and Auto ended unparked). A robot parked next to the zone can only
+     * be at one end. The other end's approach gets the usual retries.
+     */
+    public static boolean PARK_OTHER_END_IF_BLOCKED = true;
+    /**
+     * Parking decides SWARM (LEAVE + PARK >= 16: both robots parked), so the park timer keeps this
+     * much more than the plain estimate + PARK_MARGIN_S: room for one blocked try (~0.9 s) and the
+     * way to the other end (2026-11-19; the match-4 simulations parked with 0.2-0.7 s to spare
+     * without it).
+     */
+    public static double PARK_BLOCK_RESERVE_S = 1.5;
+    /**
+     * AUTO park end: a BLOCKED / PUSHED this close (red frame) to the nearer end's approach, nearer
+     * it than the other end's, earlier in the Auto, means a robot there: park at the other end (by
+     * the lane) from the start. Match 4: blocked 19.8" from the far end's approach.
+     */
+    public static double PARK_AVOID_TRIP_IN = 30.0;
+    /**
+     * The last resort: this long before the end, not in the LOADING ZONE, John drops whatever park
+     * step runs and drives straight to the nearest spot PARK_DASH_OVERLAP_IN inside the zone, at
+     * PARK_DASH_IPS.
+     */
+    public static double PARK_DASH_S = 1.5;
+    public static double PARK_DASH_OVERLAP_IN = 3.0;
+    public static double PARK_DASH_IPS = 30.0;
+    /**
+     * The way to the other end (red frame; a partner is parked somewhere at the first end, maybe
+     * half in the zone, e.g. on the F2 / F1 seam): back off PARK_BACKOFF_IN straight out from the
+     * wall (not back along his way: pinned at an angle, that kept a corner on a robot on the seam
+     * in the simulation), then along a lane below the parking strip, turned to the park heading, to the other
+     * end's park X, and only there into the zone. The lane: John's center PARK_LANE_OFF_ZONE_IN out
+     * from the zone's line (an 18" robot against the wall sticks 6.4" out of the 11.6" zone, John's
+     * half width 8.6", 2" between). Not straight across: from match 4's shot-2 spot that line runs
+     * through a robot on the F2 / F1 seam (simulation, 2026-11-19).
+     */
+    public static double PARK_BACKOFF_IN = 3.0;
+    public static double PARK_LANE_OFF_ZONE_IN = 17.0;
+    /** The lane ends this far out from the park spot; from there into the zone (the shortcut below then creeps in). */
+    public static double PARK_LANE_RISE_STOP_IN = 4.0;
+    /**
+     * On the way to a park approach (outside the LOADING ZONE), John already overlaps the zone by
+     * this much both ways: he leaves the approach out and drives straight from there to the park
+     * spot (the last stretch, at PARK_SPEED_IPS). The match-4 simulation (2026-11-19): going to the
+     * other end, the drive crossed the zone, left it for the approach and came back in. If that last
+     * stretch is blocked, he stays (already partly in, parkElsewhere).
+     */
+    public static double PARK_STOP_OVERLAP_IN = 4.0;
     /** If the park is blocked (and John is not partly in yet): a spot this much shallower (never deeper). */
     public static double PARK_ALT_OFFSET_IN = 5.0;
     /** Red LOADING ZONE (FTC); PARK scores when the robot is partly inside (by at least PARK_OVERLAP_IN). */
@@ -410,6 +474,7 @@ public class JohnAuto extends LinearOpMode {
         boolean haveSettings = AutoSettings.isSaved(blackboard);
         AutoSettings settings = new AutoSettings(blackboard);
         blue = settings.alliance() == AutoSettings.Alliance.BLUE;
+        parkEnd = settings.parkEnd();
         tracker = new CellTracker(!blue);
         aimer = new Aimer(follower, tracker, camera.available());
         TagLocalizer startFix = new TagLocalizer(START_SAMPLES);
@@ -500,7 +565,7 @@ public class JohnAuto extends LinearOpMode {
         Scheduler.schedule(sequential(
                 waitMs(settings.delayS() * 1000.0),
                 race(mainRoutine(), waitUntil(() ->
-                        AUTO_S - autoSeconds() <= parkSeconds(follower.pose()) + PARK_MARGIN_S)),
+                        AUTO_S - autoSeconds() <= parkSeconds(follower.pose()) + PARK_MARGIN_S + PARK_BLOCK_RESERVE_S)),
                 instant(() -> {
                     if (!routineDone) {
                         logEvent(String.format(Locale.US, "time to park: %.1f s left, park about %.1f s from %s",
@@ -513,7 +578,9 @@ public class JohnAuto extends LinearOpMode {
                 }),
                 lazy(() -> routineDone ? label("park")
                         : instant(() -> step = "park")),   // forced by the time: no Y
-                limit("park", PARK_MAX_S, lazy(this::park)),
+                race(limit("park", PARK_MAX_S, lazy(this::park)),
+                        waitUntil(() -> AUTO_S - autoSeconds() <= PARK_DASH_S && !inLoadingZone(red(follower.pose())))),
+                lazy(() -> inLoadingZone(red(follower.pose())) ? instant(() -> { }) : parkDash()),
                 instant(() -> step = "done")));
 
         lastLoopS = clock.seconds();
@@ -634,8 +701,9 @@ public class JohnAuto extends LinearOpMode {
                             label("to shot 2, aim 2, shoot 2"),
                             guard("shot 2", this::shotSeconds, this::shotEnd, () -> limit("shot 2", SHOT_MAX_S, sequential(
                                     lazy(this::toShootingSpot),
-                                    aim(),
-                                    volley("volley 2", Shooter.INDEXER_STEPS_PER_VOLLEY, 0)))));
+                                    ifInRange("volley 2", () -> sequential(
+                                            aim(),
+                                            volley("volley 2", Shooter.INDEXER_STEPS_PER_VOLLEY, 0)))))));
                 }),
                 instant(() -> routineDone = true));
     }
@@ -800,8 +868,9 @@ public class JohnAuto extends LinearOpMode {
                             label(name + ": to the other side"),
                             guard(name + ": the other side", this::shotSeconds, this::shotEnd, () -> sequential(
                                     lazy(this::toShootingSpot),
-                                    aim(),
-                                    volley(name, Math.max(1, left[0]), switches + 1))));
+                                    ifInRange(name, () -> sequential(
+                                            aim(),
+                                            volley(name, Math.max(1, left[0]), switches + 1))))));
                 }));
     }
 
@@ -920,6 +989,31 @@ public class JohnAuto extends LinearOpMode {
     }
 
     /**
+     * {@code shoot} only if John is in range of the up CELL now (ShootingZone.problem with the
+     * SHOT2_BLOCKED_TOLERANCE_* tolerance); else he keeps the balls (for the TeleOp) and the routine
+     * goes on, i.e. to the park. A block on the way to the spot, or no spot on the field, leaves him
+     * out of range: a ball from there would likely miss (2026-11-19: 40.8" from the CELL, under the
+     * speed table's 42", in the match-4 simulation).
+     */
+    private Command ifInRange(String name, java.util.function.Supplier<Command> shoot) {
+        return lazy(() -> {
+            Pose p = follower.pose();
+            double[] c = tracker.target();
+            String problem = ShootingZone.problem(p.x(), p.y(), c[0], c[1], tracker.upAudience(),
+                    SHOT2_BLOCKED_TOLERANCE_IN, SHOT2_BLOCKED_TOLERANCE_DEG);
+            if (problem == null) {
+                return shoot.get();
+            }
+            return instant(() -> {
+                follower.hold(follower.pose());
+                shooter.setSpin(false);
+                spinGoal = null;
+                logEvent(name + ": not in range at " + Drawing.format(p) + " (" + problem + "): keeping the balls");
+            });
+        });
+    }
+
+    /**
      * To the nearest spot in the up CELL's shooting zone (ShootingZone, on our half, around the HIVE
      * frame), turning to the shooting heading on the way; nothing if already in range.
      */
@@ -942,16 +1036,88 @@ public class JohnAuto extends LinearOpMode {
                 Drawing.format(goal)));
         return sequential(
                 instant(() -> spinGoal = goal),   // the main loop spins up SPIN_LEAD_S before the end
-                watcher.follow("to shot 2", () -> aimedRoute(goal)));
+                watcher.follow("to shot 2", () -> aimedRoute(goal), SHOT2_RETRIES, () -> {
+                    Pose p = follower.pose();
+                    double[] c = tracker.target();
+                    return ShootingZone.problem(p.x(), p.y(), c[0], c[1], tracker.upAudience(),
+                            SHOT2_BLOCKED_TOLERANCE_IN, SHOT2_BLOCKED_TOLERANCE_DEG) == null;
+                }));
     }
 
     /**
-     * Around the HIVE frame to the LOADING ZONE; the last stretch slow. If that is blocked: stay when
+     * Around the HIVE frame to the LOADING ZONE; the last stretch slow. The way to the nearer end
+     * blocked: the other end at once (PARK_OTHER_END_IF_BLOCKED). The last stretch blocked: stay when
      * already partly in the LOADING ZONE, else try the other spots along it.
      */
     private Command park() {
+        Pose here = red(follower.pose());
+        boolean nearer = fromAudienceSide(here);
+        boolean fromAudience = parkFromAudience(here);
+        logEvent("park end: " + (fromAudience ? "audience" : "far") + " (" + parkEndWhy + ")");
+        // Not the nearer end: something is (or the partner parks) at the nearer one; the lane keeps
+        // clear of the parking strip there
+        return fromAudience == nearer ? parkAt(fromAudience, PARK_OTHER_END_IF_BLOCKED) : parkOtherEnd(fromAudience);
+    }
+
+    private AutoSettings.ParkEnd parkEnd = AutoSettings.ParkEnd.AUTO;
+    private String parkEndWhy = "";
+
+    /** The end to park at (red frame pose): Game Setup's, else the nearer one unless a block was near it. */
+    private boolean parkFromAudience(Pose red) {
+        if (parkEnd != AutoSettings.ParkEnd.AUTO) {
+            parkEndWhy = "Game Setup";
+            return parkEnd == AutoSettings.ParkEnd.AUDIENCE;
+        }
+        boolean nearer = fromAudienceSide(red);
+        Pose trip = watcher.lastTripPose();
+        if (trip != null) {
+            Pose t = red(trip);
+            double dNear = distance(t, parkApproach(nearer)), dOther = distance(t, parkApproach(!nearer));
+            if (dNear < PARK_AVOID_TRIP_IN && dNear < dOther) {
+                parkEndWhy = String.format(Locale.US, "away from the block at %s, %.0f in from the %s end",
+                        Drawing.format(trip), dNear, nearer ? "audience" : "far");
+                return !nearer;
+            }
+        }
+        parkEndWhy = "the nearer end";
+        return nearer;
+    }
+
+    /** The park approach of one end (red frame). */
+    private static Pose parkApproach(boolean fromAudience) {
+        double side = fromAudience ? 1.0 : -1.0;
+        return new Pose(parkX(fromAudience) + side * PARK_APPROACH_OUT_IN, parkY() + PARK_APPROACH_OFF_WALL_IN,
+                Math.toRadians(PARK_HEADING_DEG));
+    }
+
+    private static double distance(Pose a, Pose b) {
+        return Math.hypot(a.x() - b.x(), a.y() - b.y());
+    }
+
+    /**
+     * The last resort (PARK_DASH_S before the end, not in the LOADING ZONE): straight to the
+     * nearest spot PARK_DASH_OVERLAP_IN inside it, keeping the heading.
+     */
+    private Command parkDash() {
+        Pose red = red(follower.pose());
+        double c = Math.abs(Math.cos(red.heading())), s = Math.abs(Math.sin(red.heading()));
+        double halfX = RobotGeometry.LENGTH_IN / 2.0 * c + RobotGeometry.WIDTH_IN / 2.0 * s;
+        double halfY = RobotGeometry.LENGTH_IN / 2.0 * s + RobotGeometry.WIDTH_IN / 2.0 * c;
+        double x = Math.max(LOADING_ZONE_MIN_X + PARK_DASH_OVERLAP_IN - halfX,
+                Math.min(LOADING_ZONE_MAX_X - PARK_DASH_OVERLAP_IN + halfX, red.x()));
+        double y = Math.max(RED_WALL_Y + halfY + 0.5, Math.min(LOADING_ZONE_MAX_Y - PARK_DASH_OVERLAP_IN + halfY, red.y()));
+        Pose spot = new Pose(x, y, red.heading());
+        logEvent(String.format(Locale.US, "park: %.1f s left, NOT in the LOADING ZONE: straight to (%.1f, %.1f)",
+                AUTO_S - autoSeconds(), field(spot).x(), field(spot).y()));
+        return sequential(
+                watcher.creep("park dash", () -> field(spot), PARK_DASH_IPS),
+                instant(() -> logEvent((inLoadingZone(red(follower.pose())) ? "parked (dash) at " : "park dash ended NOT in the LOADING ZONE at ")
+                        + Drawing.format(follower.pose()))));
+    }
+
+    /** Park at one end of the LOADING ZONE; {@code otherEndIfBlocked}: no retries on the way there. */
+    private Command parkAt(boolean fromAudience, boolean otherEndIfBlocked) {
         double heading = Math.toRadians(PARK_HEADING_DEG);
-        boolean fromAudience = fromAudienceSide(red(follower.pose()));
         double side = fromAudience ? 1.0 : -1.0;   // +X: the A4 side, -X: the A6 side
         double parkX = parkX(fromAudience);
         Pose approach = new Pose(parkX + side * PARK_APPROACH_OUT_IN, parkY() + PARK_APPROACH_OFF_WALL_IN, heading);
@@ -960,7 +1126,83 @@ public class JohnAuto extends LinearOpMode {
                 fromAudience ? "A4 / A5" : "A5 / A6", parkX, parkY(), fromAudience ? "audience" : "far",
                 Drawing.format(follower.pose())));
         return sequential(
-                watcher.follow("park: around the HIVE", () -> around(field(approach), 0)),
+                watcher.follow("park: around the HIVE", () -> around(field(approach), 0),
+                        otherEndIfBlocked ? 0 : PathWatcher.RETRIES, null,
+                        () -> inLoadingZone(red(follower.pose()), PARK_STOP_OVERLAP_IN)),
+                lazy(() -> !watcher.gaveUp() && inLoadingZone(red(follower.pose()), PARK_STOP_OVERLAP_IN)
+                        ? sequential(
+                                instant(() -> logEvent("park: in the LOADING ZONE on the way at " + Drawing.format(follower.pose())
+                                        + ": straight to the park spot")),
+                                parkFinish(parkX, side, parkPose))
+                        : watcher.gaveUp() && otherEndIfBlocked && !inLoadingZone(red(follower.pose()))
+                        ? sequential(
+                                instant(() -> logEvent("park: the way to the " + (fromAudience ? "audience" : "far")
+                                        + " end is blocked: parking at the other end")),
+                                parkOtherEnd(!fromAudience))
+                        : parkFinish(parkX, side, parkPose)));
+    }
+
+    /**
+     * After the way to one end was blocked: back off out from the wall,
+     * along the lane below the parking strip to the other end's park X, up into the zone; once 4"
+     * in (PARK_STOP_OVERLAP_IN), the last stretch straight to the park spot.
+     */
+    private Command parkOtherEnd(boolean fromAudience) {
+        double heading = Math.toRadians(PARK_HEADING_DEG);
+        double side = fromAudience ? 1.0 : -1.0;
+        double parkX = parkX(fromAudience);
+        Pose parkPose = new Pose(parkX, parkY(), heading);
+        double laneY = LOADING_ZONE_MAX_Y + PARK_LANE_OFF_ZONE_IN;
+        final boolean[] backedOff = {false};
+        logEvent(String.format(Locale.US, "park on the %s seam at (%.1f, %.1f): back off %.0f in, along the lane at Y %.1f, then in",
+                fromAudience ? "A4 / A5" : "A5 / A6", parkX, parkY(), PARK_BACKOFF_IN, laneY));
+        return sequential(
+                watcher.follow("park: the lane", () -> {
+                    // red frame points; the back-off keeps the heading, the next leg turns to the park heading
+                    Pose here = red(follower.pose());
+                    List<Pose> pts = new ArrayList<>();
+                    pts.add(here);
+                    if (!backedOff[0]) {   // only the first plan: on a retry he is already off
+                        backedOff[0] = true;
+                        // straight out from the red wall: robots parked along it are what blocked him
+                        pts.add(new Pose(here.x(), here.y() + PARK_BACKOFF_IN, here.heading()));
+                    }
+                    int turnLeg = pts.size() - 1;   // the first leg after the back-off
+                    Pose last = pts.get(pts.size() - 1);
+                    if (last.y() < laneY - 1.0) {   // nearer the red wall than the lane: out to it first
+                        pts.add(new Pose(last.x(), laneY, heading));
+                    }
+                    for (Pose q : new Pose[]{new Pose(parkX, laneY, heading), new Pose(parkX, parkY() + PARK_LANE_RISE_STOP_IN, heading)}) {
+                        Pose prev = pts.get(pts.size() - 1);
+                        if (Math.hypot(q.x() - prev.x(), q.y() - prev.y()) > 1.0) {   // no tiny legs
+                            pts.add(q);
+                        }
+                    }
+                    if (pts.size() == 1) {   // already at the rise's end: straight in
+                        pts.add(parkPose);
+                    }
+                    Path[] legs = new Path[pts.size() - 1];
+                    for (int i = 0; i < legs.length; i++) {
+                        Pose a = field(pts.get(i)), b = field(pts.get(i + 1));
+                        legs[i] = i < turnLeg ? line(a, b).constant(a)
+                                : i == turnLeg ? line(a, b).linear(a, b) : line(a, b).constant(b);
+                    }
+                    return legs.length == 1 ? legs[0] : path(legs);
+                }, PathWatcher.RETRIES, null, () -> inLoadingZone(red(follower.pose()), PARK_STOP_OVERLAP_IN)),
+                lazy(() -> {
+                    if (!watcher.gaveUp() || inLoadingZone(red(follower.pose()))) {
+                        return parkFinish(parkX, side, parkPose);
+                    }
+                    return instant(() -> {
+                        follower.manual(DrivePowers.zero());
+                        logEvent("park: the other end is blocked too, NOT in the LOADING ZONE at " + Drawing.format(follower.pose()));
+                    });
+                }));
+    }
+
+    /** The last park stretch along the wall, then the blocked-park fallbacks. */
+    private Command parkFinish(double parkX, double side, Pose parkPose) {
+        return sequential(
                 watcher.creep("park", () -> field(parkPose), PARK_SPEED_IPS),
                 lazy(() -> {
                     if (!watcher.gaveUp()) {
@@ -1014,13 +1256,18 @@ public class JohnAuto extends LinearOpMode {
 
     /** True when the robot (red frame) overlaps the red LOADING ZONE by at least PARK_OVERLAP_IN both ways. */
     private static boolean inLoadingZone(Pose red) {
+        return inLoadingZone(red, PARK_OVERLAP_IN);
+    }
+
+    /** True when the robot (red frame) overlaps the red LOADING ZONE by at least {@code overlapIn} both ways. */
+    private static boolean inLoadingZone(Pose red, double overlapIn) {
         double c = Math.abs(Math.cos(red.heading()));
         double s = Math.abs(Math.sin(red.heading()));
         double halfX = RobotGeometry.LENGTH_IN / 2.0 * c + RobotGeometry.WIDTH_IN / 2.0 * s;
         double halfY = RobotGeometry.LENGTH_IN / 2.0 * s + RobotGeometry.WIDTH_IN / 2.0 * c;
         double overlapX = Math.min(red.x() + halfX, LOADING_ZONE_MAX_X) - Math.max(red.x() - halfX, LOADING_ZONE_MIN_X);
         double overlapY = Math.min(red.y() + halfY, LOADING_ZONE_MAX_Y) - Math.max(red.y() - halfY, RED_WALL_Y);
-        return overlapX >= PARK_OVERLAP_IN && overlapY >= PARK_OVERLAP_IN;
+        return overlapX >= overlapIn && overlapY >= overlapIn;
     }
 
     // =========================================================================
@@ -1063,7 +1310,14 @@ public class JohnAuto extends LinearOpMode {
 
     /** Estimated park time from a pose (field frame): around the HIVE to the approach, then slow. */
     private double parkSeconds(Pose from) {
-        boolean fromAudience = fromAudienceSide(red(from));
+        Pose red = red(from);
+        boolean fromAudience = parkFromAudience(red);
+        if (fromAudience != fromAudienceSide(red)) {   // the other end, by the lane (parkOtherEnd)
+            double laneY = LOADING_ZONE_MAX_Y + PARK_LANE_OFF_ZONE_IN;
+            double length = PARK_BACKOFF_IN + Math.abs(red.y() - laneY) + Math.abs(red.x() - parkX(fromAudience))
+                    + Math.abs(laneY - parkY());
+            return length / AVG_DRIVE_IPS + PARK_OVERHEAD_S;
+        }
         double parkX = parkX(fromAudience);
         double side = fromAudience ? 1.0 : -1.0;
         Pose approach = field(new Pose(parkX + side * PARK_APPROACH_OUT_IN, parkY() + PARK_APPROACH_OFF_WALL_IN,
