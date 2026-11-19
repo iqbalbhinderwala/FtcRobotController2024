@@ -1,5 +1,6 @@
 package org.firstinspires.ftc.teamcode.John.TeleOp;
 
+import org.firstinspires.ftc.teamcode.John.FieldGeometry;
 import static com.pedropathing.api.Paths.line;
 import static com.pedropathing.api.Paths.path;
 
@@ -1130,7 +1131,7 @@ public class JohnTeleOp extends LinearOpMode {
      */
     private static Pose backWallPose(Pose pose) {
         boolean audience = pose.x() >= 0;
-        double x = (72.0 - RobotGeometry.WIDTH_IN / 2.0) * (audience ? 1.0 : -1.0);
+        double x = (FieldGeometry.WALL - RobotGeometry.WIDTH_IN / 2.0) * (audience ? 1.0 : -1.0);
         return new Pose(x, pose.y(), Math.toRadians(audience ? 90.0 : -90.0));
     }
 

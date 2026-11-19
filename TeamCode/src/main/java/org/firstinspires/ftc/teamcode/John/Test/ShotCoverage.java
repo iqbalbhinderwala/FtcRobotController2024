@@ -1,5 +1,6 @@
 package org.firstinspires.ftc.teamcode.John.Test;
 
+import org.firstinspires.ftc.teamcode.John.FieldGeometry;
 import com.pedropathing.math.Pose;
 
 
@@ -295,7 +296,7 @@ public class ShotCoverage {
         double c = Math.abs(Math.cos(heading)), sn = Math.abs(Math.sin(heading));
         double halfX = RobotGeometry.LENGTH_IN / 2.0 * c + RobotGeometry.WIDTH_IN / 2.0 * sn;
         double halfY = RobotGeometry.LENGTH_IN / 2.0 * sn + RobotGeometry.WIDTH_IN / 2.0 * c;
-        double edge = 72.0 - WALL_GAP_IN;
+        double edge = FieldGeometry.WALL - WALL_GAP_IN;
         double x = Math.max(-edge + halfX, Math.min(edge - halfX, x0));
         double y = Math.max(-edge + halfY, Math.min(edge - halfY, y0));
         return new double[]{x, y, ShootingZone.shootingHeading(x, y, cellX, cellY), Math.hypot(x - x0, y - y0)};

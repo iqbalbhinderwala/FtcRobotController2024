@@ -1,5 +1,6 @@
 package org.firstinspires.ftc.teamcode.John.Vision;
 
+import org.firstinspires.ftc.teamcode.John.FieldGeometry;
 import com.pedropathing.math.Pose;
 
 import java.util.ArrayDeque;
@@ -96,7 +97,7 @@ public class TagLocalizer {
         if (count() < minSamples) {
             return wall;
         }
-        double limit = 72.0 - robotHalfAlongWall;
+        double limit = FieldGeometry.WALL - robotHalfAlongWall;
         return new Pose(wall.x(), Math.max(-limit, Math.min(limit, y())), wall.heading());
     }
 

@@ -10,7 +10,8 @@ import org.firstinspires.ftc.teamcode.John.Hardware.Shooter;
  *
  *  - [John] Auto TEST square (JohnAutoTestSquare): the GARDEN square (0 deg) with the diagonal wall touch, one back-off
  *    and second push on a stall, and the gradual flywheel raise for volley 2 (ball 2 waits less).
- *  - [John] Auto TEST 15 deg (JohnAutoTest15): the same with the GARDEN angled 15 deg.
+ *  (A 15 deg variant was dropped on 2026-11-15: at the practice field the angled corner stalled
+ *  against the wall.)
  *
  * The variant is the first event in the log ("variant: ...").
  */
@@ -42,7 +43,7 @@ public abstract class JohnAutoTest extends JohnAuto {
     protected static void newFeatures(double angleDeg, String name) {
         GARDEN_ANGLE_DEG = angleDeg;
         GARDEN_TOUCH = true;
-        GARDEN_END_RETRIES = 1;
+        GARDEN_END_RETRIES = 0;   // the back-off cost 2 s and gained nothing (r1149): off
         Shooter.PRESPIN_RAMP_RPM_PER_S = 150;
         VARIANT = name;
     }

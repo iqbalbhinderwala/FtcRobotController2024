@@ -54,7 +54,7 @@ public class ShootingZone {
     /** squareRoute(): no leg shorter than this next to an entry / exit point (see dropShortLegs()). */
     public static double MIN_LEG_IN = 6.0;
 
-    private static final double FIELD_HALF = 72.0;
+    private static final double FIELD_HALF = FieldGeometry.WALL;
 
     private ShootingZone() {}
 

@@ -62,6 +62,22 @@ public class Shooter {
      */
     public static double FIRE_ABOVE_WAIT_MS = 500;
     /**
+     * Steps past this many in a volley are spares (for a ball that comes late): they fire without the
+     * upper speed limit. With no ball left to pull it down the flywheel runs 100-150 RPM fast, and the
+     * spare step waited 2.2 s for it (Auto r1152).
+     */
+    public static int BALLS_PER_VOLLEY = 4;
+    /**
+     * The first ball of a volley: the flywheel aims this far from the table speed and the ball fires
+     * once within FIRST_BALL_BELOW_RPM under that (at most FIRE_ABOVE_RPM over); from the second ball
+     * on, the table speed. Shot Calibration's first balls left about 50 RPM slower than Auto's (each
+     * volley there fired right at the hand-off from the boost, ~100 under the set speed, and the
+     * flywheel was still climbing as the ball went through); the first ball of volley 1 went long in
+     * r1149 and r1152 (fired at 2143, the flywheel 2228-2271 as it went through, target 2208).
+     */
+    public static double FIRST_BALL_OFFSET_RPM = -50;
+    public static double FIRST_BALL_BELOW_RPM = 40;
+    /**
      * While only spinning (setSpin, no volley) the flywheel waits this far from the table speed; the
      * volley then raises it to the table speed. Shot Calibration (r1071) spun up from rest for every
      * volley, so its balls left while the speed was still rising: 29-93 RPM under the set speed
@@ -212,7 +228,8 @@ public class Shooter {
     public String update() {
         event = null;
         if (!Double.isNaN(baseRpm)) {
-            double desired = feed == Feed.IDLE ? baseRpm + PRESPIN_OFFSET_RPM : baseRpm;
+            double desired = feed == Feed.IDLE ? baseRpm + PRESPIN_OFFSET_RPM
+                    : feed == Feed.SPIN_UP && stepsDone == 0 ? baseRpm + FIRST_BALL_OFFSET_RPM : baseRpm;
             double dt = Math.min(0.1, rampTimer.seconds());
             rampTimer.reset();
             // Up gradually only from a spinning flywheel; from rest (or down) straight to the speed
@@ -241,7 +258,10 @@ public class Shooter {
             return;
         }
         double tolerance = fireToleranceRpm(distance);
-        boolean inWindow = flywheel.within(tolerance, Math.min(FIRE_ABOVE_RPM, tolerance));
+        boolean firstBall = feed == Feed.SPIN_UP && stepsDone == 0;
+        boolean inWindow = firstBall
+                ? flywheel.within(FIRST_BALL_BELOW_RPM, FIRE_ABOVE_RPM)   // around the lowered first-ball target
+                : flywheel.within(tolerance, Math.min(FIRE_ABOVE_RPM, tolerance));
         boolean above = !inWindow && flywheel.rpm() > flywheel.targetRpm();
         double loopMs = Math.min(100.0, fastTimer.milliseconds());
         fastTimer.reset();
@@ -251,8 +271,9 @@ public class Shooter {
             aboveMs += loopMs;   // a reading past the tolerance does not start the wait over
         }
         boolean fastButClose = above && flywheel.within(tolerance);
+        boolean spare = stepsDone >= BALLS_PER_VOLLEY && flywheel.within(tolerance, Double.POSITIVE_INFINITY);
         boolean ready = !paused
-                && (flywheel.closedLoop() ? inWindow || (fastButClose && aboveMs >= FIRE_ABOVE_WAIT_MS)
+                && (flywheel.closedLoop() ? inWindow || spare || (fastButClose && aboveMs >= FIRE_ABOVE_WAIT_MS)
                 : flywheel.onSeconds() * 1000.0 >= OPEN_LOOP_SPIN_UP_MS);
         switch (feed) {
             case SPIN_UP:

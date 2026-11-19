@@ -1,5 +1,6 @@
 package org.firstinspires.ftc.teamcode.John.Vision;
 
+import org.firstinspires.ftc.teamcode.John.FieldGeometry;
 import com.acmerobotics.dashboard.config.Config;
 import com.pedropathing.math.Pose;
 
@@ -42,7 +43,7 @@ public class WallFinder {
     }
 
     private static double wallX() {
-        return 72.0 - RobotGeometry.WIDTH_IN / 2.0;
+        return FieldGeometry.WALL - RobotGeometry.WIDTH_IN / 2.0;
     }
 
     /** How far the tags' X is from the audience / far wall position (inches), or infinity. */

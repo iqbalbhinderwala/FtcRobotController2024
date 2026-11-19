@@ -22,10 +22,11 @@ import com.qualcomm.robotcore.hardware.ServoImplEx;
 public class Defender {
 
     /**
-     * Servo position folded into the robot (John v2, 2026-11-14: 0.35; v1 0.2, the brace vertical at
-     * 0.5). NaN would mean not calibrated: stow() then does nothing.
+     * Servo position folded into the robot (John v2: 0.35 on 2026-11-14, 0.275 then 0.2 on 2026-11-15,
+     * halfway back toward v1's 0.2; the brace is vertical at 0.5). NaN would mean not calibrated:
+     * stow() then does nothing.
      */
-    public static double STOWED_POSITION = 0.35;
+    public static double STOWED_POSITION = 0.2;
     /** Servo position folded out, close to horizontal (calibrated 2026-11-07: 0.8; v2 the same). */
     public static double DEPLOYED_POSITION = 0.8;
     /** Brace straight up (2026-11-07). */

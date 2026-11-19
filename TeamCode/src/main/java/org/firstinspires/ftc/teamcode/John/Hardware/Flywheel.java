@@ -87,7 +87,7 @@ public class Flywheel {
      * John v2: 25 (v1 10), so an overshoot or a slow drift comes back faster; with only F and P 10 a
      * spin-up overshoot of ~100 RPM took seconds to fade, and Shooter.FIRE_ABOVE_RPM now waits for it.
      */
-    public static double P = 25.0;
+    public static double P = 10.0;   // back to 10 (2026-11-15): with 25 the first ball of a volley went long (r1149)
     /** Small: F does the holding; I only corrects slow drift (r0046: 0 / 0.5 / 1 all fine, 3 once overshot). */
     /**
      * John v2: 0. The calibration (r1057, no balls) picked 1.0, but in Auto r1061 / r1063 the I term

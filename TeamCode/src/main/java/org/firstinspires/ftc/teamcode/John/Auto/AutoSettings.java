@@ -1,5 +1,6 @@
 package org.firstinspires.ftc.teamcode.John.Auto;
 
+import org.firstinspires.ftc.teamcode.John.FieldGeometry;
 import com.pedropathing.math.Pose;
 import com.qualcomm.robotcore.hardware.Gamepad;
 
@@ -137,8 +138,8 @@ public class AutoSettings {
     }
 
     public static Pose startPose(Alliance alliance, StartTile tile) {
-        // Camera wall flush on the audience wall (X = 72): the robot's width is along field X
-        double x = 72.0 - RobotGeometry.WIDTH_IN / 2.0;
+        // Camera wall flush on the audience wall (X = FieldGeometry.WALL): the robot's width is along field X
+        double x = FieldGeometry.WALL - RobotGeometry.WIDTH_IN / 2.0;
         double heading = Math.toRadians(90.0);   // shooter (left side) faces away from the wall
         return alliance == Alliance.RED
                 ? new Pose(x, tile.redY, heading)

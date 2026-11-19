@@ -1,5 +1,6 @@
 package org.firstinspires.ftc.teamcode.John.Auto;
 
+import org.firstinspires.ftc.teamcode.John.FieldGeometry;
 import static com.pedropathing.api.Paths.line;
 import static com.pedropathing.api.Paths.path;
 import static com.pedropathing.ivy.commands.Commands.instant;
@@ -129,17 +130,17 @@ public class JohnAuto extends LinearOpMode {
 
     // ---- Red positions, FTC field coordinates (inches); blue is reflected ----
     /** Audience wall and red wall. */
-    public static double AUDIENCE_WALL_X = 72.0;
-    public static double RED_WALL_Y = -72.0;
+    public static double AUDIENCE_WALL_X = FieldGeometry.WALL;
+    public static double RED_WALL_Y = -FieldGeometry.WALL;
     /** Gap kept from a wall when driving along it. */
     public static double WALL_GAP = 0.5;
     /** Extra room between the turning robot's corner and the wall. */
     public static double TURN_MARGIN = 0.5;
     /** GARDEN: the 4 balls lie along the audience wall; the first (farthest from the corner) at this Y. */
-    public static double GARDEN_FIRST_BALL_Y = -61.9;
+    public static double GARDEN_FIRST_BALL_Y = -FieldGeometry.WALL + 10.1;   // 10.1" from the red wall (was -61.9 with the wall at 72)
     public static double BALL_RADIUS = 1.4;
     /** Start the slow stretch this far before intake A reaches the first ball. */
-    public static double SLOW_BEFORE_BALL_IN = 4.0;
+    public static double SLOW_BEFORE_BALL_IN = 2.0;   // 2 (was 4): r1149 / r1152 slowed down with room to spare
     /**
      * The fast run along the audience wall to the GARDEN: this far off the wall and no faster than
      * this (0 = no cap); the slow stretch through the balls then slides onto the wall (WALL_GAP).
@@ -184,7 +185,13 @@ public class JohnAuto extends LinearOpMode {
      * stretch first: not used. It only counts if he moved at least GARDEN_TOUCH_MIN_MOVE_IN toward the
      * wall first (he starts GARDEN_RUN_GAP_IN off it).
      */
-    public static double GARDEN_TOUCH_POWER = 0.35;
+    public static double GARDEN_TOUCH_POWER = 0.35;   // to break free sideways
+    /**
+     * A gentle tap: once moving sideways, the sideways power holds about this speed (2026-11-15 practice
+     * field: at a constant 0.35 John met the wall at 5-5.7 in/s, shaking the balls along it).
+     */
+    public static double GARDEN_TOUCH_SIDE_IPS = 2.5;
+    public static double GARDEN_TOUCH_MIN_POWER = 0.18;
     public static double GARDEN_TOUCH_FORWARD = 0.20;
     public static double GARDEN_TOUCH_LEAD_IN = 12.0;
     public static double GARDEN_TOUCH_MIN_MOVE_IN = 0.3;
@@ -193,7 +200,11 @@ public class JohnAuto extends LinearOpMode {
      * GARDEN_RUN_GAP_IN (that margin was for odometry error, which the touch measured): with 1.0 the
      * corner moved 1" back off the wall right after touching it.
      */
-    public static double GARDEN_TOUCHED_GAP_IN = 0.3;
+    /**
+     * +0.25: just off the wall (the tap measured it to ~0.3"). Riding it at -0.25 (into the wall) rubbed:
+     * the creep slowed to 2-3 in/s and John caught the wall crease at the B/C tile seam (match 1, r1164).
+     */
+    public static double GARDEN_TOUCHED_GAP_IN = 0.25;
     public static double GARDEN_TOUCH_MAX_S = 1.5;
     public static double GARDEN_TOUCH_MAX_FIX_IN = 2.5;
     /** The touch is done once slower than this SIDEWAYS for GARDEN_TOUCH_STILL_MS (after GARDEN_TOUCH_GRACE_MS). */
@@ -231,7 +242,7 @@ public class JohnAuto extends LinearOpMode {
     /** Red LOADING ZONE (FTC); PARK scores when the robot is partly inside (by at least PARK_OVERLAP_IN). */
     public static double LOADING_ZONE_MIN_X = -48.0;
     public static double LOADING_ZONE_MAX_X = -24.0;
-    public static double LOADING_ZONE_MAX_Y = -60.4;
+    public static double LOADING_ZONE_MAX_Y = -FieldGeometry.WALL + 11.6;   // 11.6" from the red wall (was -60.4 with the wall at 72)
     public static double PARK_OVERLAP_IN = 1.0;
     /**
      * Before the last park stretch: just off the red wall, this far outside the seam John parks on, at
@@ -318,8 +329,8 @@ public class JohnAuto extends LinearOpMode {
     public static double AVG_DRIVE_IPS = 40.0;
     public static double DRIVE_OVERHEAD_S = 0.6;
     public static double PARK_OVERHEAD_S = 1.0;
-    public static double AIM_S = 1.2;
-    public static double VOLLEY_S = 3.5;
+    public static double AIM_S = 0.8;   // John v2: the aim takes ~0.7 s (was 1.2)
+    public static double VOLLEY_S = 3.2;   // John v2: 5 steps in 3.0-3.4 s (was 3.5)
     /** Hard limits per stage (seconds): past them the stage is dropped and the routine goes on. */
     public static double STEP_AIM_MAX_S = 6.0;
     public static double VOLLEY_MAX_S = 9.0;
@@ -841,16 +852,20 @@ public class JohnAuto extends LinearOpMode {
         // Intake A is at the robot's -X end, which points toward the red wall (-Y) at heading 90
         double slowY = gardenSlowY(runHeading, runX);
         double endY = RED_WALL_Y + halfLength + GARDEN_END_GAP_IN;
-        Pose touchAt = new Pose(squareRunX, Math.min(here.y(), slowY + (GARDEN_TOUCH ? GARDEN_TOUCH_LEAD_IN : 0.0)), heading);
+        // The wall tap right where John reaches the wall line (not GARDEN_TOUCH_LEAD_IN before the balls:
+        // the tap drives forward slowly, and r1149 / r1152 crept ~15" at 5 in/s); then the fast run
+        Pose touchAt = new Pose(squareRunX, here.y(), heading);
         gardenFixX = 0.0;
         gardenTouched = false;
         // The angled run line: from the wall touch when it worked (smaller margin), else the planned one
+        // gardenFixX = odometry - real: a real position X is odometry X + gardenFixX (2026-11-15 practice
+        // field: subtracting it moved John off the wall by twice the error, 0.9-2.1")
         DoubleSupplier angledX = () -> gardenTouched
-                ? AUDIENCE_WALL_X - extentX(runHeading) - GARDEN_TOUCHED_GAP_IN - gardenFixX : runX;
+                ? AUDIENCE_WALL_X - extentX(runHeading) - GARDEN_TOUCHED_GAP_IN + gardenFixX : runX;
         DoubleSupplier squareX = () -> gardenTouched
-                ? AUDIENCE_WALL_X - extentX(heading) - GARDEN_TOUCHED_GAP_IN - gardenFixX : wallX;
+                ? AUDIENCE_WALL_X - extentX(heading) - GARDEN_TOUCHED_GAP_IN + gardenFixX : wallX;
         logEvent(String.format(Locale.US, "garden: wall at x %.1f (run x %.1f at %.0f deg), slow from y %.1f to %.1f "
-                        + "at %.0f in/s, turning back to 90%s", wallX, runX, 90.0 + GARDEN_ANGLE_DEG, touchAt.y(), endY,
+                        + "at %.0f in/s, turning back to 90%s", wallX, runX, 90.0 + GARDEN_ANGLE_DEG, slowY, endY,
                 COLLECT_SPEED_IPS, GARDEN_TOUCH ? "; wall touch first" : ""));
         return sequential(
                 instant(() -> follower.hold(field(turned))),
@@ -859,12 +874,16 @@ public class JohnAuto extends LinearOpMode {
                         waitMs(TURN_TIMEOUT_MS)),
                 watcher.follow("garden: to the wall", () -> around(field(atWall), 0)),
                 intake.start(Intake.Side.A),
-                watcher.follow("garden: along the wall", () -> toward(field(touchAt), true, GARDEN_RUN_SPEED_IPS)),
-                GARDEN_TOUCH ? touchWall(wallX + WALL_GAP, slowY) : instant(() -> { }),
+                GARDEN_TOUCH ? touchWall(wallX + WALL_GAP, slowY + 6.0) : instant(() -> { }),
+                // The fast run along the wall (on the line the tap corrected), to the slow point
+                watcher.follow("garden: along the wall", () -> toward(field(new Pose(gardenTouched
+                        ? AUDIENCE_WALL_X - extentX(heading) - GARDEN_RUN_GAP_IN + gardenFixX : squareRunX,   // 1" off: clear of the creases
+                        Math.min(follower.pose() == null ? here.y() : red(follower.pose()).y(), slowY), heading)), true,
+                        GARDEN_RUN_SPEED_IPS)),
                 // Angle onto the run line (shifted by the touch), then creep through the balls
-                instant(() -> follower.hold(field(new Pose(angledX.getAsDouble(), Math.min(touchAt.y(), slowY), runHeading)))),
+                instant(() -> follower.hold(field(new Pose(angledX.getAsDouble(), slowY, runHeading)))),
                 race(waitUntil(() -> {
-                            Pose g = field(new Pose(angledX.getAsDouble(), Math.min(touchAt.y(), slowY), runHeading));
+                            Pose g = field(new Pose(angledX.getAsDouble(), slowY, runHeading));
                             Pose p = follower.pose();
                             return Math.hypot(p.x() - g.x(), p.y() - g.y()) <= 0.75
                                     && Math.abs(normalize(g.heading() - p.heading())) <= Math.toRadians(TURN_TOLERANCE_DEG);
@@ -1143,7 +1162,7 @@ public class JohnAuto extends LinearOpMode {
                             gardenFixX = fix;
                             gardenTouched = true;
                             logEvent(String.format(Locale.US, "garden: wall touch at odometry x %.1f (wall says %.1f): "
-                                    + "GARDEN targets shifted %+.1f in", odomX, touchX, -fix));
+                                    + "GARDEN targets shifted %+.1f in", odomX, touchX, fix));
                         } else {
                             gardenFixX = 0.0;
                             logEvent(String.format(Locale.US, "garden: wall touch not used (%s, odometry x %.1f, wall says "
@@ -1157,7 +1176,10 @@ public class JohnAuto extends LinearOpMode {
                     // Diagonal: forward toward the red wall (intake A leads: robot -X) and toward the camera
                     // side (robot -Y = the audience wall at 90 red), the heading held
                     double hErr = normalize(heading[0] - p.heading());
-                    follower.manual(new DrivePowers(-GARDEN_TOUCH_FORWARD, -GARDEN_TOUCH_POWER,
+                    // Full push until moving sideways, then hold GARDEN_TOUCH_SIDE_IPS (a tap, not a hit)
+                    double side = sideways < 1.0 ? GARDEN_TOUCH_POWER : Math.max(GARDEN_TOUCH_MIN_POWER,
+                            Math.min(GARDEN_TOUCH_POWER, GARDEN_TOUCH_POWER - 0.04 * (sideways - GARDEN_TOUCH_SIDE_IPS) - 0.1));
+                    follower.manual(new DrivePowers(-GARDEN_TOUCH_FORWARD, -side,
                             Math.max(-0.3, Math.min(0.3, 1.5 * hErr))));
                 })
                 .setDone(() -> done[0]);
