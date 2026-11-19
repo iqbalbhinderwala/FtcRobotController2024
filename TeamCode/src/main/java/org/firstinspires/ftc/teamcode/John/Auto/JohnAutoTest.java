@@ -8,10 +8,9 @@ import org.firstinspires.ftc.teamcode.John.Hardware.Shooter;
  * select it on the Driver Station, no rebuild). Each variant sets its values for its own run only
  * and puts the competition defaults back afterwards (the values are static and outlive an OpMode).
  *
- *  - [John] Auto TEST square (JohnAutoTestSquare): the GARDEN square (0 deg) with the diagonal wall touch, one back-off
- *    and second push on a stall, and the gradual flywheel raise for volley 2 (ball 2 waits less).
- *  (A 15 deg variant was dropped on 2026-11-15: at the practice field the angled corner stalled
- *  against the wall.)
+ * No variants now: TEST square (wall touch, volley-2 ramp) ran all six day-2 matches (2026-11-15)
+ * and became the default of [John] Auto. The 15 deg variant was dropped: at the practice field the
+ * angled corner stalled against the wall. Add a subclass here for the next untested feature.
  *
  * The variant is the first event in the log ("variant: ...").
  */
@@ -44,7 +43,6 @@ public abstract class JohnAutoTest extends JohnAuto {
         GARDEN_ANGLE_DEG = angleDeg;
         GARDEN_TOUCH = true;
         GARDEN_END_RETRIES = 0;   // the back-off cost 2 s and gained nothing (r1149): off
-        Shooter.PRESPIN_RAMP_RPM_PER_S = 150;
         VARIANT = name;
     }
 }

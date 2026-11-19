@@ -165,8 +165,7 @@ public class JohnAuto extends LinearOpMode {
      * 0 = the old square approach (r1085 picked up 3 of 4, maybe missing the last one).
      */
     /**
-     * 0 for the competition (2026-11-15): the angled approach is untested in its current form; the
-     * [John] Auto TEST OpModes (JohnAutoTest) run it.
+     * 0 (2026-11-15): at the practice field the 15 deg corner stalled against the wall; square it is.
      */
     public static double GARDEN_ANGLE_DEG = 0.0;
     /**
@@ -176,7 +175,7 @@ public class JohnAuto extends LinearOpMode {
      * angled run line and the end), so the leading corner runs the planned gap from the real wall.
      * The odometry itself is not changed. 2026-11-14: the real gap varied by 1-2".
      */
-    public static boolean GARDEN_TOUCH = false;   // untested: off for the competition (JohnAutoTest runs it)
+    public static boolean GARDEN_TOUCH = true;   // on since 2026-11-15: all six day-2 matches ran it (TEST square)
     /**
      * The touch drives diagonally: forward toward the balls (GARDEN_TOUCH_FORWARD) and sideways into
      * the wall (GARDEN_TOUCH_POWER). On mecanum a diagonal grips far better than a pure strafe (John v2
@@ -213,15 +212,20 @@ public class JohnAuto extends LinearOpMode {
     public static double GARDEN_TOUCH_GRACE_MS = 250;
     /** Stalled this close to the collect's end (which lies past the red wall): back off and push again. */
     public static double GARDEN_NEAR_END_IN = 7.0;
-    public static int GARDEN_END_RETRIES = 0;   // the back-off is untested: 0 for the competition (JohnAutoTest: 1)
+    public static int GARDEN_END_RETRIES = 0;   // the back-off cost 2 s and gained nothing (r1149): off
     /**
      * The turn back to 90 is complete this far before the collect's end (which lies past the red wall).
      * 8 (was 4): r1135 reached the last two balls, stacked along the wall into the corner, still at
      * 98 deg; the corner pinned them instead of the intake face taking them.
      */
     public static double GARDEN_TURN_DONE_BEFORE_IN = 8.0;
+    /**
+     * Shooter.PRESPIN_RAMP_RPM_PER_S during Auto (volley 2 raised gradually, ball 2 waits less); put
+     * back when Auto ends, so TeleOp keeps the instant raise. Run in all six day-2 matches.
+     */
+    public static double AUTO_PRESPIN_RAMP_RPM_PER_S = 150;
     /** Which settings this run uses ("competition", or a JohnAutoTest variant): in the start event. */
-    public static String VARIANT = "competition";
+    public static String VARIANT = "competition (square, wall touch, volley-2 ramp)";
     /**
      * Park: partly inside the red LOADING ZONE (A5: X -48 to -24, Y -72 to -60.4), camera wall on the
      * wall, never driving through it (a partner may be in it). John comes in from the end nearer his
@@ -383,6 +387,16 @@ public class JohnAuto extends LinearOpMode {
 
     @Override
     public void runOpMode() {
+        double ramp = Shooter.PRESPIN_RAMP_RPM_PER_S;
+        try {
+            Shooter.PRESPIN_RAMP_RPM_PER_S = AUTO_PRESPIN_RAMP_RPM_PER_S;
+            runAuto();
+        } finally {
+            Shooter.PRESPIN_RAMP_RPM_PER_S = ramp;
+        }
+    }
+
+    private void runAuto() {
         FtcDashboard dashboard = FtcDashboard.getInstance();
         telemetry = new MultipleTelemetry(telemetry, dashboard.getTelemetry());
 

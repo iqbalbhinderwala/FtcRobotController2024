@@ -92,7 +92,7 @@ public class Shooter {
      * waited up to 1.1 s for the firing window (Auto r1134). Ball 1 fires as before (within the
      * tolerance under the target). Lowering is immediate.
      */
-    public static double PRESPIN_RAMP_RPM_PER_S = 1e9;   // off (instant, as tested) for the competition; JohnAutoTest: 150
+    public static double PRESPIN_RAMP_RPM_PER_S = 1e9;   // off (instant) in TeleOp; JohnAuto sets AUTO_PRESPIN_RAMP_RPM_PER_S (150) for its run
     public static double TOLERANCE_NEAR_IN = 52;
     public static double TOLERANCE_FAR_IN = 60;
     /**
