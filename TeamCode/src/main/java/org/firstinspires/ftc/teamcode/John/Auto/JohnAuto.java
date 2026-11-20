@@ -256,6 +256,23 @@ public class JohnAuto extends LinearOpMode {
      */
     public static int SHOT2_RETRIES = 0;
     /**
+     * Shooting spots keep John (any heading: half his diagonal, 12.1") this far plus
+     * SHOT_SPOT_WALL_GAP_IN off our alliance wall: robots park along it (the LOADING ZONE, the
+     * corners), up to 18" deep. Match 4 of 2026-11-15 (r1173): the spot (50.2, 46.2) was on the
+     * E / F seam in the corner, the partner parked in F1 blocked it; a spot inside row E (center
+     * Y <= 39) was in range too.
+     */
+    public static double SHOT_SPOT_WALL_KEEPOUT_IN = 18.0;
+    public static double SHOT_SPOT_WALL_GAP_IN = 2.0;
+    /**
+     * Blocked on the way to the shot-2 spot and out of range: the robot in the way is taken to be
+     * SHOT2_OBSTACLE_AHEAD_IN ahead of John along his way, and he tries once more for the nearest
+     * spot whose center is SHOT2_OBSTACLE_CLEAR_IN from it (its half 9" + John's half diagonal
+     * 12.1" + 3"). Blocked again or out of range: he keeps the balls.
+     */
+    public static double SHOT2_OBSTACLE_AHEAD_IN = 18.0;
+    public static double SHOT2_OBSTACLE_CLEAR_IN = 24.0;
+    /**
      * The drive to the park approach is blocked: drive at once to the LOADING ZONE's other end, no
      * retry of the same way (match 4, r1173: the far-end approach was in F1, where the partner had
      * parked; two retries into it and Auto ended unparked). A robot parked next to the zone can only
@@ -1026,7 +1043,10 @@ public class JohnAuto extends LinearOpMode {
             logEvent("shot 2: already in range of the " + tracker.upCellName() + " CELL");
             return instant(() -> { });
         }
-        Pose spot = ShootingZone.nearestSpot(here, t[0], t[1], audience, !blue);
+        Pose spot = ShootingZone.nearestSpot(here, t[0], t[1], audience, !blue, true, this::offOurWall);
+        if (spot == null) {   // nothing clear of the wall strip: any spot
+            spot = ShootingZone.nearestSpot(here, t[0], t[1], audience, !blue);
+        }
         if (spot == null) {
             logEvent("shot 2: " + problem + ", and no spot in range on the field");
             return instant(() -> { });
@@ -1036,12 +1056,44 @@ public class JohnAuto extends LinearOpMode {
                 Drawing.format(goal)));
         return sequential(
                 instant(() -> spinGoal = goal),   // the main loop spins up SPIN_LEAD_S before the end
-                watcher.follow("to shot 2", () -> aimedRoute(goal), SHOT2_RETRIES, () -> {
+                watcher.follow("to shot 2", () -> aimedRoute(goal), SHOT2_RETRIES, this::inShotRange),
+                lazy(() -> {
+                    if (!watcher.gaveUp() || inShotRange()) {
+                        return instant(() -> { });
+                    }
+                    // Blocked out of range: once more, for a spot clear of the robot in the way
                     Pose p = follower.pose();
+                    double dx = goal.x() - p.x(), dy = goal.y() - p.y(), d = Math.max(1e-6, Math.hypot(dx, dy));
+                    double ox = p.x() + dx / d * SHOT2_OBSTACLE_AHEAD_IN, oy = p.y() + dy / d * SHOT2_OBSTACLE_AHEAD_IN;
                     double[] c = tracker.target();
-                    return ShootingZone.problem(p.x(), p.y(), c[0], c[1], tracker.upAudience(),
-                            SHOT2_BLOCKED_TOLERANCE_IN, SHOT2_BLOCKED_TOLERANCE_DEG) == null;
+                    Pose alt = ShootingZone.nearestSpot(p, c[0], c[1], tracker.upAudience(), !blue, true,
+                            (x, y) -> offOurWall(x, y) && Math.hypot(x - ox, y - oy) >= SHOT2_OBSTACLE_CLEAR_IN);
+                    if (alt == null) {
+                        return instant(() -> logEvent(String.format(Locale.US,
+                                "shot 2: no other spot in range clear of the robot at about (%.1f, %.1f)", ox, oy)));
+                    }
+                    Pose altGoal = alt.withHeading(aimer.aimHeading(alt));
+                    logEvent(String.format(Locale.US, "shot 2: blocked; a robot at about (%.1f, %.1f): trying %s",
+                            ox, oy, Drawing.format(altGoal)));
+                    return sequential(
+                            instant(() -> spinGoal = altGoal),
+                            watcher.follow("to shot 2 (another spot)", () -> aimedRoute(altGoal), 0, this::inShotRange));
                 }));
+    }
+
+    /** In range of the up CELL from where John is, with the SHOT2_BLOCKED_TOLERANCE_* tolerance. */
+    private boolean inShotRange() {
+        Pose p = follower.pose();
+        double[] c = tracker.target();
+        return ShootingZone.problem(p.x(), p.y(), c[0], c[1], tracker.upAudience(),
+                SHOT2_BLOCKED_TOLERANCE_IN, SHOT2_BLOCKED_TOLERANCE_DEG) == null;
+    }
+
+    /** A spot (field frame) that keeps John clear of the parking strip along our alliance wall. */
+    private boolean offOurWall(double x, double y) {
+        double halfDiag = Math.hypot(RobotGeometry.LENGTH_IN, RobotGeometry.WIDTH_IN) / 2.0;
+        double fromWall = FieldGeometry.WALL - (blue ? y : -y);
+        return fromWall >= SHOT_SPOT_WALL_KEEPOUT_IN + halfDiag + SHOT_SPOT_WALL_GAP_IN;
     }
 
     /**
@@ -1480,7 +1532,10 @@ public class JohnAuto extends LinearOpMode {
         if (ShootingZone.problem(here.x(), here.y(), t[0], t[1], tracker.upAudience()) == null) {
             return here;
         }
-        Pose spot = ShootingZone.nearestSpot(here, t[0], t[1], tracker.upAudience(), !blue);
+        Pose spot = ShootingZone.nearestSpot(here, t[0], t[1], tracker.upAudience(), !blue, true, this::offOurWall);
+        if (spot == null) {
+            spot = ShootingZone.nearestSpot(here, t[0], t[1], tracker.upAudience(), !blue);
+        }
         return spot == null ? here : spot;
     }
 

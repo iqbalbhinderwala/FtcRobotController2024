@@ -301,7 +301,7 @@ public class JohnTeleOp extends LinearOpMode {
 
     private static final String LOG_HEADER = "t_s,shot,x,y,h_deg,aim_deg,target_x,target_y,target_src,"
             + "distance,rpm_target,rpm,flywheel_mode,indexer_step,tags,up_cell,watchdog,"
-            + "stick_fwd,stick_left,stick_turn,heading_hold_deg,battery_v,cam_x,cam_y,cam_err_in,event";
+            + "stick_fwd,stick_left,stick_turn,heading_hold_deg,battery_v,cam_x,cam_y,cam_err_in,intake,event";
 
     private Follower follower;
     private ForesightConfig foresight;
@@ -561,8 +561,8 @@ public class JohnTeleOp extends LinearOpMode {
         boolean startUnknown = startFrom == Start.WALL && walls.found(MIN_START_SAMPLES) == null
                 && initVision.size() < MIN_START_SAMPLES && startFix.count() < MIN_START_SAMPLES;
         log.row(0.0, shot, start.x(), start.y(), Math.toDegrees(start.heading()), null, null, null, null, null, null,
-                null, null, null, null, tracker.upCellName(), watchdog.state(), null, null, null,
-                shooter.flywheel().voltage(), null, null, null,
+                null, null, null, null, tracker.upCellName(), watchdog.state(), null, null, null, null,
+                shooter.flywheel().voltage(), null, null, null, intake.status(),
                 String.format(Locale.US, "start %s at %s (%s)%s", red ? "red" : "blue", Drawing.format(start),
                         startFrom == Start.AUTO ? "from the autonomous"
                                 : wallFound != null ? walls.describe(MIN_START_SAMPLES)
@@ -1112,7 +1112,7 @@ public class JohnTeleOp extends LinearOpMode {
                     shooter.flywheel().mode(), shooter.indexer().stepCount(), frame == null ? null : frame.ids(),
                     tracker.upCellName(), state, stickFwd, stickLeft, stickTurn,
                     Double.isNaN(headingHold) ? null : Math.toDegrees(headingHold), shooter.flywheel().voltage(),
-                    cam[0], cam[1], cam[2], event);
+                    cam[0], cam[1], cam[2], intake.status(), event);
         }
         shooter.stop();
         intake.off();

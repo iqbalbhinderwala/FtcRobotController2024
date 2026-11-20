@@ -9,6 +9,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
+import java.util.function.BiPredicate;
 
 /**
  * Where John can shoot from at an up CELL, FTC field coordinates (inches). Distances are from the
@@ -120,6 +121,12 @@ public class ShootingZone {
      */
     public static Pose nearestSpot(Pose from, double cellX, double cellY, boolean audienceCell, boolean red,
                                    boolean ownHalfOnly) {
+        return nearestSpot(from, cellX, cellY, audienceCell, red, ownHalfOnly, null);
+    }
+
+    /** The same, only spots (x, y) that {@code allowed} (may be null) accepts. */
+    public static Pose nearestSpot(Pose from, double cellX, double cellY, boolean audienceCell, boolean red,
+                                   boolean ownHalfOnly, BiPredicate<Double, Double> allowed) {
         double axis = audienceCell ? 0.0 : Math.PI;
         double maxOff = Math.max(0.0, MAX_OFF_AXIS_DEG - MARGIN_DEG);
         Pose best = null;
@@ -130,7 +137,8 @@ public class ShootingZone {
                 double x = cellX + r * Math.cos(a);
                 double y = cellY + r * Math.sin(a);
                 double heading = shootingHeading(x, y, cellX, cellY);
-                if ((ownHalfOnly && (red ? y > 0 : y < 0)) || !onField(x, y, heading)) {
+                if ((ownHalfOnly && (red ? y > 0 : y < 0)) || !onField(x, y, heading)
+                        || (allowed != null && !allowed.test(x, y))) {
                     continue;
                 }
                 double d = Math.hypot(x - from.x(), y - from.y());
